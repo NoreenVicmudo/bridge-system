@@ -1,24 +1,31 @@
 import { useState } from "react";
 import { Link, usePage } from "@inertiajs/react";
 
-export default function Sidebar({ isOpen, onClose }) {
-    const { auth } = usePage().props;
+export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
+    // 1. Get the current URL from Inertia to determine active state
+    const { url } = usePage();
+
+    // Mock user for design
+    const user = { name: "User Name", level: 0 };
     const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-    // Helper to close profile when clicking the overlay
     const closeProfile = () => setIsProfileOpen(false);
 
     return (
         <>
-            {/* 1. Mobile Sidebar Overlay (Closes Sidebar) */}
+            {/* Sidebar Overlay (Veil) */}
             <div
                 className={`fixed inset-0 bg-black/50 z-[1001] transition-opacity duration-300 ${
                     isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+                } ${
+                    // If alwaysOverlay is true (Main Page), show on all screens.
+                    // If false (Student Info), hide on Desktop (md:hidden).
+                    alwaysOverlay ? "" : "md:hidden"
                 }`}
                 onClick={onClose}
             />
 
-            {/* 2. Global Veil (Covers the REST OF THE SCREEN when profile is open) */}
+            {/* Global Profile Veil */}
             <div
                 className={`fixed inset-0 bg-black/50 z-[1003] transition-opacity duration-300 ${
                     isProfileOpen
@@ -30,11 +37,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {/* Sidebar Container */}
             <aside
-                className={`fixed top-0 left-0 h-full w-[260px] bg-[#5c297c] text-white shadow-2xl flex flex-col transform transition-all duration-300 ease-in-out ${
+                className={`fixed top-0 left-0 h-full w-[260px] bg-[#5c297c] text-white shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${
                     isOpen ? "translate-x-0" : "-translate-x-full"
                 } ${isProfileOpen ? "z-[1005]" : "z-[1002]"}`}
             >
-                {/* 3. Internal Veil (Covers SIDEBAR LINKS when profile is open) */}
+                {/* Internal Profile Veil */}
                 <div
                     className={`absolute inset-0 bg-black/50 z-20 transition-opacity duration-300 ${
                         isProfileOpen
@@ -51,12 +58,9 @@ export default function Sidebar({ isOpen, onClose }) {
                         alt="Logo"
                         className="h-10 w-auto"
                     />
-
-                    {/* Double Chevron Toggle Arrow */}
                     <button
                         onClick={onClose}
                         className="text-white/70 hover:text-[#ffb736] transition-colors p-1 rounded focus:outline-none"
-                        title="Collapse Menu"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -67,7 +71,7 @@ export default function Sidebar({ isOpen, onClose }) {
                         >
                             <path
                                 fillRule="evenodd"
-                                d="M8.354 1.646a.5.5 0 0 1 0 .708L2.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"
+                                d="M8.354 1.646a.5.5 0 0 1 0 .708L2.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"
                             />
                             <path
                                 fillRule="evenodd"
@@ -77,16 +81,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     </button>
                 </div>
 
-                {/* MENU ITEMS */}
+                {/* NAV ITEMS */}
                 <nav className="relative z-10 flex-1 overflow-y-auto py-4 px-3 space-y-1">
-                    <SidebarLink href="/" active={route().current("main")}>
+                    {/* HOME: Active if URL is exactly '/' or '/main' */}
+                    <SidebarLink
+                        href="/main"
+                        active={url === "/main" || url === "/main"}
+                    >
                         <i className="bi bi-house-door text-lg"></i>
                         <span>Home</span>
                     </SidebarLink>
 
+                    {/* STUDENT INFO: Active if URL starts with '/student-info' */}
                     <SidebarLink
-                        href="/student-info"
-                        active={route().current("student.*")}
+                        href="/student-info-filter"
+                        active={url.startsWith("/student-info-filter")}
                     >
                         <svg
                             className="w-5 h-5"
@@ -101,10 +110,14 @@ export default function Sidebar({ isOpen, onClose }) {
                                 d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
                             ></path>
                         </svg>
-                        <span>Student Info</span>
+                        <span>Student Information</span>
                     </SidebarLink>
 
-                    <SidebarLink href="/academic-profile">
+                    {/* ACADEMIC PROFILE */}
+                    <SidebarLink
+                        href="/academic-profile-filter"
+                        active={url.startsWith("/academic-profile-filter")}
+                    >
                         <svg
                             className="w-5 h-5"
                             fill="none"
@@ -121,7 +134,11 @@ export default function Sidebar({ isOpen, onClose }) {
                         <span>Academic Profile</span>
                     </SidebarLink>
 
-                    <SidebarLink href="/program-metrics">
+                    {/* PROGRAM METRICS */}
+                    <SidebarLink
+                        href="/program-metrics-filter"
+                        active={url.startsWith("/program-metrics-filter")}
+                    >
                         <svg
                             className="w-5 h-5"
                             fill="none"
@@ -138,7 +155,11 @@ export default function Sidebar({ isOpen, onClose }) {
                         <span>Program Metrics</span>
                     </SidebarLink>
 
-                    <SidebarLink href="/generate-report">
+                    {/* GENERATE REPORT */}
+                    <SidebarLink
+                        href="/report-generation-filter"
+                        active={url.startsWith("/report-generation-filter")}
+                    >
                         <svg
                             className="w-5 h-5"
                             fill="none"
@@ -155,7 +176,11 @@ export default function Sidebar({ isOpen, onClose }) {
                         <span>Generate Report</span>
                     </SidebarLink>
 
-                    <SidebarLink href="/student-information-entry">
+                    {/* ADDITIONAL ENTRY */}
+                    <SidebarLink
+                        href="/student-information-entry"
+                        active={url.startsWith("/student-information-entry")}
+                    >
                         <svg
                             className="w-5 h-5"
                             fill="none"
@@ -172,12 +197,15 @@ export default function Sidebar({ isOpen, onClose }) {
                         <span>Additional Entry</span>
                     </SidebarLink>
 
-                    {/* Management Section (Unconditionally Visible) */}
                     <div className="pt-4 pb-2 px-3 text-xs font-bold text-[#ffb736] uppercase tracking-wider">
                         Management
                     </div>
 
-                    <SidebarLink href="/transaction-logs">
+                    {/* TRANSACTION LOGS */}
+                    <SidebarLink
+                        href="/transaction-logs"
+                        active={url.startsWith("/transaction-logs")}
+                    >
                         <svg
                             className="w-5 h-5"
                             fill="none"
@@ -194,7 +222,11 @@ export default function Sidebar({ isOpen, onClose }) {
                         <span>Transaction Logs</span>
                     </SidebarLink>
 
-                    <SidebarLink href="/users">
+                    {/* MANAGE USERS */}
+                    <SidebarLink
+                        href="/users"
+                        active={url.startsWith("/users")}
+                    >
                         <svg
                             className="w-5 h-5"
                             fill="none"
@@ -218,53 +250,32 @@ export default function Sidebar({ isOpen, onClose }) {
                     </SidebarLink>
                 </nav>
 
-                {/* 4. PROFILE SECTION (Z-30 to sit above Internal Veil) */}
+                {/* PROFILE SECTION */}
                 <div className="relative z-30 border-t border-white/10 p-4 bg-[#5c297c]">
-                    {/* Drop-up Menu */}
                     <div
-                        className={`
-                        absolute bottom-full left-4 right-4 mb-2 
-                        bg-[#6b358e] rounded-lg shadow-xl overflow-hidden border border-white/10
-                        transform transition-all duration-300 ease-out origin-bottom
-                        ${
-                            isProfileOpen
-                                ? "translate-y-0 opacity-100 scale-100 delay-75"
-                                : "translate-y-4 opacity-0 scale-95 pointer-events-none"
-                        }
-                    `}
+                        className={`absolute bottom-full left-4 right-4 mb-2 bg-[#6b358e] rounded-lg shadow-xl overflow-hidden border border-white/10 transform transition-all duration-300 ease-out origin-bottom ${isProfileOpen ? "translate-y-0 opacity-100 scale-100 delay-75" : "translate-y-4 opacity-0 scale-95 pointer-events-none"}`}
                     >
-                        <Link
-                            href={route("logout")}
-                            method="post"
-                            as="button"
-                            className="w-full text-left px-4 py-3 text-sm text-white hover:bg-[#ffb736] hover:text-[#5c297c] transition-colors flex items-center gap-2"
-                        >
+                        <button className="w-full text-left px-4 py-3 text-sm text-white hover:bg-[#ffb736] hover:text-[#5c297c] transition-colors flex items-center gap-2">
                             <i className="bi bi-box-arrow-right"></i> Logout
-                        </Link>
+                        </button>
                     </div>
-
-                    {/* Profile Trigger Button */}
                     <button
                         onClick={() => setIsProfileOpen(!isProfileOpen)}
                         className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none relative"
                     >
                         <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold shrink-0 border border-white/30">
-                            {auth.user?.name.charAt(0)}
+                            {user.name.charAt(0)}
                         </div>
-
                         <div className="text-left flex-1 min-w-0">
                             <div className="text-sm font-bold truncate">
-                                {auth.user?.name}
+                                {user.name}
                             </div>
                             <div className="text-xs text-white/60 truncate">
-                                {auth.user?.level === 0 ? "Admin" : "User"}
+                                {user.level === 0 ? "Admin" : "User"}
                             </div>
                         </div>
-
                         <svg
-                            className={`w-4 h-4 text-white/50 transition-transform duration-300 ${
-                                isProfileOpen ? "rotate-180" : ""
-                            }`}
+                            className={`w-4 h-4 text-white/50 transition-transform duration-300 ${isProfileOpen ? "rotate-180" : ""}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -287,11 +298,7 @@ function SidebarLink({ href, active, children }) {
     return (
         <Link
             href={href}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${
-                active
-                    ? "bg-[#ffb736] text-[#5c297c] shadow-md"
-                    : "hover:bg-white/10 text-white/90"
-            }`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${active ? "bg-[#ffb736] text-[#5c297c] shadow-md" : "hover:bg-white/10 text-white/90"}`}
         >
             {children}
         </Link>

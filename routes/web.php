@@ -24,11 +24,61 @@ Route::get('/main', function () {
     return Inertia::render('Main');
 })->name('main');
 
-/* upon connecting but in the mean time use main to navigate
-Route::get('/main', function () {
-    return Inertia::render('Main');
-})->middleware(['auth', 'verified'])->name('main');
-*/
+Route::get('/student-info-filter', function () {
+        return Inertia::render('Student/StudentInfoFilter'); 
+    })->name('student.info.filter');
+
+Route::get('/academic-profile-filter', function () {
+    return Inertia::render('Academic/AcademicProfileFilter'); 
+})->name('academic.profile.filter');
+
+Route::get('/program-metrics-filter', function () {
+    return Inertia::render('Program/ProgramMetricsFilter'); 
+})->name('program.metrics.filter');
+
+Route::get('/report-generation-filter', function () {
+    return Inertia::render('Reports/ReportGenerationFilter'); 
+})->name('report.generation.filter');
+
+Route::get('/student-masterlist', function () {
+    return Inertia::render('Student/StudentMasterlist'); 
+})->name('student.masterlist');
+
+Route::get('/student-information', function () {
+    return Inertia::render('Student/StudentInfo'); 
+})->name('student.information');
+
+Route::get('/student-information', function () {
+    return Inertia::render('Student/StudentInfo'); 
+})->name('student.information');
+
+Route::get('/gwa-info', function () {
+    return Inertia::render('Academic/GWAInfo'); 
+})->name('gwa.info');
+
+Route::get('/board-subject-grades', function () {
+    return Inertia::render('Academic/BoardSubjectGrades'); 
+})->name('board.subject.grades');
+
+Route::get('/retakes-info', function () {
+    return Inertia::render('Academic/RetakesInfo'); 
+})->name('retakes.info');
+
+Route::get('/performance-rating', function () {
+    return Inertia::render('Academic/PerformanceRating'); 
+})->name('performance.rating');
+
+Route::get('/simulation-exam', function () {
+    return Inertia::render('Academic/SimulationExam'); 
+})->name('simulation.exam');
+
+Route::get('/review-attendance', function () {
+    return Inertia::render('Academic/ReviewAttendance'); 
+})->name('review.attendance');
+
+Route::get('/academic-recognition', function () {
+    return Inertia::render('Academic/AcademicRecognition'); 
+})->name('academic.recognition');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

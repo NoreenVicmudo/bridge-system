@@ -1,11 +1,13 @@
-import { useRef, useLayoutEffect, useState } from "react";
+import { useRef, useLayoutEffect } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Link } from "@inertiajs/react";
 
 export default function Main({ auth }) {
     return (
-        <AuthenticatedLayout>
-            {/* --- HERO SECTION (Unchanged) --- */}
+        // FIX: Add defaultCollapsed={true} here!
+        // This forces the sidebar to stay closed when you visit the Main Page.
+        <AuthenticatedLayout defaultCollapsed={true}>
+            {/* --- HERO SECTION --- */}
             <section className="relative h-[80vh] w-full overflow-hidden">
                 <div className="absolute inset-0 bg-[url('main.webp')] bg-cover bg-center bg-fixed">
                     <div className="absolute inset-0 bg-black/50"></div>
@@ -20,20 +22,15 @@ export default function Main({ auth }) {
             </section>
 
             {/* --- MODULES SECTION --- */}
-            <section className="relative py-20 px-6 bg-white overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(#ccc_1px,transparent_1px)] [background-size:20px_20px] opacity-70"></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-white via-white/50 to-transparent pointer-events-none"></div>
-
+            <section className="relative py-20 px-6 overflow-hidden">
                 <div className="relative z-10 max-w-7xl mx-auto">
-                    {/* CHANGED: Used Flexbox with justify-center to center the last row elements */}
                     <div className="flex flex-wrap justify-center gap-6">
-                        {/* 1. Student Information */}
+                        {/* Your Module Cards... */}
                         <ModuleCard
                             href="/student-info"
                             title="Student Information"
                             desc="Access comprehensive student data and records"
                         >
-                            {/* Icon: User Graduate */}
                             <svg
                                 className="w-8 h-8"
                                 fill="currentColor"
@@ -42,14 +39,11 @@ export default function Main({ auth }) {
                                 <path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z" />
                             </svg>
                         </ModuleCard>
-
-                        {/* 2. Academic Profile */}
                         <ModuleCard
                             href="/academic-profile"
                             title="Academic Profile"
                             desc="Access student academic performance metrics"
                         >
-                            {/* Icon: Book */}
                             <svg
                                 className="w-8 h-8"
                                 fill="currentColor"
@@ -58,14 +52,11 @@ export default function Main({ auth }) {
                                 <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z" />
                             </svg>
                         </ModuleCard>
-
-                        {/* 3. Program Metrics */}
                         <ModuleCard
                             href="/program-metrics"
                             title="Program Metrics"
                             desc="Analyze student board preparations"
                         >
-                            {/* Icon: Chart Line */}
                             <svg
                                 className="w-8 h-8"
                                 fill="currentColor"
@@ -74,14 +65,11 @@ export default function Main({ auth }) {
                                 <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z" />
                             </svg>
                         </ModuleCard>
-
-                        {/* 4. Generate Reports */}
                         <ModuleCard
                             href="/reports"
                             title="Generate Reports"
                             desc="Create detailed reports and analytics"
                         >
-                            {/* Icon: File Alt */}
                             <svg
                                 className="w-8 h-8"
                                 fill="currentColor"
@@ -90,14 +78,11 @@ export default function Main({ auth }) {
                                 <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
                             </svg>
                         </ModuleCard>
-
-                        {/* 5. User Management */}
                         <ModuleCard
                             href="/users"
                             title="User Management"
                             desc="Manage user accounts and permissions"
                         >
-                            {/* Icon: Tools */}
                             <svg
                                 className="w-8 h-8"
                                 fill="currentColor"
@@ -106,14 +91,11 @@ export default function Main({ auth }) {
                                 <path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z" />
                             </svg>
                         </ModuleCard>
-
-                        {/* 6. Additional Entry */}
                         <ModuleCard
                             href="/student-entry"
                             title="Additional Entry"
                             desc="Add new data and information"
                         >
-                            {/* Icon: Plus */}
                             <svg
                                 className="w-8 h-8"
                                 fill="currentColor"
@@ -122,14 +104,11 @@ export default function Main({ auth }) {
                                 <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                             </svg>
                         </ModuleCard>
-
-                        {/* 7. Transaction Logs */}
                         <ModuleCard
                             href="/transaction-logs"
                             title="Transaction Logs"
                             desc="Track system activities and changes"
                         >
-                            {/* Icon: Book Open */}
                             <svg
                                 className="w-8 h-8"
                                 fill="currentColor"
@@ -145,18 +124,15 @@ export default function Main({ auth }) {
     );
 }
 
-// --- Header Component (Unchanged) ---
+// ... Keep SameWidthHeader and ModuleCard unchanged ...
 function SameWidthHeader() {
     const bridgeRef = useRef(null);
     const line1Ref = useRef(null);
     const line2Ref = useRef(null);
-
     const adjustWidths = () => {
         if (!bridgeRef.current || !line1Ref.current || !line2Ref.current)
             return;
-
         const targetWidth = bridgeRef.current.getBoundingClientRect().width;
-
         const scaleLine = (element) => {
             element.style.transform = "none";
             element.style.width = "max-content";
@@ -165,11 +141,9 @@ function SameWidthHeader() {
             element.style.transformOrigin = "right center";
             element.style.transform = `scale(${scaleFactor})`;
         };
-
         scaleLine(line1Ref.current);
         scaleLine(line2Ref.current);
     };
-
     useLayoutEffect(() => {
         adjustWidths();
         window.addEventListener("resize", adjustWidths);
@@ -179,7 +153,6 @@ function SameWidthHeader() {
             clearTimeout(timeoutId);
         };
     }, []);
-
     return (
         <div className="flex flex-col items-end w-full max-w-full">
             <h1
@@ -208,14 +181,10 @@ function SameWidthHeader() {
     );
 }
 
-// --- Updated Module Card ---
-// Now accepts 'children' for the SVG Icon and handles width for Flexbox centering
 function ModuleCard({ href, children, title, desc }) {
     return (
         <Link
             href={href}
-            // w-72 sets a fixed width so they look uniform in the centered flex layout
-            // grow-0 ensures they don't stretch weirdly
             className="group relative bg-white border border-gray-100 rounded-2xl p-8 flex flex-col items-center text-center shadow-[0_4px_6px_rgba(0,0,0,0.05)] hover:shadow-[0_15px_30px_rgba(92,41,124,0.15)] hover:-translate-y-2 transition-all duration-300 w-full sm:w-72 md:w-80"
         >
             <div className="w-20 h-20 rounded-full bg-[#5c297c] group-hover:bg-[#ffb736] group-hover:scale-110 flex items-center justify-center mb-6 transition-all duration-300 text-white">
