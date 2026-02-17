@@ -2,24 +2,76 @@ import React, { useState, useEffect } from "react";
 import { router } from "@inertiajs/react";
 import CustomSelectGroup from "@/Components/SelectGroup";
 
-export default function ChangeMetricModal({ isOpen, onClose, currentMetric }) {
+export default function ChangeMetricModal({
+    isOpen,
+    onClose,
+    currentMetric,
+    type = "academic",
+}) {
     const [selectedMetric, setSelectedMetric] = useState("");
     const [animate, setAnimate] = useState(false);
 
-    const METRICS = [
-        { label: "GWA", value: "GWA", url: "/academic-profile/gwa" },
-        { label: "Grades in Board Subjects", value: "Grades in Board Subjects", url: "/academic-profile/board-grades" },
-        { label: "Back Subjects/Retakes", value: "Back Subjects/Retakes", url: "/academic-profile/retakes" },
-        { label: "Performance Rating", value: "Performance Rating", url: "/academic-profile/performance" },
-        { label: "Simulation Exam Results", value: "Simulation Exam Results", url: "/academic-profile/mock-exams" },
-        { label: "Attendance in Review Classes", value: "Attendance in Review Classes", url: "/academic-profile/attendance" },
-        { label: "Academic Recognition", value: "Academic Recognition", url: "/academic-profile/recognition" },
+    // --- 1. DEFINE METRIC GROUPS ---
+    const ACADEMIC_METRICS = [
+        { label: "GWA", value: "GWA", url: "/gwa-info" },
+        {
+            label: "Grades in Board Subjects",
+            value: "Grades in Board Subjects",
+            url: "/board-subject-grades",
+        },
+        {
+            label: "Back Subjects/Retakes",
+            value: "Back Subjects/Retakes",
+            url: "/retakes-info",
+        },
+        {
+            label: "Performance Rating",
+            value: "Performance Rating",
+            url: "/performance-rating",
+        },
+        {
+            label: "Simulation Exam Results",
+            value: "Simulation Exam Results",
+            url: "/simulation-exam",
+        },
+        {
+            label: "Attendance in Review Classes",
+            value: "Attendance in Review Classes",
+            url: "/review-attendance",
+        },
+        {
+            label: "Academic Recognition",
+            value: "Academic Recognition",
+            url: "/academic-recognition",
+        },
     ];
+
+    const PROGRAM_METRICS = [
+        {
+            label: "Review Center",
+            value: "Review Center",
+            url: "/review-center",
+        },
+        {
+            label: "Mock Exam Scores",
+            value: "Mock Exam Scores",
+            url: "/mock-board-scores",
+        },
+        {
+            label: "Licensure Exam Results",
+            value: "Licensure Exam Results",
+            url: "/licensure-exam",
+        },
+    ];
+
+    // --- 2. SELECT ACTIVE LIST BASED ON 'type' PROP ---
+    const activeOptions =
+        type === "program" ? PROGRAM_METRICS : ACADEMIC_METRICS;
 
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
-            setSelectedMetric(currentMetric || "GWA");
+            setSelectedMetric(currentMetric || "");
         } else {
             setAnimate(false);
         }
@@ -31,9 +83,8 @@ export default function ChangeMetricModal({ isOpen, onClose, currentMetric }) {
     };
 
     const handleChange = () => {
-        const target = METRICS.find(m => m.value === selectedMetric);
+        const target = activeOptions.find((m) => m.value === selectedMetric);
         if (target) {
-            // console.log("Navigating to:", target.url); // Use for testing
             router.visit(target.url);
             closeModal();
         }
@@ -42,46 +93,55 @@ export default function ChangeMetricModal({ isOpen, onClose, currentMetric }) {
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            
-            <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                
-                {/* Header - Purple Text Only */}
-                <div className="p-6 pb-0 text-center">
-                    <h2 className="text-[26px] font-bold text-[#5c297c] tracking-wide">Change Academic Metric</h2>
+        <div
+            className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}
+        >
+            <div
+                className={`bg-white rounded-2xl w-[90%] max-w-[550px] shadow-2xl relative flex flex-col transition-all duration-300 transform overflow-visible ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+            >
+                {/* Header */}
+                <div className="p-8 pb-4 text-center">
+                    <h2 className="text-[26px] font-bold text-[#5c297c] tracking-wide">
+                        {type === "program"
+                            ? "Change Program Metric"
+                            : "Change Academic Metric"}
+                    </h2>
                 </div>
 
-                {/* Content */}
-                <div className="p-8 pt-6 pb-8">
-                    
-                    {/* FIX: We pass "Select Metric:" directly to the label prop.
-                       This utilizes the internal flex layout of CustomSelectGroup 
-                       so the label is on the left and the box fills the rest of the width.
-                    */}
-                    <div className="w-full">
-                        <CustomSelectGroup 
-                            label="Select Metric:" 
-                            value={selectedMetric} 
+                {/* Content Area */}
+                <div className="px-10 pb-10 pt-2">
+                    <div className="w-full relative z-50">
+                        <CustomSelectGroup
+                            label="Select Metric:"
+                            value={selectedMetric}
                             onChange={(e) => setSelectedMetric(e.target.value)}
-                            options={METRICS}
+                            options={activeOptions}
                             placeholder="Select Metric"
+                            className="mb-0 w-full"
                         />
                     </div>
 
-                    {/* Footer Buttons Centered & Matched Widths */}
-                    <div className="flex justify-center gap-4 mt-8">
-                        <button 
-                            onClick={closeModal} 
+                    {/* Footer Buttons */}
+                    <div className="flex justify-center gap-4 mt-8 relative z-0">
+                        <button
+                            onClick={closeModal}
                             className="w-[120px] py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-[5px] hover:bg-gray-100 transition-all shadow-sm"
                         >
                             Cancel
                         </button>
-                        
-                        <button 
-                            onClick={handleChange} 
-                            className="w-[120px] py-2.5 text-sm font-bold text-white bg-[#5c297c] border border-[#5c297c] rounded-[5px] shadow-md hover:bg-[#4a1f63] transition-all"
+
+                        {/* VIEW BUTTON: Now strictly disabled until selectedMetric has a value */}
+                        <button
+                            onClick={handleChange}
+                            disabled={!selectedMetric}
+                            className={`w-[120px] py-2.5 text-sm font-bold text-white border rounded-[5px] shadow-md transition-all duration-300
+                                ${
+                                    !selectedMetric
+                                        ? "bg-gray-400 border-gray-400 cursor-not-allowed opacity-70"
+                                        : "bg-[#5c297c] border-[#5c297c] hover:bg-[#4a1f63] cursor-pointer"
+                                }`}
                         >
-                            Change
+                            View
                         </button>
                     </div>
                 </div>

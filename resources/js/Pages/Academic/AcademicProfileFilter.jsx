@@ -1,20 +1,17 @@
 import { useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
-// [BACKEND] router is needed for manual GET requests
-// import { router } from "@inertiajs/react"; 
+import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 
-// [BACKEND] This component expects a prop called 'serverOptions' containing all dropdown data.
 export default function AcademicProfileFilter({ serverOptions = null }) {
-    
     // --- 1. USE SERVER DATA OR FALLBACK TO EMPTY ---
     const options = serverOptions || {
         academicYears: [],
         colleges: [],
-        programs: {}, // { "COLLEGE_CODE": [{ label, value }] }
-        years: {},    // { "PROGRAM_CODE": 4 }
-        sections: {}, // { "PROGRAM-YEAR": [{ label, value }] }
-        semesters: []
+        programs: {},
+        years: {},
+        sections: {},
+        semesters: [],
     };
 
     // --- 2. INITIAL STATE ---
@@ -24,10 +21,11 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
         program: "",
         year_level: "",
         semester: "",
-        section: ""
+        section: "",
     };
 
     const [values, setValues] = useState(initialValues);
+    const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
 
     // --- DYNAMIC OPTIONS STATE ---
     const [programOptions, setProgramOptions] = useState([]);
@@ -38,35 +36,26 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
     const handleChange = (field, value) => {
         const newValues = { ...values, [field]: value };
 
-        // [BACKEND NOTE]: This logic assumes 'options.programs' is an object 
-        // mapped by College Code.
         if (field === "college") {
-            // Reset downstream
             newValues.program = "";
             newValues.year_level = "";
             newValues.section = "";
-            
-            // Load Programs for this College
             setProgramOptions(options.programs[value] || []);
             setYearOptions([]);
             setSectionOptions([]);
-        } 
-        else if (field === "program") {
+        } else if (field === "program") {
             newValues.year_level = "";
             newValues.section = "";
-            
-            // Generate Year Levels (1 to N)
             const maxYears = options.years[value] || 4;
-            setYearOptions(Array.from({ length: maxYears }, (_, i) => ({ 
-                value: (i + 1).toString(), 
-                label: (i + 1).toString() 
-            })));
+            setYearOptions(
+                Array.from({ length: maxYears }, (_, i) => ({
+                    value: (i + 1).toString(),
+                    label: (i + 1).toString(),
+                })),
+            );
             setSectionOptions([]);
-        }
-        else if (field === "year_level") {
+        } else if (field === "year_level") {
             newValues.section = "";
-            
-            // Load Sections for Program + Year
             const key = `${newValues.program}-${value}`;
             setSectionOptions(options.sections[key] || []);
         }
@@ -83,26 +72,28 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // [BACKEND] Connect this to your route
-        // router.get(route('academic.profile.submit'), values);
-        console.log("Submitting Values:", values);
+        localStorage.setItem("studentFilterData", JSON.stringify(values));
+        setIsMetricModalOpen(true);
     };
 
-    // Validation: Check if all fields are filled
-    const isFormComplete = values.academic_year && values.college && values.program && values.year_level && values.semester && values.section;
+    // Validation Logic
+    const isFormComplete =
+        values.academic_year &&
+        values.college &&
+        values.program &&
+        values.year_level &&
+        values.semester &&
+        values.section;
 
     return (
         <AuthenticatedLayout>
             <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
                 <div className="w-full max-w-[700px] bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] p-6 md:p-8 flex flex-col animate-fade-in-up">
                     <form onSubmit={handleSubmit}>
-                        
-                        {/* Header */}
                         <h2 className="text-center text-2xl md:text-[28px] font-bold text-[#5c297c] mb-6">
                             Academic Profile Filter
                         </h2>
 
-                        {/* ================= FILTER FORM ================= */}
                         <div className="animate-fade-in">
                             <CustomSelectGroup
                                 label="Academic Year"
@@ -110,14 +101,12 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
                                 onChange={(e) => handleChange("academic_year", e.target.value)}
                                 options={options.academicYears}
                             />
-
                             <CustomSelectGroup
                                 label="College"
                                 value={values.college}
                                 onChange={(e) => handleChange("college", e.target.value)}
                                 options={options.colleges}
                             />
-
                             <CustomSelectGroup
                                 label="Program"
                                 value={values.program}
@@ -126,7 +115,6 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
                                 disabled={!values.college}
                                 placeholder={!values.college ? "Select College first" : "Select Program"}
                             />
-
                             <CustomSelectGroup
                                 label="Year Level"
                                 value={values.year_level}
@@ -135,7 +123,6 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
                                 disabled={!values.program}
                                 placeholder={!values.program ? "Select Program first" : "Select Year"}
                             />
-
                             <CustomSelectGroup
                                 label="Semester"
                                 value={values.semester}
@@ -143,7 +130,6 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
                                 options={options.semesters}
                                 disabled={!values.year_level}
                             />
-
                             <CustomSelectGroup
                                 label="Section"
                                 value={values.section}
@@ -154,9 +140,7 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
                             />
                         </div>
 
-                        {/* ================= BUTTONS ================= */}
                         <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 w-full">
-                            
                             <button
                                 type="button"
                                 onClick={handleClear}
@@ -165,63 +149,28 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
                                 Clear
                             </button>
 
-                            {/* FILTER BUTTON - Only shows when form is complete */}
-                            {isFormComplete && (
-                                <button
-                                    type="submit"
-                                    className="px-6 py-3 bg-[#5c297c] text-white font-medium rounded-md hover:bg-[#ffb736] transition-all duration-300 text-base animate-fade-in"
-                                >
-                                    Filter Students
-                                </button>
-                            )}
+                            {/* ALWAYS VISIBLE BUTTON: Disabled if form is incomplete */}
+                            <button
+                                type="submit"
+                                disabled={!isFormComplete}
+                                className={`px-6 py-3 font-medium rounded-md transition-all duration-300 text-base
+                                    ${isFormComplete 
+                                        ? "bg-[#5c297c] text-white hover:bg-[#ffb736] cursor-pointer" 
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    }`}
+                            >
+                                Filter Students
+                            </button>
                         </div>
                     </form>
                 </div>
             </div>
+
+            <ChangeMetricModal
+                isOpen={isMetricModalOpen}
+                onClose={() => setIsMetricModalOpen(false)}
+                currentMetric=""
+            />
         </AuthenticatedLayout>
     );
 }
-
-/* ==========================================================================
-   [BACKEND DEVELOPER REFERENCE]
-   
-   The component expects a prop `serverOptions` with this structure.
-   
-   const mockData = {
-        academicYears: [
-            { value: "2023-2024", label: "2023-2024" },
-            { value: "2024-2025", label: "2024-2025" }
-        ],
-        semesters: [
-            { value: "1ST", label: "1st Semester" },
-            { value: "2ND", label: "2nd Semester" }
-        ],
-        colleges: [
-            { value: "CAST", label: "College of Arts and Sciences" },
-            { value: "CON", label: "College of Nursing" }
-        ],
-        // Programs are mapped by College Value
-        programs: {
-            "CAST": [
-                { value: "BSIT", label: "BS Information Technology" },
-                { value: "BSCS", label: "BS Computer Science" }
-            ],
-            "CON": [
-                { value: "BSN", label: "BS Nursing" }
-            ]
-        },
-        // Program duration (max years) mapped by Program Value
-        years: {
-            "BSIT": 4, 
-            "BSCS": 4,
-            "BSN": 4
-        },
-        // Sections mapped by "PROGRAM-YEAR" key
-        sections: {
-            "BSIT-1": [{ value: "1A", label: "1A" }, { value: "1B", label: "1B" }],
-            "BSIT-4": [{ value: "4A", label: "4A" }],
-            "BSN-4": [{ value: "4A", label: "4A (Nursing)" }]
-        }
-   };
-   ==========================================================================
-*/

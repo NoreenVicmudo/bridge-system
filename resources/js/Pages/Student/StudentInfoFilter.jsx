@@ -3,18 +3,13 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
 import { Link, router } from "@inertiajs/react";
 
-// [BACKEND] This component expects a prop called 'serverOptions' containing all dropdown data.
 export default function StudentInfoFilter({ serverOptions = null }) {
-    // --- 1. USE SERVER DATA OR FALLBACK TO EMPTY ---
-    // If backend hasn't connected yet, we use empty arrays to prevent crashes.
-    // The backend dev can uncomment the 'mockData' at the bottom of this file
-    // and pass it in to test the UI.
     const options = serverOptions || {
         academicYears: [],
         colleges: [],
-        programs: {}, // { "COLLEGE_CODE": [{ label, value }] }
-        years: {}, // { "PROGRAM_CODE": 4 }
-        sections: {}, // { "PROGRAM-YEAR": [{ label, value }] }
+        programs: {}, 
+        years: {}, 
+        sections: {}, 
         semesters: [],
         batches: [],
     };
@@ -35,36 +30,24 @@ export default function StudentInfoFilter({ serverOptions = null }) {
     };
 
     const [values, setValues] = useState(initialValues);
-
-    // --- DYNAMIC OPTIONS STATE ---
     const [programOptions, setProgramOptions] = useState([]);
     const [yearOptions, setYearOptions] = useState([]);
     const [sectionOptions, setSectionOptions] = useState([]);
 
-    // --- CASCADING LOGIC ---
     const handleChange = (field, value) => {
         const newValues = { ...values, [field]: value };
 
-        // [BACKEND NOTE]: This logic assumes 'options.programs' is an object
-        // mapped by College Code. If you prefer to fetch data via API
-        // (e.g. axios.get('/api/programs?college=...')), replace this logic.
-
         if (filterMode === "section") {
             if (field === "college") {
-                // Reset downstream
                 newValues.program = "";
                 newValues.year_level = "";
                 newValues.section = "";
-
-                // Load Programs for this College
                 setProgramOptions(options.programs[value] || []);
                 setYearOptions([]);
                 setSectionOptions([]);
             } else if (field === "program") {
                 newValues.year_level = "";
                 newValues.section = "";
-
-                // Generate Year Levels (1 to N)
                 const maxYears = options.years[value] || 4;
                 setYearOptions(
                     Array.from({ length: maxYears }, (_, i) => ({
@@ -75,8 +58,6 @@ export default function StudentInfoFilter({ serverOptions = null }) {
                 setSectionOptions([]);
             } else if (field === "year_level") {
                 newValues.section = "";
-
-                // Load Sections for Program + Year
                 const key = `${newValues.program}-${value}`;
                 setSectionOptions(options.sections[key] || []);
             }
@@ -99,12 +80,10 @@ export default function StudentInfoFilter({ serverOptions = null }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // [BACKEND] Connect this to your route
-        // router.get(route('student.filter.submit'), values);
         console.log("Submitting Values:", values);
     };
 
-    // Validation
+    // Validation logic
     const isSectionComplete =
         values.academic_year &&
         values.college &&
@@ -112,11 +91,13 @@ export default function StudentInfoFilter({ serverOptions = null }) {
         values.year_level &&
         values.semester &&
         values.section;
+
     const isBatchComplete =
         values.batch_college &&
         values.batch_program &&
         values.batch_year &&
         values.board_batch;
+
     const isFormComplete =
         filterMode === "section" ? isSectionComplete : isBatchComplete;
 
@@ -133,152 +114,90 @@ export default function StudentInfoFilter({ serverOptions = null }) {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setFilterMode(
-                                        filterMode === "section"
-                                            ? "batch"
-                                            : "section",
-                                    );
+                                    setFilterMode(filterMode === "section" ? "batch" : "section");
                                     handleClear();
                                 }}
                                 className="inline-flex items-center gap-2 bg-white text-[#5c297c] border border-[#5c297c] rounded-full px-4 py-1.5 font-semibold text-sm hover:bg-[#5c297c] hover:text-white transition-all duration-300 shadow-sm group"
                             >
                                 <i className="bi bi-arrow-left-right transition-transform group-hover:rotate-180"></i>
                                 <span>
-                                    {filterMode === "section"
-                                        ? "Switch to Batch Filter"
-                                        : "Switch to Section Filter"}
+                                    {filterMode === "section" ? "Switch to Batch Filter" : "Switch to Section Filter"}
                                 </span>
                             </button>
                         </div>
 
-                        {filterMode === "section" && (
+                        {filterMode === "section" ? (
                             <div className="animate-fade-in">
                                 <CustomSelectGroup
                                     label="Academic Year"
                                     value={values.academic_year}
-                                    onChange={(e) =>
-                                        handleChange(
-                                            "academic_year",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => handleChange("academic_year", e.target.value)}
                                     options={options.academicYears}
                                 />
                                 <CustomSelectGroup
                                     label="College"
                                     value={values.college}
-                                    onChange={(e) =>
-                                        handleChange("college", e.target.value)
-                                    }
+                                    onChange={(e) => handleChange("college", e.target.value)}
                                     options={options.colleges}
                                 />
                                 <CustomSelectGroup
                                     label="Program"
                                     value={values.program}
-                                    onChange={(e) =>
-                                        handleChange("program", e.target.value)
-                                    }
+                                    onChange={(e) => handleChange("program", e.target.value)}
                                     options={programOptions}
                                     disabled={!values.college}
-                                    placeholder={
-                                        !values.college
-                                            ? "Select College first"
-                                            : "Select Program"
-                                    }
+                                    placeholder={!values.college ? "Select College first" : "Select Program"}
                                 />
                                 <CustomSelectGroup
                                     label="Year Level"
                                     value={values.year_level}
-                                    onChange={(e) =>
-                                        handleChange(
-                                            "year_level",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => handleChange("year_level", e.target.value)}
                                     options={yearOptions}
                                     disabled={!values.program}
-                                    placeholder={
-                                        !values.program
-                                            ? "Select Program first"
-                                            : "Select Year"
-                                    }
+                                    placeholder={!values.program ? "Select Program first" : "Select Year"}
                                 />
                                 <CustomSelectGroup
                                     label="Semester"
                                     value={values.semester}
-                                    onChange={(e) =>
-                                        handleChange("semester", e.target.value)
-                                    }
+                                    onChange={(e) => handleChange("semester", e.target.value)}
                                     options={options.semesters}
                                     disabled={!values.year_level}
                                 />
                                 <CustomSelectGroup
                                     label="Section"
                                     value={values.section}
-                                    onChange={(e) =>
-                                        handleChange("section", e.target.value)
-                                    }
+                                    onChange={(e) => handleChange("section", e.target.value)}
                                     options={sectionOptions}
                                     disabled={!values.semester}
-                                    placeholder={
-                                        !values.semester
-                                            ? "Select Semester first"
-                                            : "Select Section"
-                                    }
+                                    placeholder={!values.semester ? "Select Semester first" : "Select Section"}
                                 />
                             </div>
-                        )}
-
-                        {filterMode === "batch" && (
+                        ) : (
                             <div className="animate-fade-in">
                                 <CustomSelectGroup
                                     label="College"
                                     value={values.batch_college}
-                                    onChange={(e) =>
-                                        handleChange(
-                                            "batch_college",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => handleChange("batch_college", e.target.value)}
                                     options={options.colleges}
                                 />
                                 <CustomSelectGroup
                                     label="Program"
                                     value={values.batch_program}
-                                    onChange={(e) =>
-                                        handleChange(
-                                            "batch_program",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => handleChange("batch_program", e.target.value)}
                                     options={programOptions}
                                     disabled={!values.batch_college}
-                                    placeholder={
-                                        !values.batch_college
-                                            ? "Select College first"
-                                            : "Select Program"
-                                    }
+                                    placeholder={!values.batch_college ? "Select College first" : "Select Program"}
                                 />
                                 <CustomSelectGroup
                                     label="Year"
                                     value={values.batch_year}
-                                    onChange={(e) =>
-                                        handleChange(
-                                            "batch_year",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => handleChange("batch_year", e.target.value)}
                                     options={options.batches}
                                 />
                                 <CustomSelectGroup
                                     label="Board Exam Batch"
                                     value={values.board_batch}
-                                    onChange={(e) =>
-                                        handleChange(
-                                            "board_batch",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => handleChange("board_batch", e.target.value)}
                                     options={[
                                         { value: "1", label: "Batch 1" },
                                         { value: "2", label: "Batch 2" },
@@ -301,14 +220,19 @@ export default function StudentInfoFilter({ serverOptions = null }) {
                             >
                                 Clear
                             </button>
-                            {isFormComplete && (
-                                <button
-                                    type="submit"
-                                    className="px-6 py-3 bg-[#5c297c] text-white font-medium rounded-md hover:bg-[#ffb736] transition-all duration-300 text-base animate-fade-in"
-                                >
-                                    Filter Students
-                                </button>
-                            )}
+                            
+                            {/* THE MODIFIED BUTTON: Now always renders but uses 'disabled' prop */}
+                            <button
+                                type="submit"
+                                disabled={!isFormComplete}
+                                className={`px-6 py-3 font-medium rounded-md transition-all duration-300 text-base
+                                    ${isFormComplete 
+                                        ? "bg-[#5c297c] text-white hover:bg-[#ffb736] cursor-pointer" 
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    }`}
+                            >
+                                Filter Students
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -316,52 +240,3 @@ export default function StudentInfoFilter({ serverOptions = null }) {
         </AuthenticatedLayout>
     );
 }
-
-/* ==========================================================================
-   [BACKEND DEVELOPER REFERENCE]
-   
-   The component expects a prop `serverOptions` with this structure.
-   If you pass this structure from the Controller, the frontend logic will work automatically.
-   
-   const mockData = {
-        academicYears: [
-            { value: "2023-2024", label: "2023-2024" },
-            { value: "2024-2025", label: "2024-2025" }
-        ],
-        semesters: [
-            { value: "1ST", label: "1st Semester" },
-            { value: "2ND", label: "2nd Semester" }
-        ],
-        batches: [
-             { value: "2026", label: "2026" },
-             { value: "2027", label: "2027" }
-        ],
-        colleges: [
-            { value: "CAST", label: "College of Arts and Sciences" },
-            { value: "CON", label: "College of Nursing" }
-        ],
-        // Programs are mapped by College Value
-        programs: {
-            "CAST": [
-                { value: "BSIT", label: "BS Information Technology" },
-                { value: "BSCS", label: "BS Computer Science" }
-            ],
-            "CON": [
-                { value: "BSN", label: "BS Nursing" }
-            ]
-        },
-        // Program duration (max years) mapped by Program Value
-        years: {
-            "BSIT": 4, 
-            "BSCS": 4,
-            "BSN": 4
-        },
-        // Sections mapped by "PROGRAM-YEAR" key
-        sections: {
-            "BSIT-1": [{ value: "1A", label: "1A" }, { value: "1B", label: "1B" }],
-            "BSIT-4": [{ value: "4A", label: "4A" }],
-            "BSN-4": [{ value: "4A", label: "4A (Nursing)" }]
-        }
-   };
-   ==========================================================================
-*/

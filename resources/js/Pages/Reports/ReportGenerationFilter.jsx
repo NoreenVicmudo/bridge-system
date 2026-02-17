@@ -2,14 +2,13 @@ import { useState, useMemo } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
 
-// [BACKEND] Expects 'serverOptions' prop with dropdown data
 export default function ReportsFilter({ serverOptions = null }) {
     
     // --- 1. USE SERVER DATA OR FALLBACK TO EMPTY ---
     const options = serverOptions || {
         colleges: [],
-        programs: {},    // { "COLLEGE_CODE": [{ label, value }] }
-        batchYears: [],  // [{value: "2020", label: "2020"}, ...]
+        programs: {},    
+        batchYears: [],  
         statYears: []    
     };
 
@@ -27,7 +26,6 @@ export default function ReportsFilter({ serverOptions = null }) {
     const [programOptions, setProgramOptions] = useState([]);
 
     // --- 2. FRONTEND LOGIC: Filter End Years ---
-    // This creates a new list for "End Year" that only contains years >= Start Year
     const filteredEndYears = useMemo(() => {
         if (!values.start_year) return options.batchYears;
         
@@ -52,7 +50,6 @@ export default function ReportsFilter({ serverOptions = null }) {
                 newValues.end_year = "";
             }
             else if (field === "start_year") {
-                // If the new start year is greater than the current end year, clear the end year
                 if (newValues.end_year && parseInt(value) > parseInt(newValues.end_year)) {
                     newValues.end_year = "";
                 }
@@ -74,7 +71,7 @@ export default function ReportsFilter({ serverOptions = null }) {
 
     // Validation
     const isBatchReportsComplete = values.college && values.program && values.start_year && values.end_year;
-    const isProgramStatsComplete = values.stat_year;
+    const isProgramStatsComplete = !!values.stat_year;
     const isFormComplete = filterMode === "batch_reports" ? isBatchReportsComplete : isProgramStatsComplete;
 
     return (
@@ -139,7 +136,7 @@ export default function ReportsFilter({ serverOptions = null }) {
                                         label="End Year"
                                         value={values.end_year}
                                         onChange={(e) => handleChange("end_year", e.target.value)}
-                                        options={filteredEndYears} // <--- USING FILTERED LIST HERE
+                                        options={filteredEndYears}
                                         disabled={!values.start_year}
                                         placeholder={!values.start_year ? "Select Start Year first" : "Select End Year"}
                                     />
@@ -167,14 +164,18 @@ export default function ReportsFilter({ serverOptions = null }) {
                                 Clear
                             </button>
 
-                            {isFormComplete && (
-                                <button
-                                    type="submit"
-                                    className="px-6 py-3 bg-[#5c297c] text-white font-medium rounded-md hover:bg-[#ffb736] transition-all duration-300 text-base animate-fade-in"
-                                >
-                                    Generate Report
-                                </button>
-                            )}
+                            {/* ALWAYS VISIBLE BUTTON: Disabled logic applied */}
+                            <button
+                                type="submit"
+                                disabled={!isFormComplete}
+                                className={`px-6 py-3 font-medium rounded-md transition-all duration-300 text-base
+                                    ${isFormComplete 
+                                        ? "bg-[#5c297c] text-white hover:bg-[#ffb736] cursor-pointer shadow-md" 
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    }`}
+                            >
+                                Generate Report
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -182,34 +183,3 @@ export default function ReportsFilter({ serverOptions = null }) {
         </AuthenticatedLayout>
     );
 }
-
-/* ==========================================================================
-   [BACKEND DEVELOPER REFERENCE]
-   
-   const mockData = {
-        colleges: [
-            { value: "CAST", label: "College of Arts and Sciences" },
-            { value: "CON", label: "College of Nursing" }
-        ],
-        programs: {
-            "CAST": [
-                { value: "BSIT", label: "BS Information Technology" },
-                { value: "BSCS", label: "BS Computer Science" }
-            ],
-            "CON": [
-                { value: "BSN", label: "BS Nursing" }
-            ]
-        },
-        batchYears: [
-             { value: "2020", label: "2020" },
-             { value: "2021", label: "2021" },
-             { value: "2022", label: "2022" },
-             { value: "2023", label: "2023" },
-             { value: "2024", label: "2024" }
-        ],
-        statYears: [
-             { value: "2023", label: "2023" },
-             { value: "2024", label: "2024" }
-        ]
-   };
-*/

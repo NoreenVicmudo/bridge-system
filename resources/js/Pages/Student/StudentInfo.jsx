@@ -200,14 +200,22 @@ export default function StudentInformation({ students }) {
                     >
                         Cancel
                     </button>
-                    {selectedIds.size > 0 && (
-                        <button
-                            onClick={() => setIsRemoveModalOpen(true)}
-                            className="px-6 py-2 bg-[#ed1c24] text-white rounded-[5px] text-sm font-medium hover:bg-[#c4151c] transition-all duration-300 ease-in-out shadow-sm animate-fade-in"
-                        >
-                            Remove ({selectedIds.size})
-                        </button>
-                    )}
+
+                    {/* MODIFIED: Button is always visible, but disabled if selectedIds is empty */}
+                    <button
+                        onClick={() => setIsRemoveModalOpen(true)}
+                        disabled={selectedIds.size === 0}
+                        className={`px-6 py-2 rounded-[5px] text-sm font-medium transition-all duration-300 ease-in-out shadow-sm 
+                            ${
+                                selectedIds.size > 0
+                                    ? "bg-[#ed1c24] text-white hover:bg-[#c4151c] cursor-pointer"
+                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
+                    >
+                        {selectedIds.size > 0
+                            ? `Remove (${selectedIds.size})`
+                            : "Remove Student"}
+                    </button>
                 </>
             );
         }

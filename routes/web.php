@@ -28,6 +28,24 @@ Route::get('/student-info-filter', function () {
         return Inertia::render('Student/StudentInfoFilter'); 
     })->name('student.info.filter');
 
+Route::get('/student-masterlist', function () {
+    return Inertia::render('Student/StudentMasterlist'); 
+})->name('student.masterlist');
+
+Route::get('/student-information', function () {
+    return Inertia::render('Student/StudentInfo'); 
+})->name('student.information');
+
+Route::get('/student-entry', function () {
+    return Inertia::render('Student/StudentEntryPage'); 
+})->name('student.entry');
+
+Route::get('/edit-student', function () {
+    return Inertia::render('Student/Edit'); 
+})->name('edit.student');
+
+
+
 Route::get('/academic-profile-filter', function () {
     return Inertia::render('Academic/AcademicProfileFilter'); 
 })->name('academic.profile.filter');
@@ -40,17 +58,7 @@ Route::get('/report-generation-filter', function () {
     return Inertia::render('Reports/ReportGenerationFilter'); 
 })->name('report.generation.filter');
 
-Route::get('/student-masterlist', function () {
-    return Inertia::render('Student/StudentMasterlist'); 
-})->name('student.masterlist');
 
-Route::get('/student-information', function () {
-    return Inertia::render('Student/StudentInfo'); 
-})->name('student.information');
-
-Route::get('/student-information', function () {
-    return Inertia::render('Student/StudentInfo'); 
-})->name('student.information');
 
 Route::get('/gwa-info', function () {
     return Inertia::render('Academic/GWAInfo'); 
@@ -79,6 +87,18 @@ Route::get('/review-attendance', function () {
 Route::get('/academic-recognition', function () {
     return Inertia::render('Academic/AcademicRecognition'); 
 })->name('academic.recognition');
+
+Route::get('/review-center', function () {
+    return Inertia::render('Program/ReviewCenter'); 
+})->name('review.center');
+
+Route::get('/mock-board-scores', function () {
+    return Inertia::render('Program/MockBoardScores'); 
+})->name('mock.board.scores');
+
+Route::get('/licensure-exam', function () {
+    return Inertia::render('Program/LicensureExam'); 
+})->name('licensure.exam');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
