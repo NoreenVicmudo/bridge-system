@@ -16,6 +16,10 @@ Route::get('/', function () {
 
 Route::redirect('/', '/login');
 
+Route::get('/signup', function () {
+    return Inertia::render('Signup');
+})->name('signup');
+
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');

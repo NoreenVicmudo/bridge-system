@@ -1,10 +1,11 @@
 import { useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
-import { Link } from "@inertiajs/react";
+import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 
 export default function ProgramMetricsFilter({ serverOptions = null }) {
-    // --- 1. USE SERVER DATA OR FALLBACK TO EMPTY ---
+    // --- 1. DATA SOURCE ---
+    // Uses real server data. Fallback to empty structure to prevent crashes if prop is missing.
     const options = serverOptions || {
         colleges: [],
         programs: {},
@@ -23,6 +24,7 @@ export default function ProgramMetricsFilter({ serverOptions = null }) {
     const [values, setValues] = useState(initialValues);
     const [programOptions, setProgramOptions] = useState([]);
     const [yearOptions, setYearOptions] = useState([]);
+    const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
 
     // --- CASCADING LOGIC ---
     const handleChange = (field, value) => {
@@ -32,13 +34,11 @@ export default function ProgramMetricsFilter({ serverOptions = null }) {
             newValues.program = "";
             newValues.year = "";
             newValues.board_batch = "";
-
             setProgramOptions(options.programs[value] || []);
             setYearOptions([]);
         } else if (field === "program") {
             newValues.year = "";
             newValues.board_batch = "";
-
             const maxYears = options.years[value] || 4;
             setYearOptions(
                 Array.from({ length: maxYears }, (_, i) => ({
@@ -61,10 +61,12 @@ export default function ProgramMetricsFilter({ serverOptions = null }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log("Submitting Values:", values);
+        // Save filter selection to local storage for the target metric page
+        localStorage.setItem("programFilterData", JSON.stringify(values));
+        setIsMetricModalOpen(true);
     };
 
-    // Validation: Check if all fields are filled
+    // Validation: Enable button only when all fields are selected
     const isFormComplete =
         values.college && values.program && values.year && values.board_batch;
 
@@ -78,6 +80,7 @@ export default function ProgramMetricsFilter({ serverOptions = null }) {
                         </h2>
 
                         <div className="animate-fade-in">
+                            {/* Design: Horizontal layout (labels on the left) */}
                             <CustomSelectGroup
                                 label="College"
                                 value={values.college}
@@ -133,21 +136,19 @@ export default function ProgramMetricsFilter({ serverOptions = null }) {
                             />
                         </div>
 
-                        {/* ================= BUTTONS ================= */}
                         <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 w-full">
                             <button
                                 type="button"
                                 onClick={handleClear}
-                                className="px-6 py-3 bg-white text-gray-600 border border-gray-300 font-medium rounded-md hover:bg-[#ffb736] hover:text-white hover:border-[#ffb736] transition-all duration-300 text-base"
+                                className="px-6 py-3 bg-white text-gray-600 border border-gray-300 font-medium rounded-md hover:bg-[#ffb736] hover:text-white hover:border-[#ffb736] transition-all duration-300 text-base shadow-sm"
                             >
                                 Clear
                             </button>
 
-                            {/* ALWAYS VISIBLE BUTTON: Disabled if form is incomplete */}
                             <button
                                 type="submit"
                                 disabled={!isFormComplete}
-                                className={`px-6 py-3 font-medium rounded-md transition-all duration-300 text-base
+                                className={`px-6 py-3 font-medium rounded-md transition-all duration-300 text-base shadow-md
                                     ${
                                         isFormComplete
                                             ? "bg-[#5c297c] text-white hover:bg-[#ffb736] cursor-pointer"
@@ -160,6 +161,14 @@ export default function ProgramMetricsFilter({ serverOptions = null }) {
                     </form>
                 </div>
             </div>
+
+            {/* Change Metric Modal - Set type to 'program' for relevant options */}
+            <ChangeMetricModal
+                isOpen={isMetricModalOpen}
+                onClose={() => setIsMetricModalOpen(false)}
+                currentMetric=""
+                type="program"
+            />
         </AuthenticatedLayout>
     );
 }

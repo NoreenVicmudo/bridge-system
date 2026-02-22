@@ -5,3 +5,13 @@
 body {
     font-family: "Montserrat", sans-serif;
 }
+
+@layer utilities {
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #5c297c;
+        border-radius: 6px;
+    }
+}

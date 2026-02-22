@@ -12,6 +12,11 @@ export default {
 
     theme: {
         extend: {
+            colors: {
+                primary: "#5c297c",
+                secondary: "#ffb736",
+                warning: "#ed1c24",
+            },
             fontFamily: {
                 sans: ["Montserrat", ...defaultTheme.fontFamily.sans],
             },
