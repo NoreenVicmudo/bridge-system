@@ -10,7 +10,8 @@ export function TableContainer({
     children,
     paginationData,
     onPageChange,
-    filterDisplay, // <--- NEW PROP for the "Student Information" card
+    filterDisplay,
+    showEditNote = true,
 }) {
     return (
         <>
@@ -24,7 +25,6 @@ export function TableContainer({
             `}</style>
 
             <div className="bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] flex flex-col w-full font-['Montserrat'] animate-fade-in relative">
-                
                 {/* --- HEADER --- */}
                 <div className="p-6 border-b border-gray-100 flex flex-col gap-6 rounded-t-[10px]">
                     <h2 className="text-[24px] md:text-[28px] font-bold text-[#5c297c] text-center w-full">
@@ -67,11 +67,13 @@ export function TableContainer({
                 <div className="p-4 bg-[#f8f9fa] border-t border-gray-200 rounded-b-[10px]">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
                         <div className="text-sm text-gray-600 font-medium">
-                            Showing {paginationData.from} to {paginationData.to} of {paginationData.total} entries
+                            Showing {paginationData.from} to {paginationData.to}{" "}
+                            of {paginationData.total} entries
                         </div>
                         <div className="flex gap-1">
                             {paginationData.links.map((link, i) => {
-                                const isSimulated = typeof onPageChange === "function";
+                                const isSimulated =
+                                    typeof onPageChange === "function";
                                 const className = `px-3 py-1.5 rounded text-sm font-medium transition-all duration-300 ease-in-out ${
                                     link.active
                                         ? "bg-[#ffb736] text-white shadow-sm"
@@ -80,22 +82,48 @@ export function TableContainer({
 
                                 if (isSimulated) {
                                     return (
-                                        <button key={i} disabled={!link.url} onClick={() => link.url && onPageChange(link.page)} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                        <button
+                                            key={i}
+                                            disabled={!link.url}
+                                            onClick={() =>
+                                                link.url &&
+                                                onPageChange(link.page)
+                                            }
+                                            className={className}
+                                            dangerouslySetInnerHTML={{
+                                                __html: link.label,
+                                            }}
+                                        />
                                     );
                                 }
                                 return link.url ? (
-                                    <Link key={i} href={link.url} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                    <Link
+                                        key={i}
+                                        href={link.url}
+                                        className={className}
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
+                                    />
                                 ) : (
-                                    <span key={i} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                    <span
+                                        key={i}
+                                        className={className}
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
+                                    />
                                 );
                             })}
                         </div>
                     </div>
 
-                    <div className="mb-2">
-                        <p className="text-[#ed1c24] text-xs md:text-sm font-medium italic">
-                            Note: Click on the Student ID to edit the student information.
-                        </p>
+                    <div className="flex-1">
+                        {showEditNote && (
+                            <p className="text-[#ed1c24] text-xs md:text-sm font-medium italic">
+                                Note: Click on the ID to edit the information.
+                            </p>
+                        )}
                     </div>
                     <hr className="border-gray-300 mb-4" />
                     <div className="flex gap-3 min-h-[42px] items-center">

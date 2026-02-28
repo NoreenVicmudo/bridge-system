@@ -1,27 +1,9 @@
 import React from "react";
 import { Head, Link, useForm } from "@inertiajs/react";
 import BackgroundLayout from "@/Components/BackgroundLayout";
-import CustomSelectGroup from "@/Components/SelectGroup"; // Importing your fixed component
+import CustomSelectGroup from "@/Components/SelectGroup";
 
-// Sample data defined outside to keep the component clean
-const SAMPLE_COLLEGES = [
-    { value: 1, label: "College of Arts and Sciences" },
-    { value: 2, label: "College of Nursing" },
-    { value: 3, label: "College of Information Technology" },
-    { value: 4, label: "College of Business and Accountancy" },
-];
-
-const SAMPLE_POSITIONS = [
-    { value: 1, label: "Dean" },
-    { value: 2, label: "Department Head" },
-    { value: 3, label: "Faculty Member" },
-    { value: 4, label: "IT Administrator" },
-];
-
-export default function SignUp({
-    colleges = SAMPLE_COLLEGES,
-    positions = SAMPLE_POSITIONS,
-}) {
+export default function SignUp({ colleges, positions }) {
     const { data, setData, post, processing, errors } = useForm({
         college: "",
         position: "",
@@ -67,7 +49,7 @@ export default function SignUp({
                             onChange={(e) => setData("college", e.target.value)}
                             options={colleges}
                             placeholder="Choose your college"
-                            vertical={true} // Labels on top
+                            vertical={true}
                             error={errors.college}
                             className="signup-purple-scroll"
                         />
@@ -81,7 +63,7 @@ export default function SignUp({
                             }
                             options={positions}
                             placeholder="Choose your position"
-                            vertical={true} // Labels on top
+                            vertical={true}
                             error={errors.position}
                             className="signup-purple-scroll"
                         />

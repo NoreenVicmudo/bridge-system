@@ -434,3 +434,96 @@ export const MOCK_STUDENTS_LICENSURE = Array.from({ length: 40 }).map(
         };
     },
 );
+
+//TRANSACTION LOGS
+export const MOCK_TRANSACTIONS = [
+    {
+        id: 1,
+        log_id: "LOG-1001",
+        user: "Juan Dela Cruz",
+        college: "CMT",
+        role: "Dean",
+        action: "UPDATE STUDENT",
+        target_entity: "202340001",
+        remarks: "Updated GWA for 1st Year, 1st Semester to 1.25",
+        created_at: "2026-03-01 08:30 AM",
+    },
+    {
+        id: 2,
+        log_id: "LOG-1002",
+        user: "Maria Clara",
+        college: "CON",
+        role: "Admin",
+        action: "ADD STUDENT",
+        target_entity: "202340005",
+        remarks: "Imported 50 new students via Excel",
+        created_at: "2026-03-01 09:15 AM",
+    },
+    {
+        id: 3,
+        log_id: "LOG-1003",
+        user: "Jose Rizal",
+        college: "CAS",
+        role: "Program Head",
+        action: "PROGRAM METRICS",
+        target_entity: "BS PSYCHOLOGY",
+        remarks: "Added new Mock Board Exam results",
+        created_at: "2026-03-01 10:45 AM",
+    },
+    {
+        id: 4,
+        log_id: "LOG-1004",
+        user: "Andres Bonifacio",
+        college: "CBA",
+        role: "Dean",
+        action: "REMOVE STUDENT",
+        target_entity: "202230045",
+        remarks: "Removed student due to transfer",
+        created_at: "2026-03-01 11:20 AM",
+    },
+    {
+        id: 5,
+        log_id: "LOG-1005",
+        user: "System Auto",
+        college: "ALL",
+        role: "System",
+        action: "REPORT GENERATION",
+        target_entity: "CMT_Batch_2025",
+        remarks: "Generated PDF report for Board Passers",
+        created_at: "2026-03-01 01:05 PM",
+    },
+];
+
+//Mock Users
+export const MOCK_USERS = [
+    {
+        id: 1,
+        username: "jdelacruz",
+        name: "Juan Dela Cruz",
+        email: "juan@mcu.edu.ph",
+        college: "CMT",
+        position: "Dean",
+        program: "ALL",
+        date_registered: "2025-10-12",
+    },
+    {
+        id: 2,
+        username: "mclara",
+        name: "Maria Clara",
+        email: "maria@mcu.edu.ph",
+        college: "CON",
+        position: "Program Head",
+        program: "BS NURSING",
+        date_registered: "2025-11-05",
+    },
+    {
+        id: 3,
+        username: "jrizal",
+        name: "Jose Rizal",
+        email: "jose@mcu.edu.ph",
+        college: "CAS",
+        position: "Admin",
+        program: "ALL",
+        date_registered: "2026-01-20",
+    },
+];

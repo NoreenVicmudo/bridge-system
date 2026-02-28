@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react"; // Added useState
 import TextInput from "@/Components/TextInput";
 import CustomSelectGroup from "@/Components/SelectGroup";
+import ConfirmSaveModal from "@/Components/Modals/ConfirmSaveModal"; // Import the reusable modal
 
 export default function StudentForm({
     data,
@@ -11,6 +12,9 @@ export default function StudentForm({
     isEdit = false,
     options = {},
 }) {
+    // 1. Modal State
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
     const safeOptions = {
         colleges: options?.colleges || [],
         livingArrangements: options?.livingArrangements || [],
@@ -29,38 +33,29 @@ export default function StudentForm({
         }));
     };
 
-    // Unified Input style: Strictly yellow focus (#ffb736)
     const inputClass =
         "w-full border-gray-300 rounded-[5px] shadow-sm text-sm p-2 " +
         "focus:border-[#ffb736] focus:ring-[#ffb736] focus:ring-1 focus:outline-none " +
         "transition-colors duration-200 placeholder:text-gray-400";
 
-    // Unified Label style: Purple (#5c297c), bold
     const labelClass = "block mb-0.5 font-bold text-sm text-[#5c297c]";
 
-    // SELECT GROUP OVERRIDES: Forced vertical layout and disabled label wrapping
     const selectGroupOverride =
         "!flex-col !items-start !gap-0.5 mb-0 w-full !whitespace-nowrap";
     const selectLabelOverride =
         "!w-full !text-left !font-bold !text-[#5c297c] !mb-0 !whitespace-nowrap";
 
     const handleBack = () => {
-        // Check where the user came from using the browser's referrer string
         const referrer = document.referrer;
-
         if (referrer.includes("student-masterlist")) {
             window.location.href = "/student-masterlist";
         } else {
-            // Default fallback to student-information
             window.location.href = "/student-information";
         }
     };
 
-    // Define which fields are strictly required for the ADD process
     const isFormValid = () => {
-        if (isEdit) return true; // In edit mode, everything is always "valid" to submit
-
-        // List of required fields based on your provided form structure
+        if (isEdit) return true;
         const requiredFields = [
             "student_number",
             "last_name",
@@ -83,60 +78,50 @@ export default function StudentForm({
             "language",
             "last_school_type",
         ];
-
-        // Check if every required field has a value
         return requiredFields.every(
             (field) => data[field] && data[field].toString().trim() !== "",
         );
     };
 
+    // 2. Intercept Submit to show Modal
+    const handleInitialSubmit = (e) => {
+        e.preventDefault();
+        if (isFormValid()) {
+            setIsConfirmModalOpen(true);
+        }
+    };
+
     return (
-        /* WRAPPER: items-start and minimal py to keep the card high up */
-        /* Changed h-[calc(100vh-60px)] to a safer h-[calc(100vh-100px)] to account for headers */
-        <div className="flex justify-center w-full px-4 py-0 h-[calc(100vh-100px)] items-start overflow-hidden">
-            {/* CONTAINER: Reduced py/px and set a strict max-h to prevent browser scroll */}
+        <div className="flex justify-center w-full px-4 py-0 h-[calc(100vh-100px)] items-start overflow-hidden font-montserrat">
             <div className="w-full max-w-2xl bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] px-6 py-4 md:px-8 md:py-5 flex flex-col max-h-full my-2">
-                <h2 className="text-center text-xl md:text-2xl font-bold text-[#5c297c] mb-3 font-montserrat flex-shrink-0">
+                <h2 className="text-center text-xl md:text-2xl font-bold text-[#5c297c] mb-3 flex-shrink-0">
                     {isEdit
                         ? "Edit Student Information"
                         : "Student Information"}
                 </h2>
 
-                {/* SCROLLABLE FORM AREA: pr-2 provides space for the custom scrollbar */}
-                <div
-                    className="overflow-y-auto overflow-x-hidden pr-2 flex-1 custom-form-scrollbar"
-                    style={{
-                        scrollbarWidth: "thin",
-                        scrollbarColor: "#5c297c transparent",
-                    }}
-                >
+                <div className="overflow-y-auto overflow-x-hidden pr-2 flex-1 custom-form-scrollbar">
                     <style>{`
                         .custom-form-scrollbar::-webkit-scrollbar { width: 4px; }
                         .custom-form-scrollbar::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; }
                         .custom-form-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                        /* Ensure no ring conflict */
                         input:focus { box-shadow: 0 0 0 1px #ffb736 !important; border-color: #ffb736 !important; }
                     `}</style>
 
-                    <form onSubmit={submit} className="flex flex-col gap-3 p-1">
+                    <form
+                        onSubmit={handleInitialSubmit}
+                        className="flex flex-col gap-3 p-1"
+                    >
                         <div className="w-full">
                             <label className={labelClass}>Student ID:</label>
                             <TextInput
                                 value={data.student_number}
-                                onChange={(e) =>
-                                    setData("student_number", e.target.value)
-                                }
-                                className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500`}
+                                className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500 font-bold`}
                                 readOnly={true}
                             />
-                            {errors.student_number && (
-                                <div className="text-red-500 text-xs mt-0.5">
-                                    {errors.student_number}
-                                </div>
-                            )}
                         </div>
 
-                        <div className="w-full">
+                        <div className="w-full text-left">
                             <label className={labelClass}>Full Name:</label>
                             <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_0.6fr] gap-2">
                                 <TextInput
@@ -175,14 +160,9 @@ export default function StudentForm({
                                     className={inputClass}
                                 />
                             </div>
-                            {errors.last_name && (
-                                <span className="text-red-500 text-xs">
-                                    {errors.last_name}
-                                </span>
-                            )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
                             <CustomSelectGroup
                                 label="College:"
                                 value={data.college}
@@ -210,7 +190,7 @@ export default function StudentForm({
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
                             <div className="w-full">
                                 <label className={labelClass}>Birthdate:</label>
                                 <TextInput
@@ -241,7 +221,7 @@ export default function StudentForm({
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
                             <div className="w-full">
                                 <label className={labelClass}>
                                     Socioeconomic Status (PHP):
@@ -276,7 +256,7 @@ export default function StudentForm({
                             />
                         </div>
 
-                        <div className="w-full">
+                        <div className="w-full text-left">
                             <label className={labelClass}>Address:</label>
                             <div className="flex flex-col gap-2">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -343,7 +323,7 @@ export default function StudentForm({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
                             <CustomSelectGroup
                                 label="Work Status:"
                                 value={data.work_status}
@@ -379,7 +359,7 @@ export default function StudentForm({
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left text-[#5c297c]">
                             <CustomSelectGroup
                                 label="Language Spoken At Home:"
                                 value={data.language}
@@ -408,7 +388,7 @@ export default function StudentForm({
                         </div>
 
                         {showOtherLanguage && (
-                            <div className="w-full animate-fade-in">
+                            <div className="w-full animate-fade-in text-left">
                                 <label className={labelClass}>
                                     If others, please specify:
                                 </label>
@@ -427,22 +407,22 @@ export default function StudentForm({
                             </div>
                         )}
 
-                        <div className="flex justify-end gap-3 mt-2 mb-2 flex-shrink-0">
+                        <div className="flex justify-end gap-3 mt-4 mb-2 flex-shrink-0">
                             <button
                                 type="button"
                                 onClick={handleBack}
-                                className="px-6 py-2.5 text-sm font-bold text-[#666] bg-white border border-[#ddd] rounded-[6px] hover:bg-[#ffb736] hover:text-white transition-all duration-300"
+                                className="px-6 py-2.5 text-sm font-bold text-[#666] bg-white border border-[#ddd] rounded-[6px] hover:bg-[#ffb736] hover:text-white transition-all duration-300 shadow-sm font-montserrat"
                             >
                                 Back
                             </button>
                             <button
                                 type="submit"
-                                disabled={processing || !isFormValid()} // Disabled if processing OR if form isn't valid
-                                className={`px-5 py-2 text-sm font-bold text-white rounded-[6px] transition-all duration-300 shadow-md 
+                                disabled={processing || !isFormValid()}
+                                className={`px-6 py-2.5 text-sm font-bold text-white rounded-[6px] transition-all duration-300 shadow-md font-montserrat
                                     ${
                                         !isFormValid() && !isEdit
                                             ? "bg-gray-400 cursor-not-allowed opacity-50"
-                                            : "bg-[#5c297c] hover:bg-[#ffb736]"
+                                            : "bg-[#5c297c] hover:bg-[#ffb736] cursor-pointer"
                                     }`}
                             >
                                 {processing
@@ -454,6 +434,23 @@ export default function StudentForm({
                         </div>
                     </form>
                 </div>
+
+                {/* 3. THE REUSABLE MODAL COMPONENT */}
+                <ConfirmSaveModal
+                    isOpen={isConfirmModalOpen}
+                    onClose={() => setIsConfirmModalOpen(false)}
+                    onConfirm={submit} // This calls the put/post logic in StudentEntryPage
+                    message={
+                        <>
+                            Are you sure you want to {isEdit ? "update" : "add"}{" "}
+                            the record for <br />
+                            <strong>
+                                {data.last_name}, {data.first_name}
+                            </strong>
+                            ?
+                        </>
+                    }
+                />
             </div>
         </div>
     );
