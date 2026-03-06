@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Link, usePage } from "@inertiajs/react";
 
 export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
-    // 1. Get the current URL from Inertia to determine active state
+    // 1. Destructure 'url' and 'auth' from Inertia's usePage().props
     const { url } = usePage();
-
-    // Mock user for design
-    const user = { name: "User Name", level: 0 };
+    const { auth } = usePage().props;
+    
+    // 2. Assign the real authenticated user from Laravel
+    const user = auth.user;
     const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     const closeProfile = () => setIsProfileOpen(false);
@@ -197,6 +198,8 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
                         <span>Additional Entry</span>
                     </SidebarLink>
 
+                    {user.position === 'Dean' && (
+                        <>
                     <div className="pt-4 pb-2 px-3 text-xs font-bold text-[#ffb736] uppercase tracking-wider">
                         Management
                     </div>
@@ -248,6 +251,8 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
                         </svg>
                         <span>Manage Users</span>
                     </SidebarLink>
+                    </>
+                    )}
                 </nav>
 
                 {/* PROFILE SECTION */}
@@ -255,9 +260,15 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
                     <div
                         className={`absolute bottom-full left-4 right-4 mb-2 bg-[#6b358e] rounded-lg shadow-xl overflow-hidden border border-white/10 transform transition-all duration-300 ease-out origin-bottom ${isProfileOpen ? "translate-y-0 opacity-100 scale-100 delay-75" : "translate-y-4 opacity-0 scale-95 pointer-events-none"}`}
                     >
-                        <button className="w-full text-left px-4 py-3 text-sm text-white hover:bg-[#ffb736] hover:text-[#5c297c] transition-colors flex items-center gap-2">
+                        {/* REPLACED THE <button> WITH INERTIA'S <Link> */}
+                        <Link 
+                            href="/logout" 
+                            method="post" 
+                            as="button"
+                            className="w-full text-left px-4 py-3 text-sm text-white hover:bg-[#ffb736] hover:text-[#5c297c] transition-colors flex items-center gap-2"
+                        >
                             <i className="bi bi-box-arrow-right"></i> Logout
-                        </button>
+                        </Link>
                     </div>
                     <button
                         onClick={() => setIsProfileOpen(!isProfileOpen)}

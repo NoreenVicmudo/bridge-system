@@ -46,6 +46,14 @@ export default function StudentMasterlist({ students }) {
     const handleSearch = isBackendReady ? (val) => {} : mock.setSearch;
     const handlePageChange = isBackendReady ? null : mock.setPage;
 
+    // --- THE BULLETPROOF FIX ---
+    // Safely extracts the array of students whether it is flat, wrapped once, or wrapped twice!
+    const studentList = Array.isArray(data) 
+        ? data 
+        : (Array.isArray(data?.data) 
+            ? data.data 
+            : (Array.isArray(data?.data?.data) ? data.data.data : []));
+
     // SORTING HANDLER
     // If backend is ready, this would likely be: router.getWithQuery({ sort: col, dir: dir })
     const sortColumn = isBackendReady ? null : mock.sortColumn;
@@ -74,11 +82,13 @@ export default function StudentMasterlist({ students }) {
 
     const toggleSelectAll = (e) => {
         if (e.target.checked) {
-            const allIds = data.data.map((s) => s.id);
+            // Replaced data.data with studentList
+            const allIds = studentList.map((s) => s.id);
             setSelectedIds(new Set([...selectedIds, ...allIds]));
         } else {
             const newSelected = new Set(selectedIds);
-            data.data.forEach((s) => newSelected.delete(s.id));
+            // Replaced data.data with studentList
+            studentList.forEach((s) => newSelected.delete(s.id));
             setSelectedIds(newSelected);
         }
     };
@@ -89,7 +99,8 @@ export default function StudentMasterlist({ students }) {
     };
 
     const getSelectedStudents = () => {
-        return data.data.filter((student) => selectedIds.has(student.id));
+        // Replaced data.data with studentList
+        return studentList.filter((student) => selectedIds.has(student.id));
     };
 
     const ExportDropdown = () => {
@@ -218,7 +229,7 @@ export default function StudentMasterlist({ students }) {
                     title="Student Masterlist"
                     search={search}
                     onSearch={handleSearch}
-                    paginationData={data}
+                    paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}
                     headerActions={<ExportDropdown />}
                     footerActions={renderFooterButtons()}
@@ -302,8 +313,8 @@ export default function StudentMasterlist({ students }) {
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
-                        {data.data.length > 0 ? (
-                            data.data.map((student, index) => (
+                        {studentList.length > 0 ? (
+                            studentList.map((student, index) => (
                                 <tr
                                     key={student.id}
                                     className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${index % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}

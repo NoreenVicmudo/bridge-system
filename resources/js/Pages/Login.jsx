@@ -25,7 +25,7 @@ export default function LoginPage() {
                     <div className="w-full md:w-1/2 flex-1 p-6 md:p-12 flex flex-col justify-center items-center bg-white">
                         {/* 5. Microsoft Teams Button */}
                         <a
-                            href="/auth/microsoft"
+                            href="/auth/azure/redirect"
                             className="group relative w-full max-w-[350px] flex items-center justify-center gap-3 bg-[#5c297c] hover:bg-[#ffb736] text-white py-3 px-4 rounded-lg font-medium transition-all duration-300 shadow-md border border-transparent"
                         >
                             {/* Microsoft / Windows Icon */}
