@@ -55,20 +55,6 @@ export default function DataEntryTabs({ userLevel }) {
                     </Link>
                 </>
             )}
-
-            {/* 3. Document Format: Super Admin (0), Admin (1), Dean (2) */}
-            {[0, 1, 2].includes(userLevel) && (
-                <Link
-                    href="/document-design"
-                    className={`${linkBaseClass} ${isActive("/document-design") ? activeClass : ""}`}
-                >
-                    <span className="hidden md:inline">Document Format</span>
-                    <i className="bi bi-file-earmark-text inline md:hidden text-lg"></i>
-                    <span
-                        className={`absolute bottom-[-2px] left-0 h-[3px] bg-[#ffb736] transition-all duration-300 ${isActive("/document-design") ? "w-full" : "w-0 group-hover:w-full"}`}
-                    ></span>
-                </Link>
-            )}
         </nav>
     );
 }

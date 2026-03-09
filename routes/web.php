@@ -153,9 +153,6 @@ Route::get('/program-additional', function () {
     return Inertia::render('Entry/ProgramMetricsEntry'); 
 })->name('program.additional');
 
-Route::get('/document-design', function () {
-    return Inertia::render('Entry/DocumentFormat'); 
-})->name('document.design');
 
 
 //REPORT GENERATION
@@ -180,6 +177,14 @@ Route::get('/edit-users', function () {
     return Inertia::render('User/EditUser'); 
 })->name('edit.users');
 
+//REPORT GENERATION
+Route::get('/report-generation', function () {
+    return Inertia::render('Reports/ReportGeneration'); 
+})->name('report.generation');
+
+Route::get('/report-programs', function () {
+    return Inertia::render('Reports/ReportGenerationPrograms'); 
+})->name('report.programs');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
