@@ -18,8 +18,8 @@ export default function FilterInfoCard({ filters, mode = "section" }) {
 
                     {/* Column 2: Department (Spans wider if needed) */}
                     <div className="flex flex-col gap-3">
-                        <InfoItem label="College" value={filters.college} icon="bi-building" />
-                        <InfoItem label="Program" value={filters.program} icon="bi-book" />
+                        <InfoItem label="College" value={filters.college_name} icon="bi-building" />
+                        <InfoItem label="Program" value={filters.program_name} icon="bi-book" />
                     </div>
 
                     {/* Column 3: Specifics */}

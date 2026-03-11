@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, usePage } from "@inertiajs/react";
+import { Link, usePage, router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
 
@@ -35,17 +35,36 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
         label: college.name,
     }));
 
-    // 4. AUTO-LOCK SECURITY: If the user is assigned to a college, lock it in immediately!
+    // 4. AUTO-LOCK SECURITY: Lock College AND Program if the user is restricted!
     useEffect(() => {
         if (user && user.college_id) {
             const userCollegeId = user.college_id.toString();
             
-            // Update both section and batch college values
-            setValues((prev) => ({
-                ...prev,
+            let newValues = {
                 college: userCollegeId,
                 batch_college: userCollegeId,
-            }));
+            };
+
+            // If the user is an Assistant (locked to a specific program)
+            if (user.program_id) {
+                const userProgramId = user.program_id.toString();
+                newValues.program = userProgramId;
+                newValues.batch_program = userProgramId;
+
+                // Auto-load the years for their specific program
+                const selectedDbProgram = dbPrograms.find((p) => p.program_id.toString() === userProgramId);
+                const maxYears = selectedDbProgram ? selectedDbProgram.years : 4;
+                
+                setYearOptions(
+                    Array.from({ length: maxYears }, (_, i) => ({
+                        value: (i + 1).toString(),
+                        label: `Year ${i + 1}`,
+                    }))
+                );
+            }
+
+            // Update state with the locked values
+            setValues((prev) => ({ ...prev, ...newValues }));
 
             // Auto-load the programs for their specific college
             const filteredPrograms = dbPrograms
@@ -91,10 +110,12 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
             } else if (field === "year_level") {
                 newValues.section = "";
                 // Hardcoding mock sections for now since we haven't built the sections table yet!
-                setSectionOptions([
-                    { value: "A", label: "Section A" },
-                    { value: "B", label: "Section B" }
-                ]);
+                setSectionOptions(
+                    Array.from({ length: 20 }, (_, i) => ({
+                       value: `${value}-${i + 1}`,
+                        label: `Section ${i + 1}`
+                    }))
+                );
             }
         } else if (filterMode === "batch") {
             if (field === "batch_college") {
@@ -110,19 +131,25 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
     };
 
     const handleClear = () => {
-        // Only clear if the user is NOT restricted to a specific college
+        let resetValues = { ...initialValues };
+        
+        // Restore locked College
         if (user && user.college_id) {
-            const userCollegeId = user.college_id.toString();
-            setValues({
-                ...initialValues,
-                college: userCollegeId,
-                batch_college: userCollegeId,
-            });
+            resetValues.college = user.college_id.toString();
+            resetValues.batch_college = user.college_id.toString();
         } else {
-            setValues(initialValues);
             setProgramOptions([]);
         }
-        setYearOptions([]);
+
+        // Restore locked Program
+        if (user && user.program_id) {
+            resetValues.program = user.program_id.toString();
+            resetValues.batch_program = user.program_id.toString();
+        } else {
+            setYearOptions([]);
+        }
+        
+        setValues(resetValues);
         setSectionOptions([]);
     };
 
@@ -142,9 +169,37 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
     const isFormComplete = filterMode === "section" ? isSectionComplete : isBatchComplete;
 
     // Hardcoded mock options for the fields we haven't built database tables for yet
-    const mockAcademicYears = [{ value: "2025-2026", label: "2025-2026" }];
-    const mockSemesters = [{ value: "1", label: "1st Semester" }, { value: "2", label: "2nd Semester" }];
+    const mockSemesters = [{ value: "1st", label: "1st Semester" }, { value: "2nd", label: "2nd Semester" }, { value: "Summer", label: "Summer" }];
     const mockBatches = [{ value: "2025", label: "Batch 2025" }, { value: "2026", label: "Batch 2026" }];
+
+// 1. Get the current year dynamically (e.g., 2026)
+    const currentYear = new Date().getFullYear(); 
+    
+    // 2. Generate Academic Years from the Current Year down to 2000
+    const dynamicAcademicYears = Array.from(
+        { length: currentYear - 2000 + 1 }, 
+        (_, i) => {
+            const startYear = currentYear - i;
+            const endYear = startYear + 1;
+            return {
+                value: `${startYear}-${endYear}`,
+                label: `${startYear}-${endYear}`
+            };
+        }
+    );
+
+    // 3. Generate standard Years for the "Batch" dropdown (Current Year down to 2000)
+    // Adding +4 to the length so they can select future graduating batches!
+    const dynamicBatches = Array.from(
+        { length: currentYear - 2000 + 5 }, 
+        (_, i) => {
+            const year = currentYear + 4 - i; 
+            return {
+                value: year.toString(),
+                label: `Batch ${year}` // Or just year.toString() for the modal
+            };
+        }
+    );
 
     return (
         <AuthenticatedLayout>
@@ -175,7 +230,7 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
                                     label="Academic Year"
                                     value={values.academic_year}
                                     onChange={(e) => handleChange("academic_year", e.target.value)}
-                                    options={mockAcademicYears}
+                                    options={dynamicAcademicYears}
                                 />
                                 <CustomSelectGroup
                                     label="College"
@@ -189,7 +244,7 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
                                     value={values.program}
                                     onChange={(e) => handleChange("program", e.target.value)}
                                     options={programOptions}
-                                    disabled={!values.college}
+                                    disabled={!values.college || (user && user.program_id !== null)}
                                     placeholder={!values.college ? "Select College first" : "Select Program"}
                                 />
                                 <CustomSelectGroup
@@ -230,7 +285,7 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
                                     value={values.batch_program}
                                     onChange={(e) => handleChange("batch_program", e.target.value)}
                                     options={programOptions}
-                                    disabled={!values.batch_college}
+                                    disabled={!values.batch_college || (user && user.program_id !== null)}
                                     placeholder={!values.batch_college ? "Select College first" : "Select Program"}
                                 />
                                 <CustomSelectGroup

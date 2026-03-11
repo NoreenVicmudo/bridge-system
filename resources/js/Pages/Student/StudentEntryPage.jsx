@@ -1,6 +1,6 @@
 import React from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { useForm, Head } from "@inertiajs/react";
+import { useForm, Head, usePage } from "@inertiajs/react";
 import StudentForm from "@/Components/Forms/StudentForm";
 
 export default function StudentEntryPage({
@@ -9,18 +9,25 @@ export default function StudentEntryPage({
     options,
 }) {
     // 1. Logic Check: If 'student' prop exists, we are in Edit mode.
+    const { auth } = usePage().props;
+    const user = auth.user;
+    const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
     const isEdit = !!student;
 
     // 2. Initialize the form
     // If editing, use student data. If adding, use empty strings (or prefilledId).
     const { data, setData, post, put, processing, errors } = useForm({
-        student_number: isEdit ? student.student_number : prefilledId || "",
+        student_number: isEdit ? student.student_number : (prefilledId || queryParams.get('prefilledId') || ""),
         last_name: isEdit ? student.last_name : "",
         first_name: isEdit ? student.first_name : "",
         middle_name: isEdit ? student.middle_name : "",
         suffix: isEdit ? student.suffix : "",
-        college: isEdit ? student.college : "",
-        program: isEdit ? student.program : "",
+        college: isEdit ? student.college : (user.college_id || queryParams.get('college') || ""),
+        program: isEdit ? student.program : (user.program_id || queryParams.get('program') || ""),
+        academic_year: queryParams.get('academic_year') || "",
+        semester: queryParams.get('semester') || "",
+        year_level: queryParams.get('year_level') || "",
+        section: queryParams.get('section') || "",
         birthdate: isEdit ? student.birthdate : "",
         sex: isEdit ? student.sex : "",
         socioeconomic_status: isEdit ? student.socioeconomic_status : "",
@@ -39,7 +46,10 @@ export default function StudentEntryPage({
 
     // 3. Handle Submit based on mode
     const handleSubmit = (e) => {
-        e.preventDefault();
+        if (e && typeof e.preventDefault === 'function') {
+            e.preventDefault();
+        }
+        
         if (isEdit) {
             put(route("students.update", student.id));
         } else {

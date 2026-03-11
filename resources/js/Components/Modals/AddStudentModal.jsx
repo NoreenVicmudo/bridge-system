@@ -1,68 +1,131 @@
 import React, { useState, useEffect } from "react";
+import { router, useForm } from "@inertiajs/react";
+import axios from "axios"; // Make sure to have axios installed, or use standard fetch!
 
-export default function AddStudentModal({ isOpen, onClose }) {
+export default function AddStudentModal({ isOpen, onClose, currentFilters = {} }) {
     const [view, setView] = useState("options");
     const [checkStatus, setCheckStatus] = useState("idle");
     const [animate, setAnimate] = useState(false);
+    
+    // Track the actual input value
+    const [studentNumberInput, setStudentNumberInput] = useState("");
 
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
             setView("options");
             setCheckStatus("idle");
+            setStudentNumberInput(""); // Reset input on open
         }
     }, [isOpen]);
 
-    // --- NEW CLOSE LOGIC (Animation first, then unmount) ---
     const closeModal = () => {
-        setAnimate(false); // 1. Start Fade Out
+        setAnimate(false);
         setTimeout(() => {
-            onClose();     // 2. Unmount after 300ms
+            onClose();
         }, 300);
+    };
+
+    // --- THE REAL DATABASE CHECK ---
+    const handleCheck = async () => {
+        if (!studentNumberInput.trim()) return;
+        
+        setCheckStatus("loading");
+        
+        try {
+            // Ask Laravel if this student exists
+            const response = await axios.get(`/api/check-student/${studentNumberInput}`);
+            setCheckStatus(response.data.exists ? "exists" : "not_exists");
+        } catch (error) {
+            console.error("Error checking student ID:", error);
+            setCheckStatus("idle"); // Reset on error
+        }
+    };
+
+    // --- THE REAL REDIRECTION ---
+    const handleProceed = () => {
+        closeModal(); // Close the modal
+        
+        // Route to the entry page, passing the student number AND the active filters!
+        router.get('/student-entry', { 
+            prefilledId: studentNumberInput,
+            ...currentFilters 
+        });
+    };
+
+    // FILE UPLOAD
+    const { data, setData, post, processing, errors, reset } = useForm({
+        file: null,
+        // Carry the context so the backend knows where to enroll them!
+        academic_year: currentFilters.academic_year || "",
+        semester: currentFilters.semester || "",
+        college: currentFilters.college || "",
+        program: currentFilters.program || "",
+        year_level: currentFilters.year_level || "",
+        section: currentFilters.section || "",
+    });
+
+    useEffect(() => {
+        if (isOpen) {
+            setData({
+                file: null, // Always reset the file input when opening
+                academic_year: currentFilters.academic_year || "",
+                semester: currentFilters.semester || "",
+                college: currentFilters.college || "",
+                program: currentFilters.program || "",
+                year_level: currentFilters.year_level || "",
+                section: currentFilters.section || "",
+            });
+        }
+    }, [isOpen, currentFilters]);
+
+    const handleImportSubmit = (e) => {
+        e.preventDefault();
+        post(route('students.import'), {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                // Laravel will pass back our "Successfully created X..." message!
+                const successMsg = page.props.flash?.success;
+                if (successMsg) {
+                    alert(successMsg); 
+                } else {
+                    alert("Import processed!");
+                }
+                closeModal();
+            },
+            onError: (err) => {
+                // If validation fails, show us why!
+                console.error("Upload Errors:", err);
+                alert("Upload failed. Check the form for errors.");
+            }
+        });
     };
 
     if (!isOpen) return null;
 
     return (
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            
-            {/* Modal Card */}
             <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
-                {/* Header */}
                 <div className="bg-[#5c297c] p-6 text-center relative">
                     <h2 className="text-2xl font-bold text-white tracking-wide">Add New Student</h2>
                     <p className="text-purple-200 text-sm mt-1">Choose how you want to add records</p>
-                    
-                    {/* Close Button (X) */}
-                    <button 
-                        onClick={closeModal} // Uses new close logic
-                        className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 rounded-full p-1 transition-all"
-                    >
+                    <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 rounded-full p-1 transition-all">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
-                {/* Content Area */}
                 <div className="p-8">
-                    
-                    {/* --- VIEW 1: INITIAL OPTIONS --- */}
                     {view === "options" && (
                         <div className="grid grid-cols-2 gap-4">
-                            <button 
-                                onClick={() => setView("import")}
-                                className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300"
-                            >
+                            <button onClick={() => setView("import")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-file-earmark-excel text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
                                 </div>
                                 <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Import File</span>
                             </button>
 
-                            <button 
-                                onClick={() => setView("manual")}
-                                className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300"
-                            >
+                            <button onClick={() => setView("manual")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-person-plus text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
                                 </div>
@@ -71,24 +134,41 @@ export default function AddStudentModal({ isOpen, onClose }) {
                         </div>
                     )}
 
-                    {/* --- VIEW 2: IMPORT FILE --- */}
                     {view === "import" && (
                         <div className="flex flex-col gap-5 animate-fade-in-up">
-                            <div className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group">
-                                <i className="bi bi-cloud-arrow-up text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
-                                <p className="text-gray-600 font-medium">Drag & Drop your Excel file here</p>
-                                <p className="text-sm text-gray-400 mt-1 mb-4">Supports .xlsx, .csv</p>
-                                <span className="px-5 py-2 bg-white border border-[#5c297c] text-[#5c297c] font-bold rounded-lg text-sm group-hover:bg-[#5c297c] group-hover:text-white transition-all">
-                                    Browse Files
-                                </span>
+                            <div className="bg-purple-50 p-5 rounded-lg border border-purple-100 text-center">
+                                <i className="bi bi-cloud-arrow-up text-4xl text-[#5c297c] mb-2 block"></i>
+                                <h3 className="font-bold text-[#5c297c] mb-1">Upload CSV File</h3>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    Enrolling students to: <strong>{currentFilters.section || "Selected Section"}</strong>
+                                </p>
+                                
+                                <form onSubmit={handleImportSubmit} className="flex flex-col gap-3">
+                                    <input 
+                                        type="file" 
+                                        accept=".csv"
+                                        onChange={(e) => setData('file', e.target.files[0])}
+                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-[#5c297c] hover:file:bg-purple-200 cursor-pointer"
+                                        required
+                                    />
+                                    {errors.file && <span className="text-red-500 text-xs">{errors.file}</span>}
+                                    
+                                    <button 
+                                        type="submit"
+                                        disabled={processing || !data.file}
+                                        className="mt-2 w-full py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] transition-all disabled:opacity-50"
+                                    >
+                                        {processing ? "Uploading & Processing..." : "Import Students"}
+                                    </button>
+                                </form>
                             </div>
-                            <button onClick={() => setView("options")} className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center">
+
+                            <button onClick={() => setView("options")} className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-2">
                                 ← Back to Options
                             </button>
                         </div>
                     )}
 
-                    {/* --- VIEW 3: MANUAL ENTRY --- */}
                     {view === "manual" && (
                         <div className="flex flex-col gap-5 animate-fade-in-up">
                             <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
@@ -96,36 +176,42 @@ export default function AddStudentModal({ isOpen, onClose }) {
                                 <div className="flex gap-2">
                                     <input 
                                         type="text" 
-                                        placeholder="e.g. 2023-1005" 
+                                        value={studentNumberInput}
+                                        onChange={(e) => setStudentNumberInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
+                                        placeholder="e.g. 2025-1005" 
                                         className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5c297c] focus:border-transparent outline-none transition-all"
                                     />
                                     <button 
-                                        onClick={() => {
-                                            setCheckStatus("loading");
-                                            setTimeout(() => setCheckStatus(Math.random() > 0.5 ? "exists" : "not_exists"), 800);
-                                        }}
-                                        className="px-6 py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] shadow-md hover:shadow-lg transition-all"
+                                        onClick={handleCheck}
+                                        disabled={!studentNumberInput.trim() || checkStatus === "loading"}
+                                        className="px-6 py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] shadow-md hover:shadow-lg transition-all disabled:opacity-60"
                                     >
-                                        {checkStatus === "loading" ? <div className="loader-dots">...</div> : "Check"}
+                                        {checkStatus === "loading" ? "..." : "Check"}
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Status Messages */}
+                            {/* UX UPGRADE: Don't show an error if they exist. Show an "Enroll" prompt! */}
                             {checkStatus === "exists" && (
-                                <div className="flex items-center gap-3 p-3 bg-red-50 text-red-600 rounded-lg border border-red-100 animate-pulse">
-                                    <i className="bi bi-exclamation-circle-fill text-xl"></i>
-                                    <span className="text-sm font-medium">Student ID already exists!</span>
+                                <div className="flex flex-col gap-3 items-center animate-fade-in">
+                                    <div className="flex items-center gap-2 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100">
+                                        <i className="bi bi-info-circle-fill text-xl"></i>
+                                        <span className="text-sm font-medium">Student found! You can proceed to enroll them.</span>
+                                    </div>
+                                    <button onClick={handleProceed} className="w-full py-3 bg-[#ffb736] text-white font-bold rounded-lg shadow-md hover:bg-[#e0a800] hover:scale-[1.02] transition-all">
+                                        Proceed to Enroll
+                                    </button>
                                 </div>
                             )}
 
                             {checkStatus === "not_exists" && (
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
-                                    <div className="flex items-center gap-2 text-green-600 font-medium">
+                                    <div className="flex items-center gap-2 p-3 bg-green-50 text-green-700 w-full justify-center rounded-lg border border-green-100">
                                         <i className="bi bi-check-circle-fill text-xl"></i>
-                                        <span>ID is available!</span>
+                                        <span className="text-sm font-medium">New Student! Proceed to create profile.</span>
                                     </div>
-                                    <button className="w-full py-3 bg-[#ffb736] text-white font-bold rounded-lg shadow-md hover:bg-[#e0a800] hover:scale-[1.02] transition-all">
+                                    <button onClick={handleProceed} className="w-full py-3 bg-[#ffb736] text-white font-bold rounded-lg shadow-md hover:bg-[#e0a800] hover:scale-[1.02] transition-all">
                                         Proceed to Registration
                                     </button>
                                 </div>

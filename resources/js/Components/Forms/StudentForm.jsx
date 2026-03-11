@@ -11,9 +11,11 @@ export default function StudentForm({
     submit,
     isEdit = false,
     options = {},
+    user = null,
 }) {
     // 1. Modal State
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const queryParams = new URLSearchParams(window.location.search);
 
     const safeOptions = {
         colleges: options?.colleges || [],
@@ -108,6 +110,14 @@ export default function StudentForm({
                         input:focus { box-shadow: 0 0 0 1px #ffb736 !important; border-color: #ffb736 !important; }
                     `}</style>
 
+                    {data.section && (
+                        <div className="mb-4 p-3 bg-purple-50 border border-purple-100 rounded-lg text-[#5c297c] text-xs">
+                            <i className="bi bi-info-circle-fill mr-2"></i>
+                            This student will be automatically enrolled in <strong>{data.academic_year}</strong>, 
+                            <strong> {data.semester}</strong>, Section <strong>{data.section}</strong>.
+                        </div>
+                    )}
+
                     <form
                         onSubmit={handleInitialSubmit}
                         className="flex flex-col gap-3 p-1"
@@ -116,8 +126,10 @@ export default function StudentForm({
                             <label className={labelClass}>Student ID:</label>
                             <TextInput
                                 value={data.student_number}
-                                className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500 font-bold`}
-                                readOnly={true}
+                                // Add onChange even if readOnly to stop the React warning
+                                onChange={(e) => setData("student_number", e.target.value)}
+                                className={`${inputClass} ${(data.student_number || isEdit) ? 'bg-gray-100 cursor-not-allowed text-gray-500 font-bold' : ''}`}
+                                readOnly={!!data.student_number || isEdit}
                             />
                         </div>
 
@@ -168,6 +180,7 @@ export default function StudentForm({
                                 value={data.college}
                                 onChange={handleCollegeChange}
                                 options={safeOptions.colleges}
+                                disabled={isEdit || (user && user.college_id !== null) || !!queryParams.get('college')}
                                 placeholder="Select College"
                                 className={selectGroupOverride}
                                 labelClassName={selectLabelOverride}
@@ -179,7 +192,7 @@ export default function StudentForm({
                                     setData("program", e.target.value)
                                 }
                                 options={availablePrograms}
-                                disabled={!data.college}
+                                disabled={!data.college || isEdit || (user && user.program_id !== null) || !!queryParams.get('program')}
                                 placeholder={
                                     !data.college
                                         ? "Select College First"
@@ -439,7 +452,7 @@ export default function StudentForm({
                 <ConfirmSaveModal
                     isOpen={isConfirmModalOpen}
                     onClose={() => setIsConfirmModalOpen(false)}
-                    onConfirm={submit} // This calls the put/post logic in StudentEntryPage
+                    onConfirm={() => submit({ preventDefault: () => {} })} // This calls the put/post logic in StudentEntryPage
                     message={
                         <>
                             Are you sure you want to {isEdit ? "update" : "add"}{" "}

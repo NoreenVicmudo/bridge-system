@@ -57,7 +57,7 @@ export default function AcademicProfileFilter({ serverOptions = null }) {
         } else if (field === "year_level") {
             newValues.section = "";
             const key = `${newValues.program}-${value}`;
-            setSectionOptions(options.sections[key] || []);
+                setSectionOptions(dbSections[key] || []);
         }
 
         setValues(newValues);

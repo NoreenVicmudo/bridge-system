@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, usePage } from "@inertiajs/react";
 import { TableContainer } from "@/Components/ReusableTable";
 import { useMockInertia, MOCK_STUDENTS } from "@/Hooks/useMockInertia";
 import AddStudentModal from "@/Components/Modals/AddStudentModal";
@@ -38,9 +38,12 @@ const SortableHeader = ({
     );
 };
 
-export default function StudentInformation({ students }) {
+export default function StudentInformation({ students, filters = {}, dbColleges = [], dbPrograms = [] }) {
     const isBackendReady = !!students;
     const mock = useMockInertia(MOCK_STUDENTS);
+
+    const { auth } = usePage().props;
+    const user = auth.user;
 
     const data = isBackendReady ? students : mock.data;
     const search = isBackendReady ? "" : mock.search;
@@ -52,6 +55,12 @@ export default function StudentInformation({ students }) {
     const sortDirection = isBackendReady ? null : mock.sortDirection;
     const handleSort = isBackendReady ? (col) => {} : mock.handleSort;
 
+    const studentList = Array.isArray(data) 
+        ? data 
+        : (Array.isArray(data?.data) 
+            ? data.data 
+            : (Array.isArray(data?.data?.data) ? data.data.data : []));
+
     // --- STATES ---
     const [isRemoveMode, setIsRemoveMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -60,14 +69,7 @@ export default function StudentInformation({ students }) {
 
     // FILTER STATE
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-    const [activeFilters, setActiveFilters] = useState({
-        academic_year: "2025-2026",
-        semester: "1st Semester",
-        college: "COLLEGE OF ARTS AND SCIENCES",
-        program: "BS PSYCHOLOGY",
-        year_level: "1ST YEAR",
-        section: "1-1",
-    });
+    const [activeFilters, setActiveFilters] = useState({filters});
     const [filterMode, setFilterMode] = useState("section"); // 'section' or 'batch'
 
     // --- HANDLERS ---
@@ -86,11 +88,13 @@ export default function StudentInformation({ students }) {
 
     const toggleSelectAll = (e) => {
         if (e.target.checked) {
-            const allIds = data.data.map((s) => s.id);
+            // Changed from data.data
+            const allIds = studentList.map((s) => s.id);
             setSelectedIds(new Set([...selectedIds, ...allIds]));
         } else {
             const newSelected = new Set(selectedIds);
-            data.data.forEach((s) => newSelected.delete(s.id));
+            // Changed from data.data
+            studentList.forEach((s) => newSelected.delete(s.id));
             setSelectedIds(newSelected);
         }
     };
@@ -101,7 +105,8 @@ export default function StudentInformation({ students }) {
     };
 
     const getSelectedStudents = () => {
-        return data.data.filter((student) => selectedIds.has(student.id));
+        // Changed from data.data
+        return studentList.filter((student) => selectedIds.has(student.id));
     };
 
     // --- EXPORT DROPDOWN ---
@@ -230,12 +235,12 @@ export default function StudentInformation({ students }) {
                     title="Student Information"
                     search={search}
                     onSearch={handleSearch}
-                    paginationData={data}
+                    paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}
                     // 1. FILTER INFO CARD
                     filterDisplay={
                         <FilterInfoCard
-                            filters={activeFilters}
+                            filters={filters}
                             mode={filterMode}
                         />
                     }
@@ -329,8 +334,8 @@ export default function StudentInformation({ students }) {
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
-                        {data.data.length > 0 ? (
-                            data.data.map((student, index) => (
+                        {studentList.length > 0 ? (
+                            studentList.map((student, index) => (
                                 <tr
                                     key={student.id}
                                     className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${index % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}
@@ -420,6 +425,7 @@ export default function StudentInformation({ students }) {
                 <AddStudentModal
                     isOpen={isAddModalOpen}
                     onClose={() => setIsAddModalOpen(false)}
+                    currentFilters={filters}
                 />
                 <RemoveStudentModal
                     isOpen={isRemoveModalOpen}
@@ -433,6 +439,9 @@ export default function StudentInformation({ students }) {
                     onClose={() => setIsFilterModalOpen(false)}
                     currentFilters={activeFilters}
                     onApply={handleApplyFilter}
+                    user={user}
+                    dbColleges={dbColleges}
+                    dbPrograms={dbPrograms}
                 />
             </div>
         </AuthenticatedLayout>

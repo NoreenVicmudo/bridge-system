@@ -5,6 +5,7 @@ use App\Http\Controllers\Student\StudentController;
 use App\Models\College;
 use App\Models\Program;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -33,9 +34,7 @@ Route::get('/main', function () {
 // and masterlist routes down to the auth group!
 // ==========================================
 
-Route::get('/student-entry', function () {
-    return Inertia::render('Student/StudentEntryPage'); 
-})->name('student.entry');
+Route::get('/student-entry', [StudentController::class, 'create'])->name('student.entry');
 
 // ACADEMIC PROFILE (Static routes for now)
 Route::get('/gwa-info', function () { return Inertia::render('Academic/GWAInfo'); })->name('gwa.info');
@@ -92,10 +91,32 @@ Route::middleware('auth')->group(function () {
         ]);
     })->name('student.info.filter'); // Fixed route name to match your sidebar
 
+    Route::get('/api/check-student/{student_number}', [StudentController::class, 'checkStudent'])->name('api.check.student');
+    Route::post('/students', [StudentController::class, 'store'])->name('students.store');
+    Route::post('/students/import', [StudentController::class, 'import'])->name('students.import');
+    
     Route::get('/academic-profile-filter', function () {
+        // 1. Get all unique active sections from the database
+        $dbSections = DB::table('student_section')
+            ->where('is_active', 1)
+            ->select('program_id', 'year_level', 'section')
+            ->distinct()
+            ->get();
+
+        // 2. Format them for React into an object: { "ProgramID-YearLevel": [ {value: "1-1", label: "1-1"} ] }
+        $sectionsMap = [];
+        foreach ($dbSections as $sec) {
+            $key = "{$sec->program_id}-{$sec->year_level}";
+            if (!isset($sectionsMap[$key])) {
+                $sectionsMap[$key] = [];
+            }
+            $sectionsMap[$key][] = ['value' => $sec->section, 'label' => $sec->section];
+        }
+
         return Inertia::render('Academic/AcademicProfileFilter', [
             'dbColleges' => College::where('is_active', true)->get(), 
-            'dbPrograms' => Program::where('is_active', true)->get()
+            'dbPrograms' => Program::where('is_active', true)->get(),
+            'dbSections' => $sectionsMap // Pass the mapped sections!
         ]);
     })->name('academic.profile.filter');
 
