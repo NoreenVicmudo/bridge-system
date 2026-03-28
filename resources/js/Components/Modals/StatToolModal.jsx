@@ -340,7 +340,7 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
                 {/* HEADER (Fixed) - Stays pinned to the top */}
                 <div className="p-6 pb-4 text-center border-b border-gray-100 relative z-[70] flex-shrink-0 bg-white">
                     <h2 className="text-[22px] font-bold text-[#5c297c] tracking-wide">
-                        Statistical Analysis Configuration
+                        Statistical Parameters
                     </h2>
                     <button onClick={closeModal} className="absolute top-6 right-6 text-gray-400 hover:text-[#5c297c] transition-all duration-300 ease-in-out">
                         <i className="bi bi-x-lg text-xl"></i>
