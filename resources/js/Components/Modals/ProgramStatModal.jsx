@@ -3,6 +3,8 @@ import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function ProgramStatModal({ isOpen, onClose, onGenerate }) {
     const [animate, setAnimate] = useState(false);
+    
+    // State is initialized once here, and will now persist!
     const [config, setConfig] = useState({
         category: "",
         field: "",
@@ -39,7 +41,6 @@ export default function ProgramStatModal({ isOpen, onClose, onGenerate }) {
         "GWA", "BoardGrades", "Retakes", "PerformanceRating", "SimExam", "MockScores",
     ];
 
-    // MOCK DATA - Replace with props from Laravel backend
     const SUB_METRICS = {
         GWA: [
             { value: "avg", label: "Average GWA" },
@@ -71,7 +72,7 @@ export default function ProgramStatModal({ isOpen, onClose, onGenerate }) {
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
-            setConfig({ category: "", field: "", sub: "" });
+            // FIX: Removed the setConfig reset here so it remembers previous choices!
         } else {
             setAnimate(false);
         }
@@ -127,20 +128,17 @@ export default function ProgramStatModal({ isOpen, onClose, onGenerate }) {
                 .stat-modal-scroll::-webkit-scrollbar-track { background: transparent; }
             `}</style>
 
-            {/* THE FIX: overflow-y-auto is placed on the entire modal wrapper, unifying the scroll behavior */}
             <div className={`bg-white rounded-2xl w-full max-w-[500px] shadow-2xl relative flex flex-col max-h-[90vh] overflow-y-auto stat-modal-scroll transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
-                {/* HEADER (Sticky) */}
                 <div className="sticky top-0 bg-white p-6 pb-4 text-center border-b border-gray-100 relative z-[70] rounded-t-2xl">
                     <h2 className="text-[22px] font-bold text-[#5c297c] tracking-wide">
-                        Statistical Parameters
+                        Program Analysis Configuration
                     </h2>
                     <button onClick={closeModal} className="absolute top-6 right-6 text-gray-400 hover:text-[#5c297c] transition-all duration-300">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
-                {/* CONTENT AREA: Kept at z-[30] so dropdowns paint perfectly over the buttons below */}
                 <div className="px-8 pb-10 pt-6 flex-1 flex flex-col gap-6 relative z-[30]">
                     <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 relative z-[50]">
                         <h4 className="font-bold text-[#5c297c] mb-4 text-sm uppercase tracking-wider">Select Variable</h4>
@@ -186,7 +184,6 @@ export default function ProgramStatModal({ isOpen, onClose, onGenerate }) {
                     </div>
                 </div>
 
-                {/* FOOTER BUTTONS: Lower z-[10] guarantees they sit underneath the dropdowns, while still naturally flowing at the bottom */}
                 <div className="flex justify-center gap-4 p-5 mt-auto border-t border-gray-100 bg-gray-50 z-[10] relative rounded-b-2xl">
                     <button onClick={closeModal} className="w-[120px] py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-[5px] hover:bg-gray-100 transition-all shadow-sm">
                         Cancel

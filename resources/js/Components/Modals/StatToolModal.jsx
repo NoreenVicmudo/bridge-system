@@ -3,6 +3,8 @@ import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function StatToolModal({ isOpen, onClose, onGenerate }) {
     const [animate, setAnimate] = useState(false);
+    
+    // State is initialized once here, and will now persist!
     const [config, setConfig] = useState({
         tool: "",
         inferentialType: "",
@@ -67,19 +69,7 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
-            setConfig({
-                tool: "",
-                inferentialType: "",
-                descCategory: "",
-                descField: "",
-                descSub: "",
-                var1Category: "",
-                var1Field: "",
-                var1Sub: "",
-                var2Category: "",
-                var2Field: "",
-                var2Sub: "",
-            });
+            // FIX: Removed the setConfig reset here so it remembers previous choices!
         } else {
             setAnimate(false);
         }
@@ -326,7 +316,6 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
     return (
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
-                /* Scrollbar applied to the MAIN scrolling wrapper */
                 .stat-modal-scroll::-webkit-scrollbar { width: 6px; }
                 .stat-modal-scroll::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; }
                 .stat-modal-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -334,23 +323,18 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
                 .animate-snap { animation: snapIn 0.2s ease-out forwards; }
             `}</style>
 
-            {/* Modal Container: Max height limits it to screen size */}
             <div className={`bg-white rounded-2xl w-full max-w-[550px] shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
-                {/* HEADER (Fixed) - Stays pinned to the top */}
                 <div className="p-6 pb-4 text-center border-b border-gray-100 relative z-[70] flex-shrink-0 bg-white">
                     <h2 className="text-[22px] font-bold text-[#5c297c] tracking-wide">
-                        Statistical Parameters
+                        Statistical Analysis Configuration
                     </h2>
                     <button onClick={closeModal} className="absolute top-6 right-6 text-gray-400 hover:text-[#5c297c] transition-all duration-300 ease-in-out">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
-                {/* MAIN SCROLLABLE AREA - Contains BOTH the forms AND the footer buttons! */}
                 <div className="flex-1 overflow-y-auto stat-modal-scroll flex flex-col relative">
-                    
-                    {/* Content Section */}
                     <div className="px-8 pt-6 pb-6 flex flex-col gap-6 relative z-[30]">
                         
                         {/* Tool Selection */}
@@ -443,11 +427,9 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
                         {/* Inferential Mode Variables */}
                         {config.tool === "inferential" && config.inferentialType && (
                             <div className="space-y-6">
-                                
                                 {/* VARIABLE 1 */}
                                 <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 relative z-[40]">
                                     <h4 className="font-bold text-[#5c297c] mb-3 text-sm">Variable 1</h4>
-
                                     <div className="relative z-[30]">
                                         <CustomSelectGroup
                                             label="Category:"
@@ -490,7 +472,6 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
                                 {config.inferentialType !== "chiSquareGOF" && (
                                     <div className="bg-green-50 p-5 rounded-xl border border-green-100 relative z-[30]">
                                         <h4 className="font-bold text-[#5c297c] mb-3 text-sm">Variable 2</h4>
-
                                         <div className="relative z-[30]">
                                             <CustomSelectGroup
                                                 label="Category:"
@@ -533,7 +514,6 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
                         )}
                     </div>
 
-                    {/* BUTTONS - Placed inside the scrollable area at the bottom so they get pushed down naturally */}
                     <div className="flex justify-center gap-4 p-5 mt-auto border-t border-gray-100 bg-gray-50 z-10 relative">
                         <button
                             onClick={closeModal}
