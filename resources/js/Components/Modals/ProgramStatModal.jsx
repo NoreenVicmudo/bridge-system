@@ -132,7 +132,7 @@ export default function ProgramStatModal({ isOpen, onClose, onGenerate }) {
                 
                 <div className="sticky top-0 bg-white p-6 pb-4 text-center border-b border-gray-100 relative z-[70] rounded-t-2xl">
                     <h2 className="text-[22px] font-bold text-[#5c297c] tracking-wide">
-                        Program Analysis Configuration
+                        Statistical Analysis
                     </h2>
                     <button onClick={closeModal} className="absolute top-6 right-6 text-gray-400 hover:text-[#5c297c] transition-all duration-300">
                         <i className="bi bi-x-lg text-xl"></i>
