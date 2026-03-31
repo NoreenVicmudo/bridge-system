@@ -120,7 +120,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/check-student/{student_number}', [StudentController::class, 'checkStudent'])->name('api.check.student');
     Route::post('/students', [StudentController::class, 'store'])->name('students.store');
     Route::post('/students/import', [StudentController::class, 'import'])->name('students.import');
-    
+    Route::post('/students/enroll', [StudentController::class, 'enroll'])->name('students.enroll');
+    Route::post('/students/import-batch', [StudentController::class, 'importBatch'])->name('students.import.batch');
+    Route::post('/students/masterlist', [StudentController::class, 'storeMasterlist'])->name('students.masterlist.store');
+
     Route::get('/academic-profile-filter', function () {
         // 1. Get all unique active sections from the database
         $dbSections = DB::table('student_section')

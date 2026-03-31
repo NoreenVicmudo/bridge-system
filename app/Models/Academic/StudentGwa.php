@@ -1,23 +1,21 @@
 <?php
 
-namespace App\Models\Student;
+namespace App\Models\Academic;
 
-use App\Models\Program;
+use App\Models\Student\StudentInfo;
 use Illuminate\Database\Eloquent\Model;
 
-class StudentSection extends Model
+class StudentGwa extends Model
 {
-    protected $table = 'student_section';
-    protected $primaryKey = 'enroll_id';
+    protected $table = 'student_gwa';
+    protected $primaryKey = 'gwa_id';
     public $timestamps = false;
 
     protected $fillable = [
         'student_number',
-        'section',
         'year_level',
-        'program_id',
         'semester',
-        'academic_year',
+        'gwa',
         'date_created',
         'is_active',
     ];
@@ -29,10 +27,5 @@ class StudentSection extends Model
     public function student()
     {
         return $this->belongsTo(StudentInfo::class, 'student_number', 'student_number');
-    }
-
-    public function program()
-    {
-        return $this->belongsTo(Program::class, 'program_id', 'program_id');
     }
 }

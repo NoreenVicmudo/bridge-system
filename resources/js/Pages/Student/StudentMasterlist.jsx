@@ -113,7 +113,7 @@ export default function StudentMasterlist({ students }) {
                         )}
                     </tbody>
                 </TableContainer>
-                <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+                <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode="masterlist" />
                 <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={data.data.filter(s => selectedIds.has(s.id))} />
             </div>
         </AuthenticatedLayout>

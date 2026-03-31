@@ -14,36 +14,45 @@ class StoreStudentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Core Identity
+            // Core identity
             'student_number' => ['required', 'string'],
-            
-            // Profile Data (Nullable in case they already exist)
-            'first_name' => ['nullable', 'string', 'max:50'],
-            'last_name' => ['nullable', 'string', 'max:50'],
-            'middle_name' => ['nullable', 'string', 'max:50'],
-            'suffix' => ['nullable', 'string', 'max:10'],
-            'birthdate' => ['nullable', 'date'],
-            'sex' => ['nullable', 'string'],
+
+            // Profile data (nullable because they may already exist)
+            'first_name'     => ['nullable', 'string', 'max:50'],
+            'last_name'      => ['nullable', 'string', 'max:50'],
+            'middle_name'    => ['nullable', 'string', 'max:50'],
+            'suffix'         => ['nullable', 'string', 'max:10'],
+            'birthdate'      => ['nullable', 'date'],
+            'sex'            => ['nullable', 'string'],
             'socioeconomic_status' => ['nullable', 'string'],
-            'living_arrangement' => ['nullable', 'integer'],
-            'house_no' => ['nullable', 'string'],
-            'street' => ['nullable', 'string'],
-            'barangay' => ['nullable', 'string'],
-            'city' => ['nullable', 'string'],
-            'province' => ['nullable', 'string'],
-            'postal_code' => ['nullable', 'string'],
-            'work_status' => ['nullable', 'string'],
-            'scholarship' => ['nullable', 'string'],
-            'language' => ['nullable', 'integer'],
+            'living_arrangement'   => ['nullable', 'integer'],
+            'house_no'       => ['nullable', 'string'],
+            'street'         => ['nullable', 'string'],
+            'barangay'       => ['nullable', 'string'],
+            'city'           => ['nullable', 'string'],
+            'province'       => ['nullable', 'string'],
+            'postal_code'    => ['nullable', 'string'],
+            'work_status'    => ['nullable', 'string'],
+            'scholarship'    => ['nullable', 'string'],
+            'language'       => ['nullable', 'integer'],
             'last_school_type' => ['nullable', 'string'],
 
-            // The "Context" Fields (Required to enroll them!)
-            'college' => ['required', 'integer'],
-            'program' => ['required', 'integer'],
-            'academic_year' => ['required', 'string'],
-            'semester' => ['required', 'string'],
-            'year_level' => ['required', 'integer'],
-            'section' => ['required', 'string'],
+            // Mode
+            'mode' => ['required', 'in:section,batch'],
+
+            // Section context
+            'academic_year'  => ['nullable', 'string'],
+            'semester'       => ['nullable', 'string'],
+            'section'        => ['nullable', 'string'],
+            'year_level'     => ['nullable', 'integer'],
+            'college'        => ['nullable', 'integer'],
+            'program'        => ['nullable', 'integer'],
+
+            // Batch context
+            'batch_college'  => ['nullable', 'integer'],
+            'batch_program'  => ['nullable', 'integer'],
+            'batch_year'     => ['nullable', 'integer'],
+            'batch_number'   => ['nullable', 'integer'],
         ];
     }
 }

@@ -3,16 +3,28 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { useForm, Head, usePage } from "@inertiajs/react";
 import StudentForm from "@/Components/Forms/StudentForm";
 
-export default function StudentEntryPage({
-    student = null,
-    prefilledId = null,
-    options,
-}) {
+export default function StudentEntryPage({ student = null, prefilledId = null, options }) {
     // 1. Logic Check: If 'student' prop exists, we are in Edit mode.
     const { auth } = usePage().props;
     const user = auth.user;
-    const queryParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const queryParams = new URLSearchParams(window.location.search);
     const isEdit = !!student;
+
+    const mode = queryParams.get('mode') || 'masterlist';
+    const enrollmentContext = {};
+    if (mode === 'section') {
+        enrollmentContext.academic_year = queryParams.get('academic_year');
+        enrollmentContext.semester = queryParams.get('semester');
+        enrollmentContext.college = queryParams.get('college');
+        enrollmentContext.program = queryParams.get('program');
+        enrollmentContext.year_level = queryParams.get('year_level');
+        enrollmentContext.section = queryParams.get('section');
+    } else if (mode === 'batch') {
+        enrollmentContext.college_id = queryParams.get('college_id');
+        enrollmentContext.program_id = queryParams.get('program_id');
+        enrollmentContext.year = queryParams.get('year');
+        enrollmentContext.batch_number = queryParams.get('batch_number');
+    }
 
     // 2. Initialize the form
     // If editing, use student data. If adding, use empty strings (or prefilledId).
@@ -24,10 +36,6 @@ export default function StudentEntryPage({
         suffix: isEdit ? student.suffix : "",
         college: isEdit ? student.college : (user.college_id || queryParams.get('college') || ""),
         program: isEdit ? student.program : (user.program_id || queryParams.get('program') || ""),
-        academic_year: queryParams.get('academic_year') || "",
-        semester: queryParams.get('semester') || "",
-        year_level: queryParams.get('year_level') || "",
-        section: queryParams.get('section') || "",
         birthdate: isEdit ? student.birthdate : "",
         sex: isEdit ? student.sex : "",
         socioeconomic_status: isEdit ? student.socioeconomic_status : "",
@@ -42,6 +50,16 @@ export default function StudentEntryPage({
         scholarship: isEdit ? student.scholarship : "",
         language: isEdit ? student.language : "",
         last_school_type: isEdit ? student.last_school_type : "",
+
+        academic_year: queryParams.get('academic_year') || "",
+        semester: queryParams.get('semester') || "",
+        year_level: queryParams.get('year_level') || "",
+        section: queryParams.get('section') || "",
+        // batch fields
+        college_id: queryParams.get('college_id') || "",
+        program_id: queryParams.get('program_id') || "",
+        batch_year: queryParams.get('year') || "",
+        batch_number: queryParams.get('batch_number') || "",
     });
 
     // 3. Handle Submit based on mode
@@ -70,6 +88,8 @@ export default function StudentEntryPage({
                     submit={handleSubmit}
                     isEdit={isEdit}
                     options={options}
+                    mode={mode}
+                    enrollmentContext={enrollmentContext}
                 />
             </div>
         </AuthenticatedLayout>

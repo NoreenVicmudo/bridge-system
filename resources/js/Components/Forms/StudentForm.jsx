@@ -12,6 +12,8 @@ export default function StudentForm({
     isEdit = false,
     options = {},
     user = null,
+    mode = 'section',
+    enrollmentContext = {},
 }) {
     // 1. Modal State
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -110,11 +112,118 @@ export default function StudentForm({
                         input:focus { box-shadow: 0 0 0 1px #ffb736 !important; border-color: #ffb736 !important; }
                     `}</style>
 
-                    {data.section && (
-                        <div className="mb-4 p-3 bg-purple-50 border border-purple-100 rounded-lg text-[#5c297c] text-xs">
-                            <i className="bi bi-info-circle-fill mr-2"></i>
-                            This student will be automatically enrolled in <strong>{data.academic_year}</strong>, 
-                            <strong> {data.semester}</strong>, Section <strong>{data.section}</strong>.
+                    {/* Enrollment context (read‑only) */}
+                    {mode === 'section' && (
+                        <div className="border-t pt-4 mt-4">
+                            <h3 className="font-bold text-[#5c297c] mb-2">Enrollment Details (Section)</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className={labelClass}>Academic Year:</label>
+                                    <TextInput
+                                        value={data.academic_year}
+                                        onChange={(e) => setData('academic_year', e.target.value)}
+                                        readOnly={!!enrollmentContext.academic_year}
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Semester:</label>
+                                    <TextInput
+                                        value={data.semester}
+                                        onChange={(e) => setData('semester', e.target.value)}
+                                        readOnly={!!enrollmentContext.semester}
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>College:</label>
+                                    <TextInput
+                                        value={options.colleges.find(c => c.value == data.college)?.label || ''}
+                                        readOnly
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Program:</label>
+                                    <TextInput
+                                        value={options.programs[data.college]?.find(p => p.value == data.program)?.label || ''}
+                                        readOnly
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Year Level:</label>
+                                    <TextInput
+                                        value={data.year_level}
+                                        onChange={(e) => setData('year_level', e.target.value)}
+                                        readOnly={!!enrollmentContext.year_level}
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Section:</label>
+                                    <TextInput
+                                        value={data.section}
+                                        onChange={(e) => setData('section', e.target.value)}
+                                        readOnly={!!enrollmentContext.section}
+                                        className={inputClass}
+                                    />
+                                </div>
+                            </div>
+                            {/* Hidden fields to send context on submit */}
+                            <input type="hidden" name="academic_year" value={data.academic_year} />
+                            <input type="hidden" name="semester" value={data.semester} />
+                            <input type="hidden" name="year_level" value={data.year_level} />
+                            <input type="hidden" name="section" value={data.section} />
+                            <input type="hidden" name="mode" value="section" />
+                        </div>
+                    )}
+
+                    {mode === 'batch' && (
+                        <div className="border-t pt-4 mt-4">
+                            <h3 className="font-bold text-[#5c297c] mb-2">Batch Enrollment Details</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className={labelClass}>College:</label>
+                                    <TextInput
+                                        value={options.colleges.find(c => c.value == data.college_id)?.label || ''}
+                                        readOnly
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Program:</label>
+                                    <TextInput
+                                        value={options.programs[data.college_id]?.find(p => p.value == data.program_id)?.label || ''}
+                                        readOnly
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Year:</label>
+                                    <TextInput
+                                        value={data.batch_year}
+                                        onChange={(e) => setData('batch_year', e.target.value)}
+                                        readOnly={!!enrollmentContext.year}
+                                        className={inputClass}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Board Batch:</label>
+                                    <TextInput
+                                        value={data.batch_number}
+                                        onChange={(e) => setData('batch_number', e.target.value)}
+                                        readOnly={!!enrollmentContext.batch_number}
+                                        className={inputClass}
+                                    />
+                                </div>
+                            </div>
+                            {/* Hidden fields to send context on submit */}
+                            <input type="hidden" name="batch_college" value={data.college_id} />
+                            <input type="hidden" name="batch_program" value={data.program_id} />
+                            <input type="hidden" name="batch_year" value={data.batch_year} />
+                            <input type="hidden" name="batch_number" value={data.batch_number} />
+                            <input type="hidden" name="mode" value="batch" />
                         </div>
                     )}
 

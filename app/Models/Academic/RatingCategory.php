@@ -1,23 +1,19 @@
 <?php
 
-namespace App\Models\Student;
+namespace App\Models\Academic;
 
 use App\Models\Program;
 use Illuminate\Database\Eloquent\Model;
 
-class StudentSection extends Model
+class RatingCategory extends Model
 {
-    protected $table = 'student_section';
-    protected $primaryKey = 'enroll_id';
+    protected $table = 'rating_category';
+    protected $primaryKey = 'category_id';
     public $timestamps = false;
 
     protected $fillable = [
-        'student_number',
-        'section',
-        'year_level',
+        'category_name',
         'program_id',
-        'semester',
-        'academic_year',
         'date_created',
         'is_active',
     ];
@@ -25,11 +21,6 @@ class StudentSection extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
-
-    public function student()
-    {
-        return $this->belongsTo(StudentInfo::class, 'student_number', 'student_number');
-    }
 
     public function program()
     {

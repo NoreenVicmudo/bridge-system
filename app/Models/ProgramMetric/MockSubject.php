@@ -1,23 +1,19 @@
 <?php
 
-namespace App\Models\Student;
+namespace App\Models\ProgramMetric;
 
 use App\Models\Program;
 use Illuminate\Database\Eloquent\Model;
 
-class StudentSection extends Model
+class MockSubject extends Model
 {
-    protected $table = 'student_section';
-    protected $primaryKey = 'enroll_id';
+    protected $table = 'mock_subjects';
+    protected $primaryKey = 'mock_subject_id';
     public $timestamps = false;
 
     protected $fillable = [
-        'student_number',
-        'section',
-        'year_level',
         'program_id',
-        'semester',
-        'academic_year',
+        'mock_subject_name',
         'date_created',
         'is_active',
     ];
@@ -25,11 +21,6 @@ class StudentSection extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
-
-    public function student()
-    {
-        return $this->belongsTo(StudentInfo::class, 'student_number', 'student_number');
-    }
 
     public function program()
     {

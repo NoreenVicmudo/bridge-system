@@ -1,23 +1,20 @@
 <?php
 
-namespace App\Models\Student;
+namespace App\Models\Academic;
 
-use App\Models\Program;
+use App\Models\Student\StudentInfo;
 use Illuminate\Database\Eloquent\Model;
 
-class StudentSection extends Model
+class StudentBackSubject extends Model
 {
-    protected $table = 'student_section';
-    protected $primaryKey = 'enroll_id';
+    protected $table = 'student_back_subjects';
+    protected $primaryKey = 'back_id';
     public $timestamps = false;
 
     protected $fillable = [
         'student_number',
-        'section',
-        'year_level',
-        'program_id',
-        'semester',
-        'academic_year',
+        'general_subject_id',
+        'terms_repeated',
         'date_created',
         'is_active',
     ];
@@ -31,8 +28,8 @@ class StudentSection extends Model
         return $this->belongsTo(StudentInfo::class, 'student_number', 'student_number');
     }
 
-    public function program()
+    public function generalSubject()
     {
-        return $this->belongsTo(Program::class, 'program_id', 'program_id');
+        return $this->belongsTo(GeneralSubject::class, 'general_subject_id', 'general_subject_id');
     }
 }

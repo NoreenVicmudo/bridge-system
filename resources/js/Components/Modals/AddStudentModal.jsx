@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { router, useForm } from "@inertiajs/react";
 import axios from "axios"; // Make sure to have axios installed, or use standard fetch!
 
-export default function AddStudentModal({ isOpen, onClose, currentFilters = {} }) {
+export default function AddStudentModal({ isOpen, onClose, filterMode = 'section', currentFilters = {} }) {
     const [view, setView] = useState("options");
     const [checkStatus, setCheckStatus] = useState("idle");
     const [animate, setAnimate] = useState(false);
@@ -44,61 +44,80 @@ export default function AddStudentModal({ isOpen, onClose, currentFilters = {} }
 
     // --- THE REAL REDIRECTION ---
     const handleProceed = () => {
-        closeModal(); // Close the modal
-        
-        // Route to the entry page, passing the student number AND the active filters!
-        router.get('/student-entry', { 
+        closeModal();
+        const params = new URLSearchParams({
             prefilledId: studentNumberInput,
-            ...currentFilters 
+            mode: filterMode,
         });
+
+        if (filterMode === 'section') {
+            params.append('academic_year', currentFilters.academic_year || '');
+            params.append('semester', currentFilters.semester || '');
+            params.append('college', currentFilters.college || '');
+            params.append('program', currentFilters.program || '');
+            params.append('year_level', currentFilters.year_level || '');
+            params.append('section', currentFilters.section || '');
+        } else {
+            params.append('college_id', currentFilters.batch_college || '');
+            params.append('program_id', currentFilters.batch_program || '');
+            params.append('year', currentFilters.batch_year || '');
+            params.append('batch_number', currentFilters.board_batch || '');
+        }
+
+        router.get('/student-entry', params.toString());
     };
 
-    // FILE UPLOAD
-    const { data, setData, post, processing, errors, reset } = useForm({
-        file: null,
-        // Carry the context so the backend knows where to enroll them!
-        academic_year: currentFilters.academic_year || "",
-        semester: currentFilters.semester || "",
-        college: currentFilters.college || "",
-        program: currentFilters.program || "",
-        year_level: currentFilters.year_level || "",
-        section: currentFilters.section || "",
-    });
+    // FILE UPLOAD - Using axios instead of Inertia's useForm
+    const [importFile, setImportFile] = useState(null);
+    const [importProcessing, setImportProcessing] = useState(false);
+    const [importError, setImportError] = useState(null);
 
-    useEffect(() => {
-        if (isOpen) {
-            setData({
-                file: null, // Always reset the file input when opening
-                academic_year: currentFilters.academic_year || "",
-                semester: currentFilters.semester || "",
-                college: currentFilters.college || "",
-                program: currentFilters.program || "",
-                year_level: currentFilters.year_level || "",
-                section: currentFilters.section || "",
-            });
-        }
-    }, [isOpen, currentFilters]);
-
-    const handleImportSubmit = (e) => {
+    const handleImportSubmit = async (e) => {
         e.preventDefault();
-        post(route('students.import'), {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                // Laravel will pass back our "Successfully created X..." message!
-                const successMsg = page.props.flash?.success;
-                if (successMsg) {
-                    alert(successMsg); 
-                } else {
-                    alert("Import processed!");
+        if (!importFile) return;
+        
+        setImportProcessing(true);
+        setImportError(null);
+        
+        const formData = new FormData();
+        formData.append('file', importFile);
+        
+        let endpoint;
+        if (filterMode === 'section') {
+            endpoint = route('students.import');
+            formData.append('academic_year', currentFilters.academic_year || '');
+            formData.append('semester', currentFilters.semester || '');
+            formData.append('college', currentFilters.college || '');
+            formData.append('program', currentFilters.program || '');
+            formData.append('year_level', currentFilters.year_level || '');
+            formData.append('section', currentFilters.section || '');
+        } else {
+            endpoint = route('students.import.batch');
+            formData.append('college_id', currentFilters.batch_college || '');
+            formData.append('program_id', currentFilters.batch_program || '');
+            formData.append('year', currentFilters.batch_year || '');
+            formData.append('batch_number', currentFilters.board_batch || '');
+        }
+        
+        try {
+            await axios.post(endpoint, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Inertia': true
                 }
-                closeModal();
-            },
-            onError: (err) => {
-                // If validation fails, show us why!
-                console.error("Upload Errors:", err);
-                alert("Upload failed. Check the form for errors.");
-            }
-        });
+            });
+            alert('Import successful!');
+            closeModal();
+            window.location.reload();
+        } catch (error) {
+            console.error('Import error:', error);
+            const message = error.response?.data?.message || 'Import failed. Please check the file format.';
+            alert(message);
+            setImportError(message);
+        } finally {
+            setImportProcessing(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -147,18 +166,16 @@ export default function AddStudentModal({ isOpen, onClose, currentFilters = {} }
                                     <input 
                                         type="file" 
                                         accept=".csv"
-                                        onChange={(e) => setData('file', e.target.files[0])}
+                                        onChange={(e) => setImportFile(e.target.files[0])}
                                         className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-[#5c297c] hover:file:bg-purple-200 cursor-pointer"
                                         required
                                     />
-                                    {errors.file && <span className="text-red-500 text-xs">{errors.file}</span>}
-                                    
                                     <button 
                                         type="submit"
-                                        disabled={processing || !data.file}
+                                        disabled={importProcessing || !importFile}
                                         className="mt-2 w-full py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] transition-all disabled:opacity-50"
                                     >
-                                        {processing ? "Uploading & Processing..." : "Import Students"}
+                                        {importProcessing ? "Uploading & Processing..." : "Import Students"}
                                     </button>
                                 </form>
                             </div>

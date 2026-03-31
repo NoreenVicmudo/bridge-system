@@ -155,12 +155,16 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        console.log("Submitting Values:", values);
-        // Here you will eventually use router.get() to pass these values to the Masterlist
-        router.get('/student-info', values, {
-        preserveState: true, 
-        preserveScroll: true,
-    });
+        
+        // Filter out empty values and only send keys relevant to the active mode
+        const filteredParams = Object.fromEntries(
+            Object.entries(values).filter(([_, v]) => v !== "")
+        );
+
+        router.get('/student-info', filteredParams, {
+            preserveState: true, 
+            preserveScroll: true,
+        });
     };
 
     // Validation logic (Kept exactly as you had it)

@@ -8,7 +8,7 @@ import RemoveStudentModal from "@/Components/Modals/RemoveStudentModal";
 import FilterStudentModal from "@/Components/Modals/FilterStudentModal"; // The new modal
 import FilterInfoCard from "@/Components/FilterInfoCard"; // The new card
 
-// --- SORTABLE HEADER COMPONENT ---
+/*/ --- SORTABLE HEADER COMPONENT ---
 const SortableHeader = ({
     label,
     sortKey,
@@ -36,7 +36,7 @@ const SortableHeader = ({
             </div>
         </th>
     );
-};
+};*/
 
 export default function StudentInformation({ students, filters = {}, dbColleges = [], dbPrograms = [] }) {
     const isBackendReady = !!students;
@@ -65,7 +65,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
     const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
 
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-    const [activeFilters, setActiveFilters] = useState({filters});
+    const [activeFilters, setActiveFilters] = useState(filters || {});
     const [filterMode, setFilterMode] = useState("section"); // 'section' or 'batch'
 
     // --- HANDLERS ---
@@ -73,6 +73,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
         setActiveFilters(newFilters);
         setFilterMode(mode);
         // Here you would also trigger a backend reload via router.get()
+        router.get('/student-info', newFilters, { preserveState: true, preserveScroll: true });
     };
 
     const toggleSelection = (id) => {
@@ -161,7 +162,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                     </tbody>
                 </TableContainer>
 
-                <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+                <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode={filterMode} currentFilters={activeFilters} />
                 <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={data.data.filter(s => selectedIds.has(s.id))} />
                 <FilterStudentModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={(v, m) => { setActiveFilters(v); setFilterMode(m); }} />
             </div>
