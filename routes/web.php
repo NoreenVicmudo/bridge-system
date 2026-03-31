@@ -60,15 +60,41 @@ Route::get('/mock-scores-entry', function () { return Inertia::render('Program/M
 Route::get('/licensure-exam', function () { return Inertia::render('Program/LicensureExam'); })->name('licensure.exam');
 Route::get('/licensure-entry', function () { return Inertia::render('Program/LicensureEntry'); })->name('licensure.entry');
 
-// Additional Entry
-Route::get('/student-additional', function () { return Inertia::render('Entry/StudentInformationEntry'); })->name('student.additional');
-Route::get('/academic-additional', function () { return Inertia::render('Entry/AcademicProfileEntry'); })->name('academic.additional');
-Route::get('/program-additional', function () { return Inertia::render('Entry/ProgramMetricsEntry'); })->name('program.additional');
-Route::get('/document-design', function () { return Inertia::render('Entry/DocumentFormat'); })->name('document.design');
+//Additional Entry
+Route::get('/student-additional', function () {
+    return Inertia::render('Entry/StudentInformationEntry'); 
+})->name('student.additional');
 
-// REPORT GENERATION & LOGS
-Route::get('/report-generation-filter', function () { return Inertia::render('Reports/ReportGenerationFilter'); })->name('report.generation.filter');
-Route::get('/transaction-logs', function () { return Inertia::render('Transactions/TransactionLogs'); })->name('transaction.logs');
+Route::get('/academic-additional', function () {
+    return Inertia::render('Entry/AcademicProfileEntry'); 
+})->name('academic.additional');
+
+Route::get('/program-additional', function () {
+    return Inertia::render('Entry/ProgramMetricsEntry'); 
+})->name('program.additional');
+
+
+
+//REPORT GENERATION
+Route::get('/report-generation-filter', function () {
+    return Inertia::render('Reports/ReportGenerationFilter'); 
+})->name('report.generation.filter');
+
+Route::get('/report-generation', function () {
+    return Inertia::render('Reports/ReportGeneration'); 
+})->name('report.generation');
+
+Route::get('/report-programs', function () {
+    return Inertia::render('Reports/ReportGenerationPrograms'); 
+})->name('report.programs');
+
+
+
+//TRANSACTION LOGS
+Route::get('/transaction-logs', function () {
+    return Inertia::render('Transactions/TransactionLogs'); 
+})->name('transaction.logs');
+
 
 // MANAGE USERS
 Route::get('/users', function () { return Inertia::render('User/UserList'); })->name('users');

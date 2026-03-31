@@ -1,5 +1,31 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
+import ExportButton from "@/Components/ExportButton";
+
+export const SortableHeader = ({
+    label,
+    sortKey,
+    currentSort,
+    currentDirection,
+    onSort,
+    className = "",
+}) => {
+    const isActive = currentSort === sortKey;
+    return (
+        <th
+            onClick={() => onSort(sortKey)}
+            className={`py-3 px-6 font-bold cursor-pointer hover:bg-[#4a1f63] transition-all duration-300 ease-in-out select-none group ${className}`}
+        >
+            <div className="flex items-center gap-2">
+                {label}
+                <div className="flex flex-col text-[10px] leading-none text-white/50 group-hover:text-white transition-colors duration-300 ease-in-out">
+                    <i className={`bi bi-caret-up-fill ${isActive && currentDirection === "asc" ? "text-[#ffb736]" : ""}`}></i>
+                    <i className={`bi bi-caret-down-fill ${isActive && currentDirection === "desc" ? "text-[#ffb736]" : ""}`}></i>
+                </div>
+            </div>
+        </th>
+    );
+};
 
 export function TableContainer({
     title,
@@ -12,6 +38,7 @@ export function TableContainer({
     onPageChange,
     filterDisplay,
     showEditNote = true,
+    exportEndpoint,
 }) {
     return (
         <>
@@ -25,20 +52,17 @@ export function TableContainer({
             `}</style>
 
             <div className="bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] flex flex-col w-full font-['Montserrat'] animate-fade-in relative">
-                {/* --- HEADER --- */}
                 <div className="p-6 border-b border-gray-100 flex flex-col gap-6 rounded-t-[10px]">
                     <h2 className="text-[24px] md:text-[28px] font-bold text-[#5c297c] text-center w-full">
                         {title}
                     </h2>
 
-                    {/* --- NEW: FILTER DISPLAY SLOT --- */}
                     {filterDisplay && (
                         <div className="w-full animate-fade-in-up">
                             {filterDisplay}
                         </div>
                     )}
 
-                    {/* Controls Row */}
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
                         <div className="w-full md:w-auto">
                             <input
@@ -46,90 +70,68 @@ export function TableContainer({
                                 placeholder="Search..."
                                 value={search}
                                 onChange={(e) => onSearch(e.target.value)}
-                                className="w-full md:w-[300px] px-4 py-2 border border-[#5c297c] rounded-[5px] text-sm focus:outline-none focus:ring-2 focus:ring-[#ffb736] transition-all duration-300 ease-in-out"
+                                className="w-full md:w-[300px] h-[40px] px-4 border border-[#5c297c] rounded-[5px] text-sm focus:outline-none focus:ring-2 focus:ring-[#ffb736] transition-all duration-300 ease-in-out"
                             />
                         </div>
-                        {/* Actions (Fixed Width) */}
-                        <div className="flex shrink-0 gap-2">
+                        
+                        <div className="flex shrink-0 gap-2 items-center">
+                            {exportEndpoint && <ExportButton endpoint={exportEndpoint} />}
                             {headerActions}
                         </div>
                     </div>
                 </div>
 
-                {/* --- TABLE CONTENT --- */}
                 <div className="w-full overflow-x-auto scrollbar-purple">
                     <table className="w-full text-left border-collapse whitespace-nowrap">
                         {children}
                     </table>
                 </div>
 
-                {/* --- FOOTER --- */}
-                <div className="p-4 bg-[#f8f9fa] border-t border-gray-200 rounded-b-[10px]">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-                        <div className="text-sm text-gray-600 font-medium">
-                            Showing {paginationData.from} to {paginationData.to}{" "}
-                            of {paginationData.total} entries
-                        </div>
-                        <div className="flex gap-1">
-                            {paginationData.links.map((link, i) => {
-                                const isSimulated =
-                                    typeof onPageChange === "function";
-                                const className = `px-3 py-1.5 rounded text-sm font-medium transition-all duration-300 ease-in-out ${
-                                    link.active
-                                        ? "bg-[#ffb736] text-white shadow-sm"
-                                        : "bg-[#5c297c] text-white hover:bg-[#4a1f63]"
-                                } ${!link.url ? "opacity-50 cursor-not-allowed bg-gray-400" : ""}`;
+                {(paginationData || footerActions || showEditNote) && (
+                    <div className="p-4 bg-[#f8f9fa] border-t border-gray-200 rounded-b-[10px]">
+                        {paginationData && (
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                                <div className="text-sm text-gray-600 font-medium">
+                                    Showing {paginationData.from} to {paginationData.to} of {paginationData.total} entries
+                                </div>
+                                <div className="flex gap-1">
+                                    {paginationData.links.map((link, i) => {
+                                        const isSimulated = typeof onPageChange === "function";
+                                        const className = `px-3 py-1.5 rounded text-sm font-medium transition-all duration-300 ease-in-out ${
+                                            link.active ? "bg-[#ffb736] text-white shadow-sm" : "bg-[#5c297c] text-white hover:bg-[#4a1f63]"
+                                        } ${!link.url ? "opacity-50 cursor-not-allowed bg-gray-400" : ""}`;
 
-                                if (isSimulated) {
-                                    return (
-                                        <button
-                                            key={i}
-                                            disabled={!link.url}
-                                            onClick={() =>
-                                                link.url &&
-                                                onPageChange(link.page)
-                                            }
-                                            className={className}
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    );
-                                }
-                                return link.url ? (
-                                    <Link
-                                        key={i}
-                                        href={link.url}
-                                        className={className}
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                ) : (
-                                    <span
-                                        key={i}
-                                        className={className}
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </div>
+                                        if (isSimulated) {
+                                            return <button key={i} disabled={!link.url} onClick={() => link.url && onPageChange(link.page)} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />;
+                                        }
+                                        return link.url ? (
+                                            <Link key={i} href={link.url} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                        ) : (
+                                            <span key={i} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
-                    <div className="flex-1">
                         {showEditNote && (
-                            <p className="text-[#ed1c24] text-xs md:text-sm font-medium italic">
-                                Note: Click on the ID to edit the information.
-                            </p>
+                            <div className="flex-1 mb-4">
+                                <p className="text-[#ed1c24] text-xs md:text-sm font-medium italic">
+                                    Note: Click on the ID to edit the information.
+                                </p>
+                            </div>
+                        )}
+                        
+                        {footerActions && (
+                            <>
+                                {(paginationData || showEditNote) && <hr className="border-gray-300 mb-4" />}
+                                <div className="flex gap-3 min-h-[42px] items-center">
+                                    {footerActions}
+                                </div>
+                            </>
                         )}
                     </div>
-                    <hr className="border-gray-300 mb-4" />
-                    <div className="flex gap-3 min-h-[42px] items-center">
-                        {footerActions}
-                    </div>
-                </div>
+                )}
             </div>
         </>
     );

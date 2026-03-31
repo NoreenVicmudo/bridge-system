@@ -1,13 +1,55 @@
-import React from "react";
-import { Head, Link, useForm } from "@inertiajs/react";
+import React, { useEffect } from "react";
+import { Head, Link, useForm, router } from "@inertiajs/react";
 import BackgroundLayout from "@/Components/BackgroundLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
+import NProgress from "nprogress";
 
 export default function SignUp({ colleges, positions }) {
     const { data, setData, post, processing, errors } = useForm({
         college: "",
         position: "",
     });
+
+    useEffect(() => {
+        // Snappier Configuration
+        NProgress.configure({ 
+            showSpinner: false, 
+            speed: 300, 
+            trickleSpeed: 100, // Makes it move faster
+            minimum: 0.3 
+        });
+
+        let finishTimeout;
+
+        const handleStart = () => {
+            clearTimeout(finishTimeout);
+            NProgress.start();
+        };
+
+        const handleFinish = () => {
+            // Short debounce to ensure redirects don't "double-jump"
+            finishTimeout = setTimeout(() => {
+                NProgress.done();
+            }, 100); 
+        };
+
+        const handleBrowserNav = () => {
+            NProgress.done();
+            NProgress.remove();
+        };
+
+        const removeStart = router.on("start", handleStart);
+        const removeFinish = router.on("finish", handleFinish);
+        window.addEventListener("popstate", handleBrowserNav);
+
+        return () => {
+            removeStart();
+            removeFinish();
+            window.removeEventListener("popstate", handleBrowserNav);
+            clearTimeout(finishTimeout);
+            NProgress.done();
+        };
+    }, []);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -17,13 +59,6 @@ export default function SignUp({ colleges, positions }) {
     return (
         <BackgroundLayout>
             <Head title="BRIDGE - Sign Up" />
-
-            {/* Unified Purple Scrollbar Styling */}
-            <style>{`
-                .signup-purple-scroll ul::-webkit-scrollbar { width: 6px; }
-                .signup-purple-scroll ul::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 10px; }
-                .signup-purple-scroll ul::-webkit-scrollbar-track { background: transparent; }
-            `}</style>
 
             <Link
                 href={route("login")}
@@ -38,11 +73,7 @@ export default function SignUp({ colleges, positions }) {
                         Select Affiliation
                     </h2>
 
-                    <form
-                        onSubmit={handleSubmit}
-                        className="space-y-2 text-left overflow-visible"
-                    >
-                        {/* College Dropdown using your CustomSelectGroup */}
+                    <form onSubmit={handleSubmit} className="space-y-2 text-left overflow-visible">
                         <CustomSelectGroup
                             label="Select College"
                             value={data.college}
@@ -54,13 +85,10 @@ export default function SignUp({ colleges, positions }) {
                             className="signup-purple-scroll"
                         />
 
-                        {/* Position Dropdown using your CustomSelectGroup */}
                         <CustomSelectGroup
                             label="Select Position"
                             value={data.position}
-                            onChange={(e) =>
-                                setData("position", e.target.value)
-                            }
+                            onChange={(e) => setData("position", e.target.value)}
                             options={positions}
                             placeholder="Choose your position"
                             vertical={true}
@@ -71,14 +99,9 @@ export default function SignUp({ colleges, positions }) {
                         <div className="pt-6">
                             <button
                                 type="submit"
-                                disabled={
-                                    processing ||
-                                    !data.college ||
-                                    !data.position
-                                }
+                                disabled={processing || !data.college || !data.position}
                                 className={`w-full max-w-[260px] mx-auto block font-bold py-3 rounded-lg transition-all shadow-md active:translate-y-1 flex justify-center items-center gap-3
-                                    ${
-                                        !data.college || !data.position
+                                    ${!data.college || !data.position
                                             ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                             : "bg-[#5c297c] hover:bg-[#ffb736] text-white cursor-pointer"
                                     }`}
@@ -86,9 +109,7 @@ export default function SignUp({ colleges, positions }) {
                                 {processing ? (
                                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
-                                    <span className="tracking-wide uppercase text-sm">
-                                        Continue
-                                    </span>
+                                    <span className="tracking-wide uppercase text-sm">Continue</span>
                                 )}
                             </button>
                         </div>
