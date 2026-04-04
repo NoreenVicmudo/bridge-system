@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Head, Link, usePage } from "@inertiajs/react";
+import { router, Head, Link, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
 import { useMockInertia, MOCK_STUDENTS } from "@/Hooks/useMockInertia";
 import AddStudentModal from "@/Components/Modals/AddStudentModal";
@@ -66,7 +66,14 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
 
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [activeFilters, setActiveFilters] = useState(filters || {});
-    const [filterMode, setFilterMode] = useState("section"); // 'section' or 'batch'
+    const [filterMode, setFilterMode] = useState(filters?.mode || "section");
+
+    useEffect(() => {
+        console.log('filters changed:', filters);
+        if (filters?.mode) {
+            setFilterMode(filters.mode);
+        }
+    }, [filters]);
 
     // --- HANDLERS ---
     const handleApplyFilter = (newFilters, mode) => {
@@ -164,7 +171,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
 
                 <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode={filterMode} currentFilters={activeFilters} />
                 <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={data.data.filter(s => selectedIds.has(s.id))} />
-                <FilterStudentModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={(v, m) => { setActiveFilters(v); setFilterMode(m); }} />
+                <FilterStudentModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={handleApplyFilter} dbColleges={dbColleges} dbPrograms={dbPrograms} user={user} />
             </div>
         </AuthenticatedLayout>
     );

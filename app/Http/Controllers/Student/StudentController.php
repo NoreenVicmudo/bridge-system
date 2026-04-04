@@ -42,7 +42,7 @@ class StudentController extends Controller
         $message = $action->execute($request->file('file'), $request->except('file'));
 
         // 3. Redirect back with a success message
-        return redirect()->back()->with('success', $message);
+        return response()->json(['success' => true, 'message' => $message]);
     }
 
     public function masterlist(Request $request)
@@ -97,91 +97,188 @@ class StudentController extends Controller
 
     /**
      * PATH 2: The Filtered Result (Shows only what the user searched for)
+     * Supports both Section and Batch filtering.
      */
     public function filteredInfo(Request $request)
     {
         $user = $request->user();
 
-        $query = StudentInfo::query()
-            ->with(['college', 'program', 'living', 'language'])
-            ->join('student_section', 'student_info.student_number', '=', 'student_section.student_number')
-            ->select('student_info.*', 'student_section.academic_year', 'student_section.semester', 'student_section.year_level', 'student_section.section')
-            ->where('student_info.is_active', 1)
-            ->where('student_section.is_active', 1);
+        // Detect which mode we are in
+        $isBatchMode = $request->filled('batch_college') && 
+                    $request->filled('batch_program') && 
+                    $request->filled('batch_year') && 
+                    $request->filled('board_batch');
 
-        // --- Unified Filtering Logic ---
-        // Use 'college' for Section Mode and 'batch_college' for Batch Mode (or standardize them)
-        $collegeId = $request->input('college') ?? $request->input('batch_college');
-        $programId = $request->input('program') ?? $request->input('batch_program');
+        if ($isBatchMode) {
+            // ==================== BATCH MODE ====================
+            $query = StudentInfo::query()
+                ->with(['college', 'program', 'living', 'language'])
+                ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
+                ->select(
+                    'student_info.*',
+                    'board_batch.year as batch_year',
+                    'board_batch.batch_number',
+                    'board_batch.batch_id'
+                )
+                ->where('student_info.is_active', 1)
+                ->where('board_batch.is_active', 1);
 
-        // 1. Apply Scope (What they are ALLOWED to see)
-        if ($user->college_id) {
-            $query->where('student_info.college_id', $user->college_id);
-        }
-        if ($user->program_id) {
-            $query->where('student_info.program_id', $user->program_id);
-        }
+            // 1. Apply role-based scope (what the user is allowed to see)
+            if ($user->college_id) {
+                $query->where('student_info.college_id', $user->college_id);
+            }
+            if ($user->program_id) {
+                $query->where('student_info.program_id', $user->program_id);
+            }
 
-        // 2. Apply Filters (What they WANT to see)
-        // If Admin, they can filter any college. If Dean, they are already scoped above.
-        if ($request->filled('college')) {
-            $query->where('student_info.college_id', $request->college);
-        }
-        if ($request->filled('program')) {
-            $query->where('student_info.program_id', $request->program);
-        }
-        
-        // Section specific filters
-        if ($request->filled('academic_year')) {
-            $query->where('student_section.academic_year', $request->academic_year);
-        }
-        if ($request->filled('semester')) {
-            $query->where('student_section.semester', $request->semester);
-        }
-        if ($request->filled('section')) {
-            $query->where('student_section.section', $request->section);
-        }
+            // 2. Apply batch filters from request
+            if ($request->filled('batch_college')) {
+                $query->where('student_info.college_id', $request->batch_college);
+            }
+            if ($request->filled('batch_program')) {
+                $query->where('student_info.program_id', $request->batch_program);
+            }
+            if ($request->filled('batch_year')) {
+                $query->where('board_batch.year', $request->batch_year);
+            }
+            if ($request->filled('board_batch')) {
+                $query->where('board_batch.batch_number', $request->board_batch);
+            }
 
-        $students = $query->paginate(20)->withQueryString(); // Crucial for pagination to keep filters
+            $students = $query->paginate(20)->withQueryString();
 
+            // Transform each student to match React component expectations
+            $students->getCollection()->transform(function ($student) {
+                $age = $student->student_birthdate ? \Carbon\Carbon::parse($student->student_birthdate)->age : 'N/A';
+                $address = trim("{$student->student_address_number} {$student->student_address_street}, {$student->student_address_barangay}, {$student->student_address_city}");
+                $address = $address ?: 'N/A';
 
-        // 🔥 FIX: Properly transform the collection
-        $students->getCollection()->transform(function ($student) {
-            $age = $student->student_birthdate ? \Carbon\Carbon::parse($student->student_birthdate)->age : 'N/A';
-            $address = trim("{$student->student_address_number} {$student->student_address_street}, {$student->student_address_barangay}, {$student->student_address_city}");
-            $address = $address ?: 'N/A';
+                return [
+                    'id'                => $student->student_id,
+                    'student_number'    => $student->student_number,
+                    'name'              => "{$student->student_lname}, {$student->student_fname}" . ($student->student_mname ? ' ' . substr($student->student_mname, 0, 1) . '.' : ''),
+                    'college'           => $student->college?->name ?? 'N/A',
+                    'program'           => $student->program?->name ?? 'N/A',
+                    'age'               => $age,
+                    'sex'               => $student->student_sex ?? 'N/A',
+                    'socioeconomic'     => $student->student_socioeconomic ?? 'N/A',
+                    'address'           => $address,
+                    'living_arrangement'=> $student->living?->name ?? 'N/A',
+                    'work_status'       => $student->student_work ?? 'N/A',
+                    'scholarship'       => $student->student_scholarship ?? 'N/A',
+                    'language'          => $student->language?->name ?? 'N/A',
+                    'last_school'       => $student->student_last_school ?? 'N/A',
+                    // Additional batch info (optional)
+                    'batch_year'        => $student->batch_year,
+                    'batch_number'      => $student->batch_number,
+                ];
+            });
 
-            return [
-                'id'                => $student->student_id,
-                'student_number'    => $student->student_number,
-                'name'              => "{$student->student_lname}, {$student->student_fname}" . ($student->student_mname ? ' ' . substr($student->student_mname, 0, 1) . '.' : ''),
-                'college'           => $student->college?->name ?? 'N/A',
-                'program'           => $student->program?->name ?? 'N/A',
-                'age'               => $age,
-                'sex'               => $student->student_sex ?? 'N/A',
-                'socioeconomic'     => $student->student_socioeconomic ?? 'N/A',
-                'address'           => $address,
-                'living_arrangement'=> $student->living?->name ?? 'N/A',
-                'work_status'       => $student->student_work ?? 'N/A',
-                'scholarship'       => $student->student_scholarship ?? 'N/A',
-                'language'          => $student->language?->name ?? 'N/A',
-                'last_school'       => $student->student_last_school ?? 'N/A',
-            ];
-        });
+            // Build filter data for the UI card
+            $filterData = $request->only(['batch_college', 'batch_program', 'batch_year', 'board_batch']);
+            if ($request->filled('batch_college')) {
+                $filterData['batch_college_name'] = College::find($request->batch_college)?->name;
+            }
+            if ($request->filled('batch_program')) {
+                $filterData['batch_program_name'] = Program::find($request->batch_program)?->name;
+            }
+            // Add mode indicator for the frontend
+            $filterData['mode'] = 'batch';
 
-        // Build filter info for display
-        $filterData = $request->only(['academic_year', 'semester', 'college', 'program', 'year_level', 'section']);
-        if ($request->filled('college')) {
-            $filterData['college_name'] = College::find($request->college)?->name;
+            return Inertia::render('Student/StudentInfo', [
+                'students' => $students,
+                'filters' => $filterData,
+                'dbColleges' => College::where('is_active', true)->get(),
+                'dbPrograms' => Program::where('is_active', true)->get(),
+            ]);
+        } else {
+            // ==================== SECTION MODE ====================
+            $query = StudentInfo::query()
+                ->with(['college', 'program', 'living', 'language'])
+                ->join('student_section', 'student_info.student_number', '=', 'student_section.student_number')
+                ->select('student_info.*', 'student_section.academic_year', 'student_section.semester', 'student_section.year_level', 'student_section.section')
+                ->where('student_info.is_active', 1)
+                ->where('student_section.is_active', 1);
+
+            // 1. Apply role-based scope
+            if ($user->college_id) {
+                $query->where('student_info.college_id', $user->college_id);
+            }
+            if ($user->program_id) {
+                $query->where('student_info.program_id', $user->program_id);
+            }
+
+            // 2. Apply section filters from request
+            if ($request->filled('college')) {
+                $query->where('student_info.college_id', $request->college);
+            }
+            if ($request->filled('program')) {
+                $query->where('student_info.program_id', $request->program);
+            }
+            if ($request->filled('academic_year')) {
+                $query->where('student_section.academic_year', $request->academic_year);
+            }
+            if ($request->filled('semester')) {
+                $query->where('student_section.semester', $request->semester);
+            }
+            if ($request->filled('year_level')) {
+                $query->where('student_section.year_level', $request->year_level);
+            }
+            if ($request->filled('section')) {
+                $query->where('student_section.section', $request->section);
+            }
+
+            $students = $query->paginate(20)->withQueryString();
+
+            // Transform each student
+            $students->getCollection()->transform(function ($student) {
+                $age = $student->student_birthdate ? \Carbon\Carbon::parse($student->student_birthdate)->age : 'N/A';
+                $address = trim("{$student->student_address_number} {$student->student_address_street}, {$student->student_address_barangay}, {$student->student_address_city}");
+                $address = $address ?: 'N/A';
+
+                return [
+                    'id'                => $student->student_id,
+                    'student_number'    => $student->student_number,
+                    'name'              => "{$student->student_lname}, {$student->student_fname}" . ($student->student_mname ? ' ' . substr($student->student_mname, 0, 1) . '.' : ''),
+                    'college'           => $student->college?->name ?? 'N/A',
+                    'program'           => $student->program?->name ?? 'N/A',
+                    'age'               => $age,
+                    'sex'               => $student->student_sex ?? 'N/A',
+                    'socioeconomic'     => $student->student_socioeconomic ?? 'N/A',
+                    'address'           => $address,
+                    'living_arrangement'=> $student->living?->name ?? 'N/A',
+                    'work_status'       => $student->student_work ?? 'N/A',
+                    'scholarship'       => $student->student_scholarship ?? 'N/A',
+                    'language'          => $student->language?->name ?? 'N/A',
+                    'last_school'       => $student->student_last_school ?? 'N/A',
+                ];
+            });
+
+            // Build filter data for the UI card
+            $filterData = $request->only(['academic_year', 'semester', 'college', 'program', 'year_level', 'section']);
+            if ($request->filled('college')) {
+                $filterData['college_name'] = College::find($request->college)?->name;
+            }
+            if ($request->filled('program')) {
+                $filterData['program_name'] = Program::find($request->program)?->name;
+            }
+            if ($user->college_id && !isset($filterData['college'])) {
+                $filterData['college'] = $user->college_id;
+                $filterData['college_name'] = College::find($user->college_id)?->name;
+            }
+            if ($user->program_id && !isset($filterData['program'])) {
+                $filterData['program'] = $user->program_id;
+                $filterData['program_name'] = Program::find($user->program_id)?->name;
+            }
+            $filterData['mode'] = 'section';
+
+            return Inertia::render('Student/StudentInfo', [
+                'students' => $students,
+                'filters' => $filterData,
+                'dbColleges' => College::where('is_active', true)->get(),
+                'dbPrograms' => Program::where('is_active', true)->get(),
+            ]);
         }
-        if ($request->filled('program')) {
-            $filterData['program_name'] = Program::find($request->program)?->name;
-        }
-
-        return Inertia::render('Student/StudentInfo', [
-            'students' => $students,
-            'filters' => $filterData,
-        ]);
     }
 
     public function checkStudent($studentNumber)
@@ -292,7 +389,7 @@ class StudentController extends Controller
         ]);
 
         $message = $action->execute($request->file('file'), $request->except('file'));
-        return redirect()->back()->with('success', $message);
+        return response()->json(['success' => true, 'message' => $message]);
     }
 
     public function storeMasterlist(StoreStudentRequest $request, StoreStudentAction $action)

@@ -100,16 +100,21 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
         }
         
         try {
-            await axios.post(endpoint, formData, {
+            const response = await axios.post(endpoint, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-Inertia': true
+                    // Remove X-Inertia header to avoid redirect handling
                 }
             });
-            alert('Import successful!');
-            closeModal();
-            window.location.reload();
+            if (response.data.success) {
+                alert(response.data.message);
+                closeModal();
+                // Refresh the page to show updated table data
+                window.location.reload();
+            } else {
+                alert('Import failed: ' + response.data.message);
+            }
         } catch (error) {
             console.error('Import error:', error);
             const message = error.response?.data?.message || 'Import failed. Please check the file format.';
