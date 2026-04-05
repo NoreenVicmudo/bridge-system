@@ -6,6 +6,7 @@ use App\Actions\Student\EnrollStudentAction;
 use App\Actions\Student\ImportBatchAction;
 use App\Actions\Student\ImportStudentsAction;
 use App\Actions\Student\StoreStudentAction;
+use App\Actions\Student\DirectEnrollStudentAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\StoreStudentRequest;
 use App\Models\College;
@@ -396,5 +397,26 @@ class StudentController extends Controller
     {
         $message = $action->execute($request->validated());
         return redirect()->route('student.masterlist')->with('success', $message);
-}
+    }
+
+    public function directEnroll(Request $request, DirectEnrollStudentAction $action)
+    {
+        $validated = $request->validate([
+            'student_number' => 'required|string',
+            'mode' => 'required|in:section,batch',
+            'academic_year' => 'nullable|string',
+            'semester' => 'nullable|string',
+            'section' => 'nullable|string',
+            'year_level' => 'nullable|integer',
+            'college' => 'nullable|integer',
+            'program' => 'nullable|integer',
+            'batch_college' => 'nullable|integer',
+            'batch_program' => 'nullable|integer',
+            'batch_year' => 'nullable|integer',
+            'batch_number' => 'nullable|integer',
+        ]);
+
+        $message = $action->execute($validated);
+        return response()->json(['success' => true, 'message' => $message]);
+    }
 }

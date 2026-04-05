@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { router, useForm } from "@inertiajs/react";
-import axios from "axios"; // Make sure to have axios installed, or use standard fetch!
+import axios from "axios";
 
 export default function AddStudentModal({ isOpen, onClose, filterMode = 'section', currentFilters = {} }) {
     const [view, setView] = useState("options");
     const [checkStatus, setCheckStatus] = useState("idle");
     const [animate, setAnimate] = useState(false);
+    const [enrolling, setEnrolling] = useState(false);
     
-    // Track the actual input value
     const [studentNumberInput, setStudentNumberInput] = useState("");
 
     useEffect(() => {
@@ -15,7 +15,8 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
             setAnimate(true);
             setView("options");
             setCheckStatus("idle");
-            setStudentNumberInput(""); // Reset input on open
+            setStudentNumberInput("");
+            setEnrolling(false);
         }
     }, [isOpen]);
 
@@ -26,48 +27,82 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
         }, 300);
     };
 
-    // --- THE REAL DATABASE CHECK ---
     const handleCheck = async () => {
         if (!studentNumberInput.trim()) return;
-        
         setCheckStatus("loading");
-        
         try {
-            // Ask Laravel if this student exists
             const response = await axios.get(`/api/check-student/${studentNumberInput}`);
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch (error) {
             console.error("Error checking student ID:", error);
-            setCheckStatus("idle"); // Reset on error
+            setCheckStatus("idle");
         }
     };
 
-    // --- THE REAL REDIRECTION ---
-    const handleProceed = () => {
-        closeModal();
-        const params = new URLSearchParams({
-            prefilledId: studentNumberInput,
-            mode: filterMode,
-        });
-
-        if (filterMode === 'section') {
-            params.append('academic_year', currentFilters.academic_year || '');
-            params.append('semester', currentFilters.semester || '');
-            params.append('college', currentFilters.college || '');
-            params.append('program', currentFilters.program || '');
-            params.append('year_level', currentFilters.year_level || '');
-            params.append('section', currentFilters.section || '');
+    const handleProceed = async () => {
+        if (checkStatus === 'exists') {
+            setEnrolling(true);
+            try {
+                const payload = {
+                    student_number: studentNumberInput,
+                    mode: filterMode,
+                };
+                if (filterMode === 'section') {
+                    payload.academic_year = currentFilters.academic_year || '';
+                    payload.semester = currentFilters.semester || '';
+                    payload.college = currentFilters.college || '';
+                    payload.program = currentFilters.program || '';
+                    payload.year_level = currentFilters.year_level || '';
+                    payload.section = currentFilters.section || '';
+                } else {
+                    payload.batch_college = currentFilters.batch_college || '';
+                    payload.batch_program = currentFilters.batch_program || '';
+                    payload.batch_year = currentFilters.batch_year || '';
+                    payload.batch_number = currentFilters.board_batch || '';
+                }
+                const response = await axios.post(route('students.direct-enroll'), payload);
+                if (response.data.success) {
+                    alert(response.data.message);
+                    closeModal();
+                    window.location.reload();
+                } else {
+                    alert('Enrollment failed: ' + response.data.message);
+                }
+            } catch (error) {
+                console.error('Enrollment error:', error);
+                alert('Enrollment failed. Please try again.');
+            } finally {
+                setEnrolling(false);
+            }
         } else {
-            params.append('college_id', currentFilters.batch_college || '');
-            params.append('program_id', currentFilters.batch_program || '');
-            params.append('year', currentFilters.batch_year || '');
-            params.append('batch_number', currentFilters.board_batch || '');
+            // New student: go to entry page
+            const queryObject = {
+                    prefilledId: studentNumberInput,
+                    mode: filterMode,
+                };
+
+            if (filterMode === 'section') {
+                queryObject.academic_year = currentFilters.academic_year || '';
+                queryObject.semester = currentFilters.semester || '';
+                queryObject.college = currentFilters.college || '';
+                queryObject.program = currentFilters.program || '';
+                queryObject.year_level = currentFilters.year_level || '';
+                queryObject.section = currentFilters.section || '';
+            } else {
+                queryObject.college_id = currentFilters.batch_college || '';
+                queryObject.program_id = currentFilters.batch_program || '';
+                queryObject.year = currentFilters.batch_year || '';
+                queryObject.batch_number = currentFilters.board_batch || '';
+            }
+
+            closeModal();
+            router.get('/student-entry',queryObject);
         }
 
-        router.get('/student-entry', params.toString());
+        
     };
 
-    // FILE UPLOAD - Using axios instead of Inertia's useForm
+    // FILE UPLOAD
     const [importFile, setImportFile] = useState(null);
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
@@ -104,13 +139,11 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     'X-Requested-With': 'XMLHttpRequest',
-                    // Remove X-Inertia header to avoid redirect handling
                 }
             });
             if (response.data.success) {
                 alert(response.data.message);
                 closeModal();
-                // Refresh the page to show updated table data
                 window.location.reload();
             } else {
                 alert('Import failed: ' + response.data.message);
@@ -130,7 +163,6 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
     return (
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                
                 <div className="bg-[#5c297c] p-6 text-center relative">
                     <h2 className="text-2xl font-bold text-white tracking-wide">Add New Student</h2>
                     <p className="text-purple-200 text-sm mt-1">Choose how you want to add records</p>
@@ -148,7 +180,6 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                 </div>
                                 <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Import File</span>
                             </button>
-
                             <button onClick={() => setView("manual")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-person-plus text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
@@ -166,7 +197,6 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                 <p className="text-sm text-gray-600 mb-4">
                                     Enrolling students to: <strong>{currentFilters.section || "Selected Section"}</strong>
                                 </p>
-                                
                                 <form onSubmit={handleImportSubmit} className="flex flex-col gap-3">
                                     <input 
                                         type="file" 
@@ -184,7 +214,6 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                     </button>
                                 </form>
                             </div>
-
                             <button onClick={() => setView("options")} className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-2">
                                 ← Back to Options
                             </button>
@@ -214,15 +243,18 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                 </div>
                             </div>
 
-                            {/* UX UPGRADE: Don't show an error if they exist. Show an "Enroll" prompt! */}
                             {checkStatus === "exists" && (
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
                                     <div className="flex items-center gap-2 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100">
                                         <i className="bi bi-info-circle-fill text-xl"></i>
                                         <span className="text-sm font-medium">Student found! You can proceed to enroll them.</span>
                                     </div>
-                                    <button onClick={handleProceed} className="w-full py-3 bg-[#ffb736] text-white font-bold rounded-lg shadow-md hover:bg-[#e0a800] hover:scale-[1.02] transition-all">
-                                        Proceed to Enroll
+                                    <button 
+                                        onClick={handleProceed} 
+                                        disabled={enrolling}
+                                        className="w-full py-3 bg-[#ffb736] text-white font-bold rounded-lg shadow-md hover:bg-[#e0a800] hover:scale-[1.02] transition-all disabled:opacity-60"
+                                    >
+                                        {enrolling ? "Enrolling..." : "Proceed to Enroll"}
                                     </button>
                                 </div>
                             )}

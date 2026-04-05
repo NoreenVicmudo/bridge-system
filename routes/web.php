@@ -123,6 +123,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/students/enroll', [StudentController::class, 'enroll'])->name('students.enroll');
     Route::post('/students/import-batch', [StudentController::class, 'importBatch'])->name('students.import.batch');
     Route::post('/students/masterlist', [StudentController::class, 'storeMasterlist'])->name('students.masterlist.store');
+    Route::post('/students/direct-enroll', [StudentController::class, 'directEnroll'])->name('students.direct-enroll');
 
     Route::get('/academic-profile-filter', function () {
         // 1. Get all unique active sections from the database

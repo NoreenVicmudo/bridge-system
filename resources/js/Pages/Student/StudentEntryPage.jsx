@@ -2,6 +2,7 @@ import React from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { useForm, Head, usePage } from "@inertiajs/react";
 import StudentForm from "@/Components/Forms/StudentForm";
+import { pre } from "motion/react-client";
 
 export default function StudentEntryPage({ student = null, prefilledId = null, options }) {
     // 1. Logic Check: If 'student' prop exists, we are in Edit mode.
@@ -75,6 +76,8 @@ export default function StudentEntryPage({ student = null, prefilledId = null, o
         }
     };
 
+    console.log(prefilledId);
+
     return (
         <AuthenticatedLayout>
             <Head title={isEdit ? "Edit Student" : "Add Student"} />
@@ -90,6 +93,7 @@ export default function StudentEntryPage({ student = null, prefilledId = null, o
                     options={options}
                     mode={mode}
                     enrollmentContext={enrollmentContext}
+                    user={user}
                 />
             </div>
         </AuthenticatedLayout>

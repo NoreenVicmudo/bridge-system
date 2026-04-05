@@ -1,7 +1,7 @@
-import React, { useState } from "react"; // Added useState
+import React, { useState } from "react";
 import TextInput from "@/Components/TextInput";
 import CustomSelectGroup from "@/Components/SelectGroup";
-import ConfirmSaveModal from "@/Components/Modals/ConfirmSaveModal"; // Import the reusable modal
+import ConfirmSaveModal from "@/Components/Modals/ConfirmSaveModal";
 
 export default function StudentForm({
     data,
@@ -15,7 +15,6 @@ export default function StudentForm({
     mode = 'section',
     enrollmentContext = {},
 }) {
-    // 1. Modal State
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const queryParams = new URLSearchParams(window.location.search);
 
@@ -87,7 +86,6 @@ export default function StudentForm({
         );
     };
 
-    // 2. Intercept Submit to show Modal
     const handleInitialSubmit = (e) => {
         e.preventDefault();
         if (isFormValid()) {
@@ -99,9 +97,7 @@ export default function StudentForm({
         <div className="flex justify-center w-full px-4 py-0 h-[calc(100vh-100px)] items-start overflow-hidden font-montserrat">
             <div className="w-full max-w-2xl bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] px-6 py-4 md:px-8 md:py-5 flex flex-col max-h-full my-2">
                 <h2 className="text-center text-xl md:text-2xl font-bold text-[#5c297c] mb-3 flex-shrink-0">
-                    {isEdit
-                        ? "Edit Student Information"
-                        : "Student Information"}
+                    {isEdit ? "Edit Student Information" : "Student Information"}
                 </h2>
 
                 <div className="overflow-y-auto overflow-x-hidden pr-2 flex-1 custom-form-scrollbar">
@@ -112,7 +108,7 @@ export default function StudentForm({
                         input:focus { box-shadow: 0 0 0 1px #ffb736 !important; border-color: #ffb736 !important; }
                     `}</style>
 
-                    {/* Enrollment context (read‑only) */}
+                    {/* Enrollment context display (read-only) */}
                     {mode === 'section' && (
                         <div className="border-t pt-4 mt-4">
                             <h3 className="font-bold text-[#5c297c] mb-2">Enrollment Details (Section)</h3>
@@ -170,12 +166,6 @@ export default function StudentForm({
                                     />
                                 </div>
                             </div>
-                            {/* Hidden fields to send context on submit */}
-                            <input type="hidden" name="academic_year" value={data.academic_year} />
-                            <input type="hidden" name="semester" value={data.semester} />
-                            <input type="hidden" name="year_level" value={data.year_level} />
-                            <input type="hidden" name="section" value={data.section} />
-                            <input type="hidden" name="mode" value="section" />
                         </div>
                     )}
 
@@ -218,24 +208,35 @@ export default function StudentForm({
                                     />
                                 </div>
                             </div>
-                            {/* Hidden fields to send context on submit */}
-                            <input type="hidden" name="batch_college" value={data.college_id} />
-                            <input type="hidden" name="batch_program" value={data.program_id} />
-                            <input type="hidden" name="batch_year" value={data.batch_year} />
-                            <input type="hidden" name="batch_number" value={data.batch_number} />
-                            <input type="hidden" name="mode" value="batch" />
                         </div>
                     )}
 
-                    <form
-                        onSubmit={handleInitialSubmit}
-                        className="flex flex-col gap-3 p-1"
-                    >
+                    <form onSubmit={handleInitialSubmit} className="flex flex-col gap-3 p-1">
+                        {/* Hidden fields for mode and context - must be inside form */}
+                        <input type="hidden" name="mode" value={mode} />
+                        {mode === 'section' && (
+                            <>
+                                <input type="hidden" name="academic_year" value={data.academic_year} />
+                                <input type="hidden" name="semester" value={data.semester} />
+                                <input type="hidden" name="college" value={data.college} />
+                                <input type="hidden" name="program" value={data.program} />
+                                <input type="hidden" name="year_level" value={data.year_level} />
+                                <input type="hidden" name="section" value={data.section} />
+                            </>
+                        )}
+                        {mode === 'batch' && (
+                            <>
+                                <input type="hidden" name="batch_college" value={data.college_id} />
+                                <input type="hidden" name="batch_program" value={data.program_id} />
+                                <input type="hidden" name="batch_year" value={data.batch_year} />
+                                <input type="hidden" name="batch_number" value={data.batch_number} />
+                            </>
+                        )}
+
                         <div className="w-full">
                             <label className={labelClass}>Student ID:</label>
                             <TextInput
                                 value={data.student_number}
-                                // Add onChange even if readOnly to stop the React warning
                                 onChange={(e) => setData("student_number", e.target.value)}
                                 className={`${inputClass} ${(data.student_number || isEdit) ? 'bg-gray-100 cursor-not-allowed text-gray-500 font-bold' : ''}`}
                                 readOnly={!!data.student_number || isEdit}
@@ -248,36 +249,28 @@ export default function StudentForm({
                                 <TextInput
                                     placeholder="Last Name"
                                     value={data.last_name}
-                                    onChange={(e) =>
-                                        setData("last_name", e.target.value)
-                                    }
+                                    onChange={(e) => setData("last_name", e.target.value)}
                                     className={inputClass}
                                     required
                                 />
                                 <TextInput
                                     placeholder="First Name"
                                     value={data.first_name}
-                                    onChange={(e) =>
-                                        setData("first_name", e.target.value)
-                                    }
+                                    onChange={(e) => setData("first_name", e.target.value)}
                                     className={inputClass}
                                     required
                                 />
                                 <TextInput
                                     placeholder="Middle Name"
                                     value={data.middle_name}
-                                    onChange={(e) =>
-                                        setData("middle_name", e.target.value)
-                                    }
+                                    onChange={(e) => setData("middle_name", e.target.value)}
                                     className={inputClass}
                                     required
                                 />
                                 <TextInput
                                     placeholder="Suffix"
                                     value={data.suffix}
-                                    onChange={(e) =>
-                                        setData("suffix", e.target.value)
-                                    }
+                                    onChange={(e) => setData("suffix", e.target.value)}
                                     className={inputClass}
                                 />
                             </div>
@@ -297,16 +290,10 @@ export default function StudentForm({
                             <CustomSelectGroup
                                 label="Program:"
                                 value={data.program}
-                                onChange={(e) =>
-                                    setData("program", e.target.value)
-                                }
+                                onChange={(e) => setData("program", e.target.value)}
                                 options={availablePrograms}
                                 disabled={!data.college || isEdit || (user && user.program_id !== null) || !!queryParams.get('program')}
-                                placeholder={
-                                    !data.college
-                                        ? "Select College First"
-                                        : "Select Program"
-                                }
+                                placeholder={!data.college ? "Select College First" : "Select Program"}
                                 className={selectGroupOverride}
                                 labelClassName={selectLabelOverride}
                             />
@@ -318,13 +305,8 @@ export default function StudentForm({
                                 <TextInput
                                     type="date"
                                     value={data.birthdate}
-                                    onChange={(e) =>
-                                        setData("birthdate", e.target.value)
-                                    }
-                                    onClick={(e) =>
-                                        e.target.showPicker &&
-                                        e.target.showPicker()
-                                    }
+                                    onChange={(e) => setData("birthdate", e.target.value)}
+                                    onClick={(e) => e.target.showPicker && e.target.showPicker()}
                                     className={`${inputClass} cursor-pointer`}
                                     required
                                 />
@@ -345,19 +327,12 @@ export default function StudentForm({
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
                             <div className="w-full">
-                                <label className={labelClass}>
-                                    Socioeconomic Status (PHP):
-                                </label>
+                                <label className={labelClass}>Socioeconomic Status (PHP):</label>
                                 <TextInput
                                     type="number"
                                     placeholder="Amount in PHP"
                                     value={data.socioeconomic_status}
-                                    onChange={(e) =>
-                                        setData(
-                                            "socioeconomic_status",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => setData("socioeconomic_status", e.target.value)}
                                     className={inputClass}
                                     required
                                 />
@@ -365,12 +340,7 @@ export default function StudentForm({
                             <CustomSelectGroup
                                 label="Living Arrangement:"
                                 value={data.living_arrangement}
-                                onChange={(e) =>
-                                    setData(
-                                        "living_arrangement",
-                                        e.target.value,
-                                    )
-                                }
+                                onChange={(e) => setData("living_arrangement", e.target.value)}
                                 options={safeOptions.livingArrangements}
                                 placeholder="Select Living Arrangement"
                                 className={selectGroupOverride}
@@ -385,27 +355,21 @@ export default function StudentForm({
                                     <TextInput
                                         placeholder="House No."
                                         value={data.house_no}
-                                        onChange={(e) =>
-                                            setData("house_no", e.target.value)
-                                        }
+                                        onChange={(e) => setData("house_no", e.target.value)}
                                         className={inputClass}
                                         required
                                     />
                                     <TextInput
                                         placeholder="Street"
                                         value={data.street}
-                                        onChange={(e) =>
-                                            setData("street", e.target.value)
-                                        }
+                                        onChange={(e) => setData("street", e.target.value)}
                                         className={inputClass}
                                         required
                                     />
                                     <TextInput
                                         placeholder="Barangay"
                                         value={data.barangay}
-                                        onChange={(e) =>
-                                            setData("barangay", e.target.value)
-                                        }
+                                        onChange={(e) => setData("barangay", e.target.value)}
                                         className={inputClass}
                                         required
                                     />
@@ -414,30 +378,21 @@ export default function StudentForm({
                                     <TextInput
                                         placeholder="City"
                                         value={data.city}
-                                        onChange={(e) =>
-                                            setData("city", e.target.value)
-                                        }
+                                        onChange={(e) => setData("city", e.target.value)}
                                         className={inputClass}
                                         required
                                     />
                                     <TextInput
                                         placeholder="Province"
                                         value={data.province}
-                                        onChange={(e) =>
-                                            setData("province", e.target.value)
-                                        }
+                                        onChange={(e) => setData("province", e.target.value)}
                                         className={inputClass}
                                         required
                                     />
                                     <TextInput
                                         placeholder="ZIP Code"
                                         value={data.postal_code}
-                                        onChange={(e) =>
-                                            setData(
-                                                "postal_code",
-                                                e.target.value,
-                                            )
-                                        }
+                                        onChange={(e) => setData("postal_code", e.target.value)}
                                         className={inputClass}
                                         required
                                     />
@@ -449,16 +404,11 @@ export default function StudentForm({
                             <CustomSelectGroup
                                 label="Work Status:"
                                 value={data.work_status}
-                                onChange={(e) =>
-                                    setData("work_status", e.target.value)
-                                }
+                                onChange={(e) => setData("work_status", e.target.value)}
                                 options={[
                                     { value: "Full-time", label: "Full-time" },
                                     { value: "Part-time", label: "Part-time" },
-                                    {
-                                        value: "Not-Working",
-                                        label: "Not Working",
-                                    },
+                                    { value: "Not-Working", label: "Not Working" },
                                 ]}
                                 placeholder="Select Work Status"
                                 className={selectGroupOverride}
@@ -467,9 +417,7 @@ export default function StudentForm({
                             <CustomSelectGroup
                                 label="Scholarship Status:"
                                 value={data.scholarship}
-                                onChange={(e) =>
-                                    setData("scholarship", e.target.value)
-                                }
+                                onChange={(e) => setData("scholarship", e.target.value)}
                                 options={[
                                     { value: "Internal", label: "MCU-Funded" },
                                     { value: "External", label: "External" },
@@ -485,9 +433,7 @@ export default function StudentForm({
                             <CustomSelectGroup
                                 label="Language Spoken At Home:"
                                 value={data.language}
-                                onChange={(e) =>
-                                    setData("language", e.target.value)
-                                }
+                                onChange={(e) => setData("language", e.target.value)}
                                 options={safeOptions.languages}
                                 placeholder="Select Language"
                                 className={selectGroupOverride}
@@ -496,9 +442,7 @@ export default function StudentForm({
                             <CustomSelectGroup
                                 label="Last School Attended (SHS):"
                                 value={data.last_school_type}
-                                onChange={(e) =>
-                                    setData("last_school_type", e.target.value)
-                                }
+                                onChange={(e) => setData("last_school_type", e.target.value)}
                                 options={[
                                     { value: "Private", label: "Private" },
                                     { value: "Public", label: "Public" },
@@ -511,17 +455,10 @@ export default function StudentForm({
 
                         {showOtherLanguage && (
                             <div className="w-full animate-fade-in text-left">
-                                <label className={labelClass}>
-                                    If others, please specify:
-                                </label>
+                                <label className={labelClass}>If others, please specify:</label>
                                 <TextInput
                                     value={data.other_language}
-                                    onChange={(e) =>
-                                        setData(
-                                            "other_language",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => setData("other_language", e.target.value)}
                                     placeholder="Enter other language"
                                     className={inputClass}
                                     required
@@ -541,35 +478,22 @@ export default function StudentForm({
                                 type="submit"
                                 disabled={processing || !isFormValid()}
                                 className={`px-6 py-2.5 text-sm font-bold text-white rounded-[6px] transition-all duration-300 shadow-md font-montserrat
-                                    ${
-                                        !isFormValid() && !isEdit
-                                            ? "bg-gray-400 cursor-not-allowed opacity-50"
-                                            : "bg-[#5c297c] hover:bg-[#ffb736] cursor-pointer"
-                                    }`}
+                                    ${!isFormValid() && !isEdit ? "bg-gray-400 cursor-not-allowed opacity-50" : "bg-[#5c297c] hover:bg-[#ffb736] cursor-pointer"}`}
                             >
-                                {processing
-                                    ? "Saving..."
-                                    : isEdit
-                                      ? "Update Student"
-                                      : "Add Student"}
+                                {processing ? "Saving..." : isEdit ? "Update Student" : "Add Student"}
                             </button>
                         </div>
                     </form>
                 </div>
 
-                {/* 3. THE REUSABLE MODAL COMPONENT */}
                 <ConfirmSaveModal
                     isOpen={isConfirmModalOpen}
                     onClose={() => setIsConfirmModalOpen(false)}
-                    onConfirm={() => submit({ preventDefault: () => {} })} // This calls the put/post logic in StudentEntryPage
+                    onConfirm={() => submit({ preventDefault: () => {} })}
                     message={
                         <>
-                            Are you sure you want to {isEdit ? "update" : "add"}{" "}
-                            the record for <br />
-                            <strong>
-                                {data.last_name}, {data.first_name}
-                            </strong>
-                            ?
+                            Are you sure you want to {isEdit ? "update" : "add"} the record for <br />
+                            <strong>{data.last_name}, {data.first_name}</strong>?
                         </>
                     }
                 />
