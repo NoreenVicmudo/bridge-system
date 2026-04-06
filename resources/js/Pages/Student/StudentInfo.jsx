@@ -5,93 +5,108 @@ import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
 import { useMockInertia, MOCK_STUDENTS } from "@/Hooks/useMockInertia";
 import AddStudentModal from "@/Components/Modals/AddStudentModal";
 import RemoveStudentModal from "@/Components/Modals/RemoveStudentModal";
-import FilterStudentModal from "@/Components/Modals/FilterStudentModal"; // The new modal
-import FilterInfoCard from "@/Components/FilterInfoCard"; // The new card
-
-/*/ --- SORTABLE HEADER COMPONENT ---
-const SortableHeader = ({
-    label,
-    sortKey,
-    currentSort,
-    currentDirection,
-    onSort,
-    className = "",
-}) => {
-    const isActive = currentSort === sortKey;
-    return (
-        <th
-            onClick={() => onSort(sortKey)}
-            className={`py-3 px-6 font-bold cursor-pointer hover:bg-[#4a1f63] transition-colors select-none group ${className}`}
-        >
-            <div className="flex items-center gap-2">
-                {label}
-                <div className="flex flex-col text-[10px] leading-none text-white/50 group-hover:text-white">
-                    <i
-                        className={`bi bi-caret-up-fill ${isActive && currentDirection === "asc" ? "text-[#ffb736]" : ""}`}
-                    ></i>
-                    <i
-                        className={`bi bi-caret-down-fill ${isActive && currentDirection === "desc" ? "text-[#ffb736]" : ""}`}
-                    ></i>
-                </div>
-            </div>
-        </th>
-    );
-};*/
+import FilterStudentModal from "@/Components/Modals/FilterStudentModal";
+import FilterInfoCard from "@/Components/FilterInfoCard";
 
 export default function StudentInformation({ students, filters = {}, dbColleges = [], dbPrograms = [] }) {
     const isBackendReady = !!students;
     const mock = useMockInertia(MOCK_STUDENTS);
-
     const { auth } = usePage().props;
     const user = auth.user;
 
+    // Data source
     const data = isBackendReady ? students : mock.data;
-    const search = isBackendReady ? "" : mock.search;
-    const handleSearch = isBackendReady ? () => {} : mock.setSearch;
     const handlePageChange = isBackendReady ? null : mock.setPage;
-    const sortColumn = isBackendReady ? null : mock.sortColumn;
-    const sortDirection = isBackendReady ? null : mock.sortDirection;
-    const handleSort = isBackendReady ? () => {} : mock.handleSort;
 
-    const studentList = Array.isArray(data) 
-        ? data 
-        : (Array.isArray(data?.data) 
-            ? data.data 
-            : (Array.isArray(data?.data?.data) ? data.data.data : []));
+    // Extract student list (handles paginated or flat array)
+    const studentList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.data?.data) ? data.data.data : [];
 
+    // URL params (only for backend mode)
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentSearch = urlParams.get('search') || '';
+    const currentSortParam = urlParams.get('sort') || '';
+    const currentDirectionParam = urlParams.get('direction') || 'asc';
+
+    // Mock mode uses its own sort state; backend uses URL params
+    const activeSortColumn = isBackendReady ? currentSortParam : mock.sortColumn;
+    const activeSortDirection = isBackendReady ? currentDirectionParam : mock.sortDirection;
+
+    // Map frontend sort keys to database columns
+    const sortKeyMap = {
+        student_number: 'student_info.student_number',
+        name: 'student_info.student_lname',
+        college: 'student_info.college_id',
+        program: 'student_info.program_id',
+        age: 'student_info.student_birthdate',
+        sex: 'student_info.student_sex',
+        socioeconomic: 'student_info.student_socioeconomic',
+    };
+
+    const reverseSortKeyMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'student_info.college_id': 'college',
+        'student_info.program_id': 'program',
+        'student_info.student_birthdate': 'age',
+        'student_info.student_sex': 'sex',
+        'student_info.student_socioeconomic': 'socioeconomic',
+    };
+
+    const currentFrontendSort = reverseSortKeyMap[activeSortColumn] || '';
+
+    // Handlers
+    const handleSearch = (value) => {
+        const params = { ...activeFilters, search: value };
+        router.get('/student-info', params, { preserveState: true, preserveScroll: true });
+    };
+
+    const handleSort = (sortKey) => {
+        if (!isBackendReady) {
+            mock.handleSort(sortKey);
+            return;
+        }
+        const dbColumn = sortKeyMap[sortKey] || 'student_info.student_id';
+        const newDirection = activeSortColumn === dbColumn && activeSortDirection === 'asc' ? 'desc' : 'asc';
+        const params = { ...activeFilters, sort: dbColumn, direction: newDirection };
+        router.get('/student-info', params, { preserveState: true, preserveScroll: true });
+    };
+
+    // State
     const [isRemoveMode, setIsRemoveMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
-
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [activeFilters, setActiveFilters] = useState(filters || {});
     const [filterMode, setFilterMode] = useState(filters?.mode || "section");
 
+    // Sync activeFilters when filters prop changes
     useEffect(() => {
-        console.log('filters changed:', filters);
-        if (filters?.mode) {
-            setFilterMode(filters.mode);
-        }
+        setActiveFilters(filters);
+        if (filters?.mode) setFilterMode(filters.mode);
     }, [filters]);
 
-    // --- HANDLERS ---
     const handleApplyFilter = (newFilters, mode) => {
-        setActiveFilters(newFilters);
-        setFilterMode(mode);
-        // Here you would also trigger a backend reload via router.get()
-        router.get('/student-info', newFilters, { preserveState: true, preserveScroll: true });
+        const params = { ...newFilters, search: currentSearch };
+        router.get('/student-info', params, { preserveState: true, preserveScroll: true });
     };
 
     const toggleSelection = (id) => {
         const newSelected = new Set(selectedIds);
-        if (newSelected.has(id)) newSelected.delete(id); else newSelected.add(id);
+        newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
         setSelectedIds(newSelected);
     };
 
     const toggleSelectAll = (e) => {
-        if (e.target.checked) setSelectedIds(new Set([...selectedIds, ...data.data.map(s => s.id)]));
-        else setSelectedIds(new Set());
+        if (e.target.checked) {
+            setSelectedIds(new Set([...selectedIds, ...studentList.map(s => s.id)]));
+        } else {
+            setSelectedIds(new Set());
+        }
     };
 
     return (
@@ -100,7 +115,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Student Information"
-                    search={search}
+                    search={currentSearch}
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}
@@ -130,13 +145,13 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
                             {isRemoveMode && <th className="py-3 px-6 text-center w-[50px]"><input type="checkbox" onChange={toggleSelectAll} className="accent-[#5c297c] cursor-pointer w-4 h-4 transition-all duration-300 ease-in-out" /></th>}
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="College" sortKey="college" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Program" sortKey="program" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Age" sortKey="age" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="text-center" />
-                            <SortableHeader label="Sex" sortKey="sex" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="text-center" />
-                            <SortableHeader label="Socioeconomic" sortKey="socioeconomic" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="College" sortKey="college" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Program" sortKey="program" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Age" sortKey="age" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
+                            <SortableHeader label="Sex" sortKey="sex" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
+                            <SortableHeader label="Socioeconomic" sortKey="socioeconomic" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
                             <th className="py-3 px-6 font-bold">Address</th>
                             <th className="py-3 px-6 font-bold">Living</th>
                             <th className="py-3 px-6 font-bold">Work Status</th>
@@ -146,10 +161,10 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
-                        {data.data.length > 0 ? data.data.map((student, i) => (
+                        {studentList.length > 0 ? studentList.map((student, i) => (
                             <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 {isRemoveMode && <td className="py-3 px-6 text-center"><input type="checkbox" checked={selectedIds.has(student.id)} onChange={() => toggleSelection(student.id)} className="accent-[#5c297c] cursor-pointer w-4 h-4 transition-all duration-300 ease-in-out" /></td>}
-                                <td className="py-3 px-6"><Link href={`#edit/${student.id}`} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all duration-300 ease-in-out min-w-[100px] text-center">{student.student_number}</Link></td>
+                                <td className="py-3 px-6"><Link href={route('students.edit', student.id)} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all duration-300 ease-in-out min-w-[100px] text-center">{student.student_number}</Link></td>
                                 <td className="py-3 px-6 text-gray-800 uppercase">{student.name}</td>
                                 <td className="py-3 px-6 uppercase">{student.college}</td>
                                 <td className="py-3 px-6 uppercase">{student.program}</td>
@@ -170,7 +185,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                 </TableContainer>
 
                 <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode={filterMode} currentFilters={activeFilters} />
-                <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={data.data.filter(s => selectedIds.has(s.id))} />
+                <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={studentList.filter(s => selectedIds.has(s.id))} />
                 <FilterStudentModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={handleApplyFilter} dbColleges={dbColleges} dbPrograms={dbPrograms} user={user} />
             </div>
         </AuthenticatedLayout>

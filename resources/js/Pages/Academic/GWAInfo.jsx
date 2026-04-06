@@ -1,45 +1,49 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Head, Link } from "@inertiajs/react";
-import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
-import { useMockInertia, MOCK_STUDENTS_GWA } from "@/Hooks/useMockInertia"; 
-import FilterStudentModal from "@/Components/Modals/FilterStudentModal";
+import { Head, router } from "@inertiajs/react";
+import { TableContainer } from "@/Components/ReusableTable";
+import AcademicFilterModal from "@/Components/Modals/Academic/AcademicFilterModal";
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
-import FilterInfoCard from "@/Components/FilterInfoCard"; 
-import AddStudentModal from "@/Components/Modals/AddStudentModal"; 
+import GWAAddStudentModal from "@/Components/Modals/Academic/GWAAddStudentModal";
+import FilterInfoCard from "@/Components/FilterInfoCard";
 
-const getGwaHeaders = (students) => {
-    if (!students || students.length === 0) return [];
-    const maxYears = Math.max(...students.map(s => s.program_duration || 4));
-    const headers = [];
-    for (let y = 1; y <= maxYears; y++) {
-        headers.push(`${y}Y - 1S`);
-        headers.push(`${y}Y - 2S`);
-    }
-    return headers;
-};
-
-export default function GwaPage({ students }) {
-    const isBackendReady = !!students;
-    const mock = useMockInertia(MOCK_STUDENTS_GWA);
-    
-    const data = isBackendReady ? students : mock.data;
-    const search = isBackendReady ? "" : mock.search;
-    const handleSearch = isBackendReady ? () => {} : mock.setSearch;
-    const handlePageChange = isBackendReady ? null : mock.setPage;
-
+export default function GwaPage({ students: initialStudents, filter: initialFilter, maxYears }) {
+    const [students, setStudents] = useState(initialStudents || []);
+    const [filter, setFilter] = useState(initialFilter || {});
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false); 
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    const [activeFilters, setActiveFilters] = useState({
-        academic_year: "2025-2026", semester: "1st Semester",
-        college: "COLLEGE OF ARTS AND SCIENCES", program: "BS PSYCHOLOGY",
-        year_level: "1ST YEAR", section: "1-1"
-    });
-    const [filterMode, setFilterMode] = useState("section");
+    // Load saved filter from localStorage if backend didn't provide one
+    useEffect(() => {
+        if (!initialFilter || Object.keys(initialFilter).length === 0) {
+            const saved = localStorage.getItem("academicFilterData");
+            if (saved) {
+                const f = JSON.parse(saved);
+                setFilter(f);
+                fetchGwaData(f);
+            }
+        }
+    }, []);
 
-    const gwaHeaders = useMemo(() => getGwaHeaders(data.data), [data.data]);
+    const fetchGwaData = (f) => {
+        router.get(route('gwa.info'), f, {
+            preserveState: false,
+            onSuccess: (page) => setStudents(page.props.students),
+        });
+    };
+
+    const handleApplyFilter = (newFilters) => {
+        setFilter(newFilters);
+        localStorage.setItem("academicFilterData", JSON.stringify(newFilters));
+        fetchGwaData(newFilters);
+    };
+
+    const handleEdit = (student) => {
+        router.get(route('gwa.entry'), { student_id: student.id });
+    };
+
+    const semesterLabel = filter.semester ? `GWA (${filter.semester})` : "GWA";
 
     return (
         <AuthenticatedLayout>
@@ -47,12 +51,12 @@ export default function GwaPage({ students }) {
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="General Weighted Average"
-                    search={search}
-                    onSearch={handleSearch}
-                    paginationData={data}
-                    onPageChange={handlePageChange}
+                    search=""
+                    onSearch={() => {}}
+                    paginationData={{ data: students, links: [] }}
+                    onPageChange={null}
                     exportEndpoint="/academic/export/csv"
-                    filterDisplay={<FilterInfoCard filters={activeFilters} mode={filterMode} />}
+                    filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
                     headerActions={
                         <>
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 ease-in-out shadow-sm shrink-0">
@@ -73,35 +77,55 @@ export default function GwaPage({ students }) {
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
                             <th className="py-3 px-6 font-bold text-left sticky left-0 bg-[#5c297c] z-20 w-[150px]">Student ID</th>
                             <th className="py-3 px-6 font-bold text-left sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md">Student Name</th>
-                            {gwaHeaders.map((header, i) => (
-                                <th key={i} className="py-3 px-4 font-bold text-center whitespace-nowrap min-w-[80px]">{header}</th>
-                            ))}
+                            <th className="py-3 px-6 font-bold text-center min-w-[120px]">{semesterLabel}</th>
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
-                        {data.data.length > 0 ? data.data.map((student, i) => (
-                            <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
-                                <td className="py-3 px-6 sticky left-0 bg-inherit z-10"><Link href={`#edit/${student.id}`} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all duration-300 ease-in-out text-center">{student.student_number}</Link></td>
-                                <td className="py-3 px-6 text-gray-800 uppercase font-bold sticky left-[150px] bg-inherit z-10 shadow-md">{student.name}</td>
-                                {gwaHeaders.map((header, idx) => {
-                                    const key = header.replace(/\s/g, ''); 
-                                    const grade = student.grades[key];
-                                    return (
-                                        <td key={idx} className="py-3 px-4 text-center">
-                                            {grade ? <span className={`font-bold ${grade <= 3.0 ? 'text-[#5c297c]' : 'text-red-500'}`}>{grade}</span> : <span className="text-gray-300">-</span>}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        )) : (
-                            <tr><td colSpan={gwaHeaders.length + 2} className="py-8 text-center text-gray-500 italic">No students found.</td></tr>
+                        {students.length > 0 ? (
+                            students.map((student, idx) => (
+                                <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${idx % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
+                                    <td className="py-3 px-6 sticky left-0 bg-inherit z-10">
+                                        <button onClick={() => handleEdit(student)} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all duration-300 ease-in-out text-center">
+                                            {student.student_number}
+                                        </button>
+                                    </td>
+                                    <td className="py-3 px-6 text-gray-800 uppercase font-bold sticky left-[150px] bg-inherit z-10 shadow-md">{student.name}</td>
+                                    <td className="py-3 px-6 text-center font-bold">
+                                        {student.gwa ? (
+                                            <span className={student.gwa <= 3.0 ? "text-[#5c297c]" : "text-red-500"}>{student.gwa}</span>
+                                        ) : (
+                                            <span className="text-gray-300">—</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr><td colSpan="3" className="py-8 text-center text-gray-500 italic">No students found for the current filter.</td></tr>
                         )}
                     </tbody>
                 </TableContainer>
 
-                <FilterStudentModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={(v, m) => { setActiveFilters(v); setFilterMode(m); }} allowBatch={false} />
-                <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="GWA" />
-                <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+                <AcademicFilterModal
+                    isOpen={isFilterModalOpen}
+                    onClose={() => setIsFilterModalOpen(false)}
+                    currentFilters={filter}
+                    onApply={handleApplyFilter}
+                />
+
+                <ChangeMetricModal
+                    isOpen={isMetricModalOpen}
+                    onClose={() => setIsMetricModalOpen(false)}
+                    currentMetric="GWA"
+                    type="academic"
+                />
+
+                <GWAAddStudentModal
+                    isOpen={isAddModalOpen}
+                    onClose={() => setIsAddModalOpen(false)}
+                    currentFilter={filter}
+                    maxYears={maxYears}
+                    onImportSuccess={() => fetchGwaData(filter)}
+                />
             </div>
         </AuthenticatedLayout>
     );

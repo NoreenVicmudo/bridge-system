@@ -87,7 +87,6 @@ export default function FilterStudentModal({
             .map((p) => ({ value: p.program_id.toString(), label: p.name }));
     }, [values.batch_college, dbPrograms, mode]);
 
-    // Initialize modal when opened
     useEffect(() => {
         if (!isOpen) {
             setAnimate(false);
@@ -96,7 +95,15 @@ export default function FilterStudentModal({
 
         setModalKey(prev => prev + 1);
         setAnimate(true);
-        setMode(allowSection ? "section" : "batch");
+
+        // Use mode from currentFilters if available, otherwise default
+        let newMode = defaultMode;
+        if (currentFilters?.mode && (allowSection || allowBatch)) {
+            // Only switch if the mode is allowed
+            if (currentFilters.mode === 'section' && allowSection) newMode = 'section';
+            if (currentFilters.mode === 'batch' && allowBatch) newMode = 'batch';
+        }
+        setMode(newMode);
 
         let initial = currentFilters ? { ...currentFilters } : {};
 
@@ -111,7 +118,7 @@ export default function FilterStudentModal({
             }
         }
 
-        // Ensure year_level is cleared if it doesn't match the program's max years
+        // Clear invalid year_level
         if (initial.program && initial.year_level) {
             const years = Array.from({ length: 4 }, (_, i) => (i + 1).toString());
             if (!years.includes(initial.year_level)) {
@@ -120,7 +127,7 @@ export default function FilterStudentModal({
         }
 
         setValues(initial);
-    }, [isOpen, currentFilters, user, allowSection]);
+    }, [isOpen, currentFilters, user, allowSection, allowBatch, defaultMode]);
 
     const closeModal = () => {
         setAnimate(false);

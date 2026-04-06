@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
 import { useMockInertia, MOCK_STUDENTS } from "@/Hooks/useMockInertia";
 import AddStudentModal from "@/Components/Modals/AddStudentModal";
@@ -11,23 +11,61 @@ export default function StudentMasterlist({ students }) {
     const mock = useMockInertia(MOCK_STUDENTS);
 
     const data = isBackendReady ? students : mock.data;
-    const search = isBackendReady ? "" : mock.search;
-    const handleSearch = isBackendReady ? () => {} : mock.setSearch;
     const handlePageChange = isBackendReady ? null : mock.setPage;
 
-    // --- THE BULLETPROOF FIX ---
-    // Safely extracts the array of students whether it is flat, wrapped once, or wrapped twice!
-    const studentList = Array.isArray(data) 
-        ? data 
-        : (Array.isArray(data?.data) 
-            ? data.data 
-            : (Array.isArray(data?.data?.data) ? data.data.data : []));
+    // Extract student list
+    const studentList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.data?.data) ? data.data.data : [];
 
-    // SORTING HANDLER
-    // If backend is ready, this would likely be: router.getWithQuery({ sort: col, dir: dir })
-    const sortColumn = isBackendReady ? null : mock.sortColumn;
-    const sortDirection = isBackendReady ? null : mock.sortDirection;
-    const handleSort = isBackendReady ? () => {} : mock.handleSort;
+    // URL params for backend mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentSearch = urlParams.get('search') || '';
+    const currentSortParam = urlParams.get('sort') || '';
+    const currentDirectionParam = urlParams.get('direction') || 'asc';
+
+    // Mock mode uses its own sort state; backend uses URL params
+    const activeSortColumn = isBackendReady ? currentSortParam : mock.sortColumn;
+    const activeSortDirection = isBackendReady ? currentDirectionParam : mock.sortDirection;
+
+    // Map frontend keys to DB columns
+    const sortKeyMap = {
+        student_number: 'student_number',
+        name: 'student_lname',
+        college: 'college_id',
+        program: 'program_id',
+        age: 'student_birthdate',
+        sex: 'student_sex',
+        socioeconomic: 'student_socioeconomic',
+    };
+
+    const reverseSortKeyMap = {
+        student_number: 'student_number',
+        student_lname: 'name',
+        college_id: 'college',
+        program_id: 'program',
+        student_birthdate: 'age',
+        student_sex: 'sex',
+        student_socioeconomic: 'socioeconomic',
+    };
+
+    const currentFrontendSort = reverseSortKeyMap[activeSortColumn] || '';
+
+    const handleSearch = (value) => {
+        router.get(route('student.masterlist'), { search: value }, { preserveState: true, preserveScroll: true });
+    };
+
+    const handleSort = (sortKey) => {
+        if (!isBackendReady) {
+            mock.handleSort(sortKey);
+            return;
+        }
+        const dbColumn = sortKeyMap[sortKey] || 'student_id';
+        const newDirection = activeSortColumn === dbColumn && activeSortDirection === 'asc' ? 'desc' : 'asc';
+        router.get(route('student.masterlist'), { sort: dbColumn, direction: newDirection }, { preserveState: true, preserveScroll: true });
+    };
 
     const [isRemoveMode, setIsRemoveMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -36,13 +74,16 @@ export default function StudentMasterlist({ students }) {
 
     const toggleSelection = (id) => {
         const newSelected = new Set(selectedIds);
-        if (newSelected.has(id)) newSelected.delete(id); else newSelected.add(id);
+        newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
         setSelectedIds(newSelected);
     };
 
     const toggleSelectAll = (e) => {
-        if (e.target.checked) setSelectedIds(new Set([...selectedIds, ...data.data.map(s => s.id)]));
-        else setSelectedIds(new Set());
+        if (e.target.checked) {
+            setSelectedIds(new Set([...selectedIds, ...studentList.map(s => s.id)]));
+        } else {
+            setSelectedIds(new Set());
+        }
     };
 
     return (
@@ -51,7 +92,7 @@ export default function StudentMasterlist({ students }) {
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Student Masterlist"
-                    search={search}
+                    search={currentSearch}
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}
@@ -75,13 +116,13 @@ export default function StudentMasterlist({ students }) {
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
                             {isRemoveMode && <th className="py-3 px-6 text-center w-[50px]"><input type="checkbox" onChange={toggleSelectAll} className="accent-[#5c297c] cursor-pointer w-4 h-4 transition-all duration-300 ease-in-out" /></th>}
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="College" sortKey="college" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Program" sortKey="program" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Age" sortKey="age" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="text-center" />
-                            <SortableHeader label="Sex" sortKey="sex" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="text-center" />
-                            <SortableHeader label="Socioeconomic Status" sortKey="socioeconomic" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="College" sortKey="college" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Program" sortKey="program" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Age" sortKey="age" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
+                            <SortableHeader label="Sex" sortKey="sex" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
+                            <SortableHeader label="Socioeconomic Status" sortKey="socioeconomic" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
                             <th className="py-3 px-6 font-bold">Address</th>
                             <th className="py-3 px-6 font-bold">Living</th>
                             <th className="py-3 px-6 font-bold">Work Status</th>
@@ -91,10 +132,10 @@ export default function StudentMasterlist({ students }) {
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
-                        {data.data.length > 0 ? data.data.map((student, i) => (
+                        {studentList.length > 0 ? studentList.map((student, i) => (
                             <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 {isRemoveMode && <td className="py-3 px-6 text-center"><input type="checkbox" checked={selectedIds.has(student.id)} onChange={() => toggleSelection(student.id)} className="accent-[#5c297c] cursor-pointer w-4 h-4 transition-all duration-300 ease-in-out" /></td>}
-                                <td className="py-3 px-6"><Link href={`#edit/${student.id}`} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all duration-300 ease-in-out min-w-[100px] text-center">{student.student_number}</Link></td>
+                                <td className="py-3 px-6"><Link href={route('students.edit', student.id)} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all duration-300 ease-in-out min-w-[100px] text-center">{student.student_number}</Link></td>
                                 <td className="py-3 px-6 text-gray-800 uppercase">{student.name}</td>
                                 <td className="py-3 px-6 uppercase">{student.college}</td>
                                 <td className="py-3 px-6 uppercase">{student.program}</td>
@@ -114,7 +155,7 @@ export default function StudentMasterlist({ students }) {
                     </tbody>
                 </TableContainer>
                 <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode="masterlist" />
-                <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={data.data.filter(s => selectedIds.has(s.id))} />
+                <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={studentList.filter(s => selectedIds.has(s.id))} />
             </div>
         </AuthenticatedLayout>
     );

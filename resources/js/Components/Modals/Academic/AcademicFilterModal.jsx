@@ -1,14 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { usePage } from "@inertiajs/react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
-import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 
-export default function AcademicProfileFilter() {
-    const { auth } = usePage().props;
-    const user = auth.user;
-
+export default function AcademicFilterModal({ isOpen, onClose, currentFilters, onApply }) {
     const [values, setValues] = useState({
         academic_year: "",
         college: "",
@@ -17,30 +11,39 @@ export default function AcademicProfileFilter() {
         semester: "",
         section: "",
     });
-
     const [academicYears, setAcademicYears] = useState([]);
-    const [optionsCache, setOptionsCache] = useState({}); // { "2025-2026": {...}, "2026-2027": {...} }
+    const [optionsCache, setOptionsCache] = useState({});
     const [loading, setLoading] = useState(true);
-    const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
+    const [animate, setAnimate] = useState(false);
 
-    const isCollegeRestricted = !!user?.college_id;
-    const isProgramRestricted = !!user?.program_id;
-
-    // Helper: ordinal suffix
     const getOrdinal = (n) => {
         const s = ['th', 'st', 'nd', 'rd'];
         const v = n % 100;
         return s[(v - 20) % 10] || s[v] || s[0];
     };
 
-    // 1. Fetch all academic years first
     useEffect(() => {
-        axios.get(route('academic.filter-options'), { params: {} })
-            .then(res => setAcademicYears(res.data.academic_years || []))
-            .catch(err => console.error(err));
-    }, []);
+        if (isOpen) {
+            setAnimate(true);
+            // Pre-fill with currentFilters
+            setValues({
+                academic_year: currentFilters?.academic_year || "",
+                college: currentFilters?.college || "",
+                program: currentFilters?.program || "",
+                year_level: currentFilters?.year_level || "",
+                semester: currentFilters?.semester || "",
+                section: currentFilters?.section || "",
+            });
+            if (academicYears.length === 0) {
+                axios.get(route('academic.filter-options'), { params: {} })
+                    .then(res => setAcademicYears(res.data.academic_years || []))
+                    .catch(err => console.error(err));
+            }
+        } else {
+            setAnimate(false);
+        }
+    }, [isOpen, currentFilters]);
 
-    // 2. Once academic years are known, fetch options for each year in parallel
     useEffect(() => {
         if (academicYears.length === 0) return;
         const fetchAll = async () => {
@@ -48,13 +51,12 @@ export default function AcademicProfileFilter() {
             const promises = academicYears.map(year =>
                 axios.get(route('academic.filter-options'), { params: { academic_year: year } })
                     .then(res => ({ year, data: res.data }))
-                    .catch(err => ({ year, data: null }))
+                    .catch(() => ({ year, data: null }))
             );
             const results = await Promise.all(promises);
             const cache = {};
             results.forEach(({ year, data }) => {
                 if (data) {
-                    // Transform programs array into map by college_id
                     const programsMap = {};
                     (data.programs || []).forEach(p => {
                         const collegeId = p.college_id;
@@ -76,13 +78,11 @@ export default function AcademicProfileFilter() {
         fetchAll();
     }, [academicYears]);
 
-    // Options for the selected academic year
     const currentOptions = useMemo(() => {
         if (!values.academic_year) return null;
         return optionsCache[values.academic_year] || null;
     }, [values.academic_year, optionsCache]);
 
-    // Client‑side filtered options (already scoped to academic year)
     const collegeOptions = currentOptions?.colleges || [];
     const programOptions = useMemo(() => {
         if (!values.college || !currentOptions) return [];
@@ -104,37 +104,23 @@ export default function AcademicProfileFilter() {
 
     const sectionOptions = useMemo(() => {
         if (!currentOptions || !values.year_level) return [];
-        // Sections are named like "1-1", "1-2", "2-1", etc.
-        // Only show sections that start with the selected year level
         const filtered = currentOptions.sections.filter(s => s.startsWith(`${values.year_level}-`));
         return filtered.map(s => ({ value: s, label: s }));
     }, [currentOptions, values.year_level]);
 
-    // Apply user restrictions once
-    useEffect(() => {
-        let initial = { ...values };
-        if (isCollegeRestricted) initial.college = user.college_id.toString();
-        if (isProgramRestricted) initial.program = user.program_id.toString();
-        setValues(initial);
-    }, []);
-
     const handleChange = (field, value) => {
         let newValues = { ...values, [field]: value };
-
         if (field === "academic_year") {
             newValues.college = "";
             newValues.program = "";
             newValues.year_level = "";
             newValues.semester = "";
             newValues.section = "";
-            if (isCollegeRestricted) newValues.college = user.college_id.toString();
-            if (isProgramRestricted) newValues.program = user.program_id.toString();
         } else if (field === "college") {
             newValues.program = "";
             newValues.year_level = "";
             newValues.semester = "";
             newValues.section = "";
-            if (isProgramRestricted) newValues.program = user.program_id.toString();
         } else if (field === "program") {
             newValues.year_level = "";
             newValues.semester = "";
@@ -148,140 +134,103 @@ export default function AcademicProfileFilter() {
         setValues(newValues);
     };
 
-    const handleClear = () => {
-        let newValues = {
-            academic_year: "",
-            college: "",
-            program: "",
-            year_level: "",
-            semester: "",
-            section: "",
-        };
-        if (isCollegeRestricted) newValues.college = user.college_id.toString();
-        if (isProgramRestricted) newValues.program = user.program_id.toString();
-        setValues(newValues);
-    };
-
-    // Inside the component, after programOptions and collegeOptions are defined
     const handleSubmit = () => {
         if (!values.academic_year || !values.college || !values.program || !values.year_level || !values.semester || !values.section) {
             return;
         }
-
-        // Resolve names from the current options
-        const collegeOption = collegeOptions.find(c => c.value === values.college);
-        const programOption = programOptions.find(p => p.value === values.program);
-
-        const enrichedFilter = {
-            ...values,
-            college_name: collegeOption?.label || values.college,
-            program_name: programOption?.label || values.program,
-        };
-
-        onApply(enrichedFilter);
+        onApply(values);
         closeModal();
     };
 
-    const isFormComplete = !!(
-        values.academic_year &&
-        values.college &&
-        values.program &&
-        values.year_level &&
-        values.semester &&
-        values.section
-    );
+    const closeModal = () => {
+        setAnimate(false);
+        setTimeout(onClose, 300);
+    };
 
-    if (loading) {
-        return (
-            <AuthenticatedLayout>
-                <div className="flex justify-center items-center h-screen">Loading filter options...</div>
-            </AuthenticatedLayout>
-        );
-    }
-
-    const isAcademicYearDisabled = false;
-    const isCollegeDisabled = !values.academic_year || isCollegeRestricted;
-    const isProgramDisabled = !values.college || isProgramRestricted;
-    const isYearLevelDisabled = !values.program;
-    const isSemesterDisabled = !values.year_level;
-    const isSectionDisabled = !values.semester;
+    if (!isOpen) return null;
 
     return (
-        <AuthenticatedLayout>
-            <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
-                <div className="w-full max-w-[700px] bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] p-6 md:p-8">
-                    <form onSubmit={handleSubmit}>
-                        <h2 className="text-center text-2xl md:text-[28px] font-bold text-[#5c297c] mb-6">
-                            Academic Profile Filter
-                        </h2>
+        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+            <div className={`bg-white rounded-2xl w-[90%] max-w-[700px] shadow-2xl relative flex flex-col transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+                <div className="bg-[#5c297c] p-6 text-center relative rounded-t-2xl">
+                    <h2 className="text-2xl font-bold text-white">Filter Students (Academic)</h2>
+                    <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors">
+                        <i className="bi bi-x-lg text-xl"></i>
+                    </button>
+                </div>
 
-                        <div className="space-y-3">
+                <div className="p-8">
+                    {loading ? (
+                        <div className="text-center py-8">Loading filter options...</div>
+                    ) : (
+                        <div className="space-y-4">
                             <CustomSelectGroup
                                 label="Academic Year"
                                 value={values.academic_year}
                                 onChange={(e) => handleChange("academic_year", e.target.value)}
                                 options={academicYears.map(ay => ({ value: ay, label: ay }))}
-                                disabled={isAcademicYearDisabled}
                             />
-
                             <CustomSelectGroup
                                 label="College"
                                 value={values.college}
                                 onChange={(e) => handleChange("college", e.target.value)}
                                 options={collegeOptions}
-                                disabled={isCollegeDisabled}
+                                disabled={!values.academic_year}
                                 placeholder={!values.academic_year ? "Select Academic Year first" : "Select College"}
                             />
-
                             <CustomSelectGroup
                                 label="Program"
                                 value={values.program}
                                 onChange={(e) => handleChange("program", e.target.value)}
                                 options={programOptions}
-                                disabled={isProgramDisabled}
+                                disabled={!values.college}
                                 placeholder={!values.college ? "Select College first" : "Select Program"}
                             />
-
                             <CustomSelectGroup
                                 label="Year Level"
                                 value={values.year_level}
                                 onChange={(e) => handleChange("year_level", e.target.value)}
                                 options={yearLevelOptions}
-                                disabled={isYearLevelDisabled}
+                                disabled={!values.program}
                                 placeholder={!values.program ? "Select Program first" : "Select Year Level"}
                             />
-
                             <CustomSelectGroup
                                 label="Semester"
                                 value={values.semester}
                                 onChange={(e) => handleChange("semester", e.target.value)}
                                 options={semesterOptions}
-                                disabled={isSemesterDisabled}
+                                disabled={!values.year_level}
                                 placeholder={!values.year_level ? "Select Year Level first" : "Select Semester"}
                             />
-
                             <CustomSelectGroup
                                 label="Section"
                                 value={values.section}
                                 onChange={(e) => handleChange("section", e.target.value)}
                                 options={sectionOptions}
-                                disabled={isSectionDisabled}
+                                disabled={!values.semester}
                                 placeholder={!values.semester ? "Select Semester first" : "Select Section"}
                             />
                         </div>
+                    )}
 
-                        <div className="mt-8 flex justify-center gap-3">
-                            <button type="button" onClick={handleClear} className="px-6 py-3 bg-white text-gray-600 border border-gray-300 rounded-md hover:bg-[#ffb736] hover:text-white transition">
-                                Clear
-                            </button>
-                            <button type="submit" disabled={!isFormComplete} className={`px-6 py-3 rounded-md transition ${isFormComplete ? "bg-[#5c297c] text-white hover:bg-[#ffb736] cursor-pointer" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                                Filter Students
-                            </button>
-                        </div>
-                    </form>
+                    <div className="mt-8 flex justify-center gap-4">
+                        <button onClick={closeModal} className="px-6 py-3 bg-white text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100 transition">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={!values.academic_year || !values.college || !values.program || !values.year_level || !values.semester || !values.section}
+                            className={`px-6 py-3 rounded-md transition ${
+                                values.academic_year && values.college && values.program && values.year_level && values.semester && values.section
+                                    ? "bg-[#5c297c] text-white hover:bg-[#ffb736] cursor-pointer"
+                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            }`}
+                        >
+                            Apply Filter
+                        </button>
+                    </div>
                 </div>
             </div>
-            <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="" type="academic" filterData={values} />
-        </AuthenticatedLayout>
+        </div>
     );
 }

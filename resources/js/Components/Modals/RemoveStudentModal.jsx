@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function RemoveStudentModal({
     isOpen,
     onClose,
     selectedStudents,
+    onSuccess, // optional callback after deletion
 }) {
     const [mode, setMode] = useState("single");
     const [animate, setAnimate] = useState(false);
     const [singleReason, setSingleReason] = useState("");
     const [individualReasons, setIndividualReasons] = useState({});
+    const [deleting, setDeleting] = useState(false);
 
     const REASON_OPTIONS = [
         { value: "Transferred", label: "Transferred out" },
@@ -23,6 +26,7 @@ export default function RemoveStudentModal({
             setAnimate(true);
             setSingleReason("");
             setIndividualReasons({});
+            setDeleting(false);
         }
     }, [isOpen]);
 
@@ -39,30 +43,53 @@ export default function RemoveStudentModal({
         );
     };
 
+    const handleConfirm = async () => {
+        if (!isReadyToRemove()) return;
+
+        setDeleting(true);
+        try {
+            const payload = {
+                students: selectedStudents.map(s => s.id),
+                reason_mode: mode,
+                location: window.location.pathname.includes("masterlist") ? "MASTERLIST" : "STUDENT_INFO",
+            };
+            if (mode === "single") {
+                payload.reason = singleReason;
+            } else {
+                payload.per_reasons = individualReasons;
+            }
+
+            const response = await axios.post(route('students.bulk-destroy'), payload);
+            if (response.data.success) {
+                alert(`Successfully deleted ${response.data.deleted_count} student(s).`);
+                if (onSuccess) onSuccess();
+                closeModal();
+                window.location.reload();
+            } else {
+                alert('Deletion failed: ' + response.data.message);
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            alert('An error occurred while deleting students.');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent pointer-events-none"}`}>
-            
-            {/* STYLES: Purple scrollbars for ALL scrollable areas inside this modal */}
             <style>{`
                 .modal-scroll-area::-webkit-scrollbar, 
-                .modal-scroll-area ul::-webkit-scrollbar { 
-                    width: 6px; 
-                }
+                .modal-scroll-area ul::-webkit-scrollbar { width: 6px; }
                 .modal-scroll-area::-webkit-scrollbar-thumb, 
-                .modal-scroll-area ul::-webkit-scrollbar-thumb { 
-                    background-color: #5c297c; 
-                    border-radius: 10px; 
-                }
+                .modal-scroll-area ul::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 10px; }
                 .modal-scroll-area::-webkit-scrollbar-track, 
-                .modal-scroll-area ul::-webkit-scrollbar-track { 
-                    background: transparent; 
-                }
+                .modal-scroll-area ul::-webkit-scrollbar-track { background: transparent; }
             `}</style>
 
             <div className={`bg-white rounded-2xl w-[95%] max-w-[600px] shadow-2xl relative flex flex-col transition-all duration-300 transform overflow-visible ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                
                 {/* Header */}
                 <div className="bg-red-50 p-6 border-b border-red-100 flex items-start gap-4 rounded-t-2xl relative z-[100]">
                     <div className="bg-red-100 p-3 rounded-full shrink-0">
@@ -90,9 +117,8 @@ export default function RemoveStudentModal({
                         </button>
                     </div>
 
-                    {/* SCROLLABLE AREA: handles student list, but NOT the dropdowns */}
+                    {/* Scrollable Area */}
                     <div className="modal-scroll-area max-h-[350px] overflow-y-auto overflow-x-visible pr-2">
-                        
                         {mode === "single" ? (
                             <div className="flex flex-col gap-4 animate-fade-in relative z-[90]">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
@@ -113,17 +139,12 @@ export default function RemoveStudentModal({
                                     vertical={true}
                                     className="!mb-0"
                                 />
-                                {/* Bottom padding to allow dropdown to open without triggering container scroll */}
                                 <div className="h-32"></div>
                             </div>
                         ) : (
                             <div className="flex flex-col gap-3 animate-fade-in pb-40">
                                 {selectedStudents.map((student) => (
-                                    <div 
-                                        key={student.id} 
-                                        /* hover:z-50 is key: it brings the row to the front only when needed */
-                                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg relative z-10 hover:z-[60] bg-white transition-all"
-                                    >
+                                    <div key={student.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg relative z-10 hover:z-[60] bg-white transition-all">
                                         <div className="flex flex-col max-w-[50%]">
                                             <span className="text-sm font-bold text-gray-800 truncate">{student.name}</span>
                                             <span className="text-xs text-gray-500">{student.student_number}</span>
@@ -151,10 +172,15 @@ export default function RemoveStudentModal({
                         Cancel
                     </button>
                     <button
-                        disabled={!isReadyToRemove()}
-                        className={`px-5 py-2.5 text-sm font-bold text-white rounded-lg shadow-md transition-all flex items-center gap-2 ${isReadyToRemove() ? "bg-red-500 hover:bg-red-600" : "bg-gray-400 cursor-not-allowed opacity-70"}`}
+                        onClick={handleConfirm}
+                        disabled={!isReadyToRemove() || deleting}
+                        className={`px-5 py-2.5 text-sm font-bold text-white rounded-lg shadow-md transition-all flex items-center gap-2 ${isReadyToRemove() && !deleting ? "bg-red-500 hover:bg-red-600" : "bg-gray-400 cursor-not-allowed opacity-70"}`}
                     >
-                        <i className="bi bi-trash"></i> Confirm Removal
+                        {deleting ? (
+                            <div className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <><i className="bi bi-trash"></i> Confirm Removal</>
+                        )}
                     </button>
                 </div>
             </div>

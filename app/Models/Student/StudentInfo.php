@@ -14,6 +14,7 @@ use App\Models\Program;
 use App\Models\ProgramMetric\BoardBatch;
 use App\Models\Student\Language;
 use App\Models\Student\LivingArrangement;
+use App\Models\Student\SocioeconomicStatus;
 use App\Models\Student\StudentSection;
 use Illuminate\Database\Eloquent\Model;
 
@@ -52,7 +53,7 @@ class StudentInfo extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'date_created' => 'datetime',
-        'student_birthdate' => 'date',
+        'student_birthdate' => 'date:Y-m-d',
     ];
 
     public function college()
@@ -133,5 +134,26 @@ class StudentInfo extends Model
         return $this->hasOne(StudentSection::class, 'student_number', 'student_number')
                     ->where('is_active', 1)
                     ->latest('date_created');
+    }
+    
+    public function getSocioeconomicCategoryAttribute()
+    {
+        $income = $this->student_socioeconomic;
+        if (is_null($income)) return 'N/A';
+
+        $category = SocioeconomicStatus::where(function($q) use ($income) {
+                $q->where('minimum', '<=', $income)
+                ->where(function($sub) use ($income) {
+                    $sub->where('maximum', '>=', $income)
+                        ->orWhereNull('maximum');
+                });
+            })
+            ->orWhere(function($q) use ($income) {
+                $q->whereNull('minimum')
+                ->where('maximum', '>=', $income);
+            })
+            ->first();
+
+        return $category ? $category->status : 'Unknown';
     }
 }

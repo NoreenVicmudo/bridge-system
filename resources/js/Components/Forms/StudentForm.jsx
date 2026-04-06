@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { router } from '@inertiajs/react';
 import TextInput from "@/Components/TextInput";
 import CustomSelectGroup from "@/Components/SelectGroup";
 import ConfirmSaveModal from "@/Components/Modals/ConfirmSaveModal";
@@ -49,11 +50,12 @@ export default function StudentForm({
         "!w-full !text-left !font-bold !text-[#5c297c] !mb-0 !whitespace-nowrap";
 
     const handleBack = () => {
-        const referrer = document.referrer;
-        if (referrer.includes("student-masterlist")) {
-            window.location.href = "/student-masterlist";
+        // If we came from a specific page, we can use history.back()
+        // Otherwise fallback to masterlist
+        if (window.history.length > 1) {
+            router.get(window.location.referrer || route('student.masterlist'));
         } else {
-            window.location.href = "/student-information";
+            router.get(route('student.masterlist'));
         }
     };
 

@@ -7,13 +7,13 @@ export default function ChangeMetricModal({
     onClose,
     currentMetric,
     type = "academic",
+    filterData = null,
 }) {
     const [selectedMetric, setSelectedMetric] = useState("");
     const [animate, setAnimate] = useState(false);
 
-    // --- 1. DEFINE METRIC GROUPS ---
     const ACADEMIC_METRICS = [
-        { label: "GWA", value: "GWA", url: "/gwa-info" },
+        { label: "GWA", value: "GWA", url: route("gwa.info") }, // named route
         { label: "Grades in Board Subjects", value: "Grades in Board Subjects", url: "/board-subject-grades" },
         { label: "Back Subjects/Retakes", value: "Back Subjects/Retakes", url: "/retakes-info" },
         { label: "Performance Rating", value: "Performance Rating", url: "/performance-rating" },
@@ -47,8 +47,18 @@ export default function ChangeMetricModal({
     const handleChange = () => {
         const target = activeOptions.find((m) => m.value === selectedMetric);
         if (target) {
-            router.visit(target.url);
+            let url = target.url;
+
+            // Append filter data as query string if provided
+            if (filterData && Object.keys(filterData).length) {
+                const params = new URLSearchParams(filterData).toString();
+                url = `${url}?${params}`;
+            }
+
             closeModal();
+            setTimeout(() => {
+                router.visit(url);  // use Inertia's router for SPA navigation
+            }, 100);
         }
     };
 
@@ -56,8 +66,6 @@ export default function ChangeMetricModal({
 
     return (
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            
-            {/* PURPLE SCROLLBAR INJECTION */}
             <style>{`
                 .metric-modal-scroll ul::-webkit-scrollbar { width: 6px; }
                 .metric-modal-scroll ul::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; }
@@ -65,15 +73,12 @@ export default function ChangeMetricModal({
             `}</style>
 
             <div className={`bg-white rounded-2xl w-[90%] max-w-[550px] shadow-2xl relative flex flex-col transition-all duration-300 transform overflow-visible ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                
-                {/* Header */}
                 <div className="p-8 pb-4 text-center">
                     <h2 className="text-[26px] font-bold text-[#5c297c] tracking-wide">
                         {type === "program" ? "Change Program Metric" : "Change Academic Metric"}
                     </h2>
                 </div>
 
-                {/* Content Area */}
                 <div className="px-10 pb-10 pt-2">
                     <div className="w-full relative z-50">
                         <CustomSelectGroup
@@ -82,12 +87,11 @@ export default function ChangeMetricModal({
                             onChange={(e) => setSelectedMetric(e.target.value)}
                             options={activeOptions}
                             placeholder="Select Metric"
-                            className="mb-0 w-full metric-modal-scroll" // Class added here
+                            className="mb-0 w-full metric-modal-scroll"
                             vertical={true}
                         />
                     </div>
 
-                    {/* Footer Buttons */}
                     <div className="flex justify-center gap-4 mt-8 relative z-0">
                         <button
                             onClick={closeModal}
@@ -95,7 +99,6 @@ export default function ChangeMetricModal({
                         >
                             Cancel
                         </button>
-
                         <button
                             onClick={handleChange}
                             disabled={!selectedMetric}
