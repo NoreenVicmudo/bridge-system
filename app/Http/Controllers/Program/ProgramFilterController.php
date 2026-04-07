@@ -31,18 +31,28 @@ class ProgramFilterController extends Controller
             $yearsMap[$p->program_id] = $p->years;
         }
 
-        // Static Board Batches (Can be moved to a DB table later)
-        $batches = [
-            ['value' => '2025-01', 'label' => 'March 2025'],
-            ['value' => '2025-02', 'label' => 'August 2025'],
-            ['value' => '2026-01', 'label' => 'March 2026'],
-        ];
+        // Pull distinct calendar years from the board_batch table
+        $years = \Illuminate\Support\Facades\DB::table('board_batch')
+            ->where('is_active', 1)
+            ->distinct()
+            ->orderBy('year', 'desc')
+            ->pluck('year')
+            ->map(fn($y) => ['value' => (string)$y, 'label' => (string)$y]);
+
+        // Pull distinct batch numbers (usually 1 or 2)
+        $batchNumbers = \Illuminate\Support\Facades\DB::table('board_batch')
+            ->where('is_active', 1)
+            ->distinct()
+            ->orderBy('batch_number', 'asc')
+            ->pluck('batch_number')
+            ->map(fn($b) => ['value' => (string)$b, 'label' => "Batch $b"]);
 
         return response()->json([
             'colleges' => $colleges,
             'programs' => $programsMap,
-            'years' => $yearsMap,
-            'boardBatches' => $batches,
+            'programYears' => $yearsMap, // Renamed to avoid confusion with calendar year
+            'calendarYears' => $years,
+            'batchNumbers' => $batchNumbers,
         ]);
     }
 }
