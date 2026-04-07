@@ -1,6 +1,6 @@
 import React from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { useForm, Head } from "@inertiajs/react";
+import { useForm, Head, router } from "@inertiajs/react"; // <-- Added router
 import UpdateBoardGradesForm from "@/Components/Forms/UpdateBoardGradesForm";
 
 export default function BoardGradesEntry({
@@ -15,14 +15,23 @@ export default function BoardGradesEntry({
     });
 
     const handleSubmit = () => {
-        if (student?.id) {
-            put(route("board-grades.update", student.id));
+        if (student?.student_id) {
+            put(route("board-grades.update", student.student_id), {
+                onSuccess: () => {
+                    // Grab the exact filters the user used to generate the table
+                    const saved = localStorage.getItem("academicFilterData");
+                    const filters = saved ? JSON.parse(saved) : {};
+                    
+                    // Route directly back to the board subjects table
+                    router.get(route('board.subject.grades'), filters);
+                }
+            });
         }
     };
 
     const fullName = student
-        ? `${student.last_name}, ${student.first_name}`
-        : "";
+        ? `${student.student_lname}, ${student.student_fname}`
+        : "Unknown Student";
 
     return (
         <AuthenticatedLayout>
@@ -33,10 +42,10 @@ export default function BoardGradesEntry({
                     setData={setData}
                     errors={errors}
                     processing={processing}
-                    submit={handleSubmit}
+                    submit={handleSubmit} 
                     studentName={fullName}
-                    subjectOptions={subjectOptions} // Array: [{ value, label }]
-                    currentGrades={currentGrades} // Object: { subject_id: grade }
+                    subjectOptions={subjectOptions} 
+                    currentGrades={currentGrades} 
                 />
             </div>
         </AuthenticatedLayout>

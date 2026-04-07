@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Academic\AcademicController;
+use App\Http\Controllers\Academic\BoardGradeController;
 use App\Http\Controllers\Academic\GwaController;
+use App\Http\Controllers\Academic\PerformanceRatingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Student\StudentController;
 use App\Models\College;
@@ -11,41 +13,45 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// ⚠️ DELETE THIS BEFORE GOING TO PRODUCTION!
+// ==========================================
+// ⚠️ DEV LOGIN (DELETE BEFORE PRODUCTION)
+// ==========================================
 Route::get('/dev-login/{id}', function ($id) {
     Auth::loginUsingId($id);
     return redirect()->route('dashboard');
 });
 
+// ==========================================
+// PUBLIC & GUEST ROUTES
+// ==========================================
 Route::redirect('/', '/login');
 
 Route::get('/signup', function () {
     return Inertia::render('Signup');
 })->name('signup');
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
-
-Route::get('/main', function () {
-    return Inertia::render('Main');
-})->name('main');
-
-// ==========================================
-// PUBLIC / UNPROTECTED ROUTES (minimal)
-// ==========================================
 Route::get('/student-entry', [StudentController::class, 'create'])->name('student.entry');
 
 // ==========================================
 // AUTHENTICATED ROUTES
 // ==========================================
 Route::middleware('auth')->group(function () {
-    // Profile
+    
+    // --- MAIN DASHBOARD VIEWS ---
+    Route::get('/dashboard', function () {
+        return Inertia::render('Dashboard');
+    })->middleware('verified')->name('dashboard');
+
+    Route::get('/main', function () {
+        return Inertia::render('Main');
+    })->name('main');
+
+    // --- PROFILE MANAGEMENT ---
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // Student Management
+    // --- STUDENT MANAGEMENT (CRUD & Actions) ---
     Route::prefix('students')->group(function () {
         Route::get('/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
         Route::put('/{student}', [StudentController::class, 'update'])->name('students.update');
@@ -58,7 +64,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/bulk-destroy', [StudentController::class, 'bulkDestroy'])->name('students.bulk-destroy');
     });
 
-    // Student Views (Masterlist & Filtered)
+    // --- STUDENT LOOKUP & APIS ---
+    Route::get('/api/check-student/{student_number}', [StudentController::class, 'checkStudent'])->name('api.check.student');
+    Route::get('/api/get-student-id/{student_number}', [StudentController::class, 'getStudentIdByNumber'])->name('api.get-student-id');
+
+    // --- STUDENT FRONTEND VIEWS ---
     Route::get('/student-masterlist', [StudentController::class, 'masterlist'])->name('student.masterlist');
     Route::get('/student-info', [StudentController::class, 'filteredInfo'])->name('student.info');
     Route::get('/student-info-filter', function () {
@@ -68,23 +78,17 @@ Route::middleware('auth')->group(function () {
         ]);
     })->name('student.info.filter');
 
-    // API endpoints for student lookup
-    Route::get('/api/check-student/{student_number}', [StudentController::class, 'checkStudent'])->name('api.check.student');
-    Route::get('/api/get-student-id/{student_number}', [StudentController::class, 'getStudentIdByNumber'])->name('api.get-student-id');
-
-    // Academic Profile – Filter & Options
+    // --- ACADEMIC METRICS (Controllers Built) ---
     Route::get('/academic/filter-options', [AcademicController::class, 'getOptions'])->name('academic.filter-options');
+    
     Route::get('/academic-profile-filter', function () {
         $dbSections = DB::table('student_section')
-            ->where('is_active', 1)
-            ->select('program_id', 'year_level', 'section')
-            ->distinct()
-            ->get();
+            ->where('is_active', 1)->select('program_id', 'year_level', 'section')
+            ->distinct()->get();
 
         $sectionsMap = [];
         foreach ($dbSections as $sec) {
-            $key = "{$sec->program_id}-{$sec->year_level}";
-            $sectionsMap[$key][] = ['value' => $sec->section, 'label' => $sec->section];
+            $sectionsMap["{$sec->program_id}-{$sec->year_level}"][] = ['value' => $sec->section, 'label' => $sec->section];
         }
 
         return Inertia::render('Academic/AcademicProfileFilter', [
@@ -94,18 +98,32 @@ Route::middleware('auth')->group(function () {
         ]);
     })->name('academic.profile.filter');
 
-    // GWA Module
+    // Grouping only the working Academic Controllers (URLs start with /academic/...)
     Route::prefix('academic')->group(function () {
+        // GWA
         Route::get('/gwa-info', [GwaController::class, 'index'])->name('gwa.info');
         Route::get('/gwa-entry', [GwaController::class, 'edit'])->name('gwa.entry');
         Route::put('/gwa/{student}', [GwaController::class, 'update'])->name('gwa.update');
         Route::post('/gwa/import', [GwaController::class, 'import'])->name('gwa.import');
-    });
+        Route::get('/gwa/export', [GwaController::class, 'export'])->name('gwa.export');
+        
+        // Board Subjects
+        Route::get('/board-subject-grades', [BoardGradeController::class, 'index'])->name('board.subject.grades');
+        Route::get('/board-grades-entry', [BoardGradeController::class, 'edit'])->name('board.grades.entry');
+        Route::put('/board-grades/{student}', [BoardGradeController::class, 'update'])->name('board-grades.update');
+        Route::post('/board-grades/import', [BoardGradeController::class, 'import'])->name('board-grades.import');
+        Route::get('/board-grades/export', [BoardGradeController::class, 'export'])->name('board-grades.export');
+    
+        // Performance Rating
+        Route::get('/performance-rating', [PerformanceRatingController::class, 'index'])->name('performance.rating');
+        Route::get('/performance-rating-entry', [PerformanceRatingController::class, 'edit'])->name('performance.rating.entry');
+        Route::put('/performance-rating/{student}', [PerformanceRatingController::class, 'update'])->name('performance-rating.update');
+        Route::post('/performance-rating/import', [PerformanceRatingController::class, 'import'])->name('performance-rating.import');
+        Route::get('/performance-rating/export', [PerformanceRatingController::class, 'export'])->name('performance-rating.export');
+        });
 
-    // Other Academic Metrics (placeholders – keep static for now)
-    Route::get('/academic/gwa/export', [GwaController::class, 'export'])->name('gwa.export');
-    Route::get('/board-subject-grades', fn() => Inertia::render('Academic/BoardSubjectGrades'))->name('board.subject.grades');
-    Route::get('/board-grades-entry', fn() => Inertia::render('Academic/BoardGradesEntry'))->name('board.grades.entry');
+    // --- ACADEMIC METRICS (Placeholders) ---
+    // (Kept outside the prefix so your current frontend URLs do not break!)
     Route::get('/retakes-info', fn() => Inertia::render('Academic/RetakesInfo'))->name('retakes.info');
     Route::get('/retakes-entry', fn() => Inertia::render('Academic/RetakesEntry'))->name('retakes.entry');
     Route::get('/performance-rating', fn() => Inertia::render('Academic/PerformanceRating'))->name('performance.rating');
@@ -117,13 +135,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/academic-recognition', fn() => Inertia::render('Academic/AcademicRecognition'))->name('academic.recognition');
     Route::get('/recognition-entry', fn() => Inertia::render('Academic/RecognitionEntry'))->name('academic.recognition.entry');
 
-    // Program Metrics (placeholders)
+    // --- PROGRAM METRICS (Placeholders) ---
     Route::get('/program-metrics-filter', function () {
         return Inertia::render('Program/ProgramMetricsFilter', [
             'dbColleges' => College::where('is_active', true)->get(),
             'dbPrograms' => Program::where('is_active', true)->get(),
         ]);
     })->name('program.metrics.filter');
+    
     Route::get('/review-center', fn() => Inertia::render('Program/ReviewCenter'))->name('review.center');
     Route::get('/review-center-entry', fn() => Inertia::render('Program/ReviewCenterEntry'))->name('review.center.entry');
     Route::get('/mock-board-scores', fn() => Inertia::render('Program/MockBoardScores'))->name('mock.board.scores');
@@ -131,19 +150,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/licensure-exam', fn() => Inertia::render('Program/LicensureExam'))->name('licensure.exam');
     Route::get('/licensure-entry', fn() => Inertia::render('Program/LicensureEntry'))->name('licensure.entry');
 
-    // Additional Entry Pages (global configs)
+    // --- ADDITIONAL ENTRY PAGES ---
     Route::get('/student-additional', fn() => Inertia::render('Entry/StudentInformationEntry'))->name('student.additional');
     Route::get('/academic-additional', fn() => Inertia::render('Entry/AcademicProfileEntry'))->name('academic.additional');
     Route::get('/program-additional', fn() => Inertia::render('Entry/ProgramMetricsEntry'))->name('program.additional');
 
-    // Reports
+    // --- REPORTS ---
     Route::prefix('report')->group(function () {
         Route::get('/generation-filter', fn() => Inertia::render('Reports/ReportGenerationFilter'))->name('report.generation.filter');
         Route::get('/generation', fn() => Inertia::render('Reports/ReportGeneration'))->name('report.generation');
         Route::get('/programs', fn() => Inertia::render('Reports/ReportGenerationPrograms'))->name('report.programs');
     });
 
-    // Transaction Logs & User Management
+    // --- SYSTEM LOGS & USERS ---
     Route::get('/transaction-logs', fn() => Inertia::render('Transactions/TransactionLogs'))->name('transaction.logs');
     Route::get('/users', fn() => Inertia::render('User/UserList'))->name('users');
     Route::get('/edit-users', fn() => Inertia::render('User/EditUser'))->name('edit.users');

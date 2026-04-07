@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
 
-export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, maxYears, onImportSuccess }) {
+export default function BoardAddStudentModal({ isOpen, onClose, currentFilter, subjectHeaders = [], onImportSuccess }) {
     const [view, setView] = useState("options");
     const [animate, setAnimate] = useState(false);
     const [studentNumber, setStudentNumber] = useState("");
@@ -41,7 +41,7 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
     const handleProceedToEdit = async () => {
         try {
             const res = await axios.get(route('api.get-student-id', { student_number: studentNumber }));
-            router.get(route('gwa.entry'), { student_id: res.data.id });
+            router.get(route('board.grades.entry'), { student_id: res.data.id });
             closeModal();
         } catch {
             alert("Student not found");
@@ -56,17 +56,17 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
 
         const formData = new FormData();
         formData.append('file', importFile);
-        // Ensure filter is sent as a string if your backend expects it that way
         formData.append('filter', JSON.stringify(currentFilter));
         
         try {
-            const response = await axios.post(route('gwa.import'), formData, { 
+            const response = await axios.post(route('board-grades.import'), formData, { 
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {
                 alert(response.data.message);
-                onImportSuccess();
+                if (onImportSuccess) onImportSuccess();
                 closeModal();
+                router.reload({ only: ['students'] });
             } else {
                 setImportError(response.data.message);
             }
@@ -82,17 +82,15 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
     return (
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                {/* Header - Matching OG Style */}
                 <div className="bg-[#5c297c] p-6 text-center relative">
-                    <h2 className="text-2xl font-bold text-white tracking-wide">Manage GWA Records</h2>
-                    <p className="text-purple-200 text-sm mt-1">Import CSV or edit a student's GWA</p>
+                    <h2 className="text-2xl font-bold text-white tracking-wide">Manage Board Grades</h2>
+                    <p className="text-purple-200 text-sm mt-1">Import CSV or edit a student's grades</p>
                     <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 rounded-full p-1 transition-all">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
                 <div className="p-8">
-                    {/* View: Options - Matching OG Grid */}
                     {view === "options" && (
                         <div className="grid grid-cols-2 gap-4">
                             <button onClick={() => setView("import")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
@@ -110,14 +108,13 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
                         </div>
                     )}
 
-                    {/* View: Import - Matching OG Layout */}
                     {view === "import" && (
                         <div className="flex flex-col gap-5 animate-fade-in-up">
                             <div className="bg-purple-50 p-5 rounded-lg border border-purple-100 text-center">
                                 <i className="bi bi-cloud-arrow-up text-4xl text-[#5c297c] mb-2 block"></i>
-                                <h3 className="font-bold text-[#5c297c] mb-1">Upload GWA Data</h3>
+                                <h3 className="font-bold text-[#5c297c] mb-1">Upload Board Grades Data</h3>
                                 <p className="text-xs text-gray-600 mb-4">
-                                    Expected columns: <strong>student_number</strong> + <strong>1Y-1S, 1Y-2S</strong>, etc. (Max Year: {maxYears})
+                                    Expected columns: <strong>student_number</strong> + Exact subject names like <strong>"{subjectHeaders[0] || 'Subject 1'}"</strong>.
                                 </p>
                                 <form onSubmit={handleImportSubmit} className="flex flex-col gap-3">
                                     <input 
@@ -143,7 +140,6 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
                         </div>
                     )}
 
-                    {/* View: Manual/Check - Matching OG Input Style */}
                     {view === "manual" && (
                         <div className="flex flex-col gap-5 animate-fade-in-up">
                             <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
@@ -171,7 +167,7 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
                                     <div className="flex items-center gap-2 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100">
                                         <i className="bi bi-info-circle-fill text-xl"></i>
-                                        <span className="text-sm font-medium">Student found! Proceed to update GWA.</span>
+                                        <span className="text-sm font-medium">Student found! Proceed to update grades.</span>
                                     </div>
                                     <button 
                                         onClick={handleProceedToEdit} 

@@ -30,11 +30,17 @@ export default function UpdateGWAForm({
 
     useEffect(() => {
         if (data.year_level && data.semester) {
+            // Map the dropdown value to match the database value
+            const mappedSemester = data.semester === "1ST" ? "1" : 
+                                   data.semester === "2ND" ? "2" : 
+                                   data.semester;
+
             const existingRecord = gwaRecords.find(
                 (r) =>
                     r.year_level.toString() === data.year_level.toString() &&
-                    r.semester.toString() === data.semester.toString(),
+                    r.semester.toString() === mappedSemester.toString(),
             );
+            
             if (existingRecord) {
                 setData("gwa", existingRecord.gwa);
             } else {
@@ -102,7 +108,7 @@ export default function UpdateGWAForm({
                                         >
                                             <input
                                                 type="text"
-                                                value={`${record.year_level}Y - ${record.semester}S`}
+                                                value={`${record.year_level} Year - Sem ${record.semester}`}
                                                 className={`${inputClass} bg-gray-50 border-gray-200 font-medium`}
                                                 readOnly
                                             />

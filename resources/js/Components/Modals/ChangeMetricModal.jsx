@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { router } from "@inertiajs/react";
+import { router } from "@inertiajs/react"; // Make sure router is imported!
 import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function ChangeMetricModal({
@@ -12,20 +12,21 @@ export default function ChangeMetricModal({
     const [selectedMetric, setSelectedMetric] = useState("");
     const [animate, setAnimate] = useState(false);
 
+    // 1. UPDATED URLs TO USE route() HELPER
     const ACADEMIC_METRICS = [
-        { label: "GWA", value: "GWA", url: route("gwa.info") }, // named route
-        { label: "Grades in Board Subjects", value: "Grades in Board Subjects", url: "/board-subject-grades" },
-        { label: "Back Subjects/Retakes", value: "Back Subjects/Retakes", url: "/retakes-info" },
-        { label: "Performance Rating", value: "Performance Rating", url: "/performance-rating" },
-        { label: "Simulation Exam Results", value: "Simulation Exam Results", url: "/simulation-exam" },
-        { label: "Attendance in Review Classes", value: "Attendance in Review Classes", url: "/review-attendance" },
-        { label: "Academic Recognition", value: "Academic Recognition", url: "/academic-recognition" },
+        { label: "GWA", value: "GWA", routeName: "gwa.info" },
+        { label: "Grades in Board Subjects", value: "Grades in Board Subjects", routeName: "board.subject.grades" },
+        { label: "Back Subjects/Retakes", value: "Back Subjects/Retakes", routeName: "retakes.info" },
+        { label: "Performance Rating", value: "Performance Rating", routeName: "performance.rating" },
+        { label: "Simulation Exam Results", value: "Simulation Exam Results", routeName: "simulation.exam" },
+        { label: "Attendance in Review Classes", value: "Attendance in Review Classes", routeName: "review.attendance" },
+        { label: "Academic Recognition", value: "Academic Recognition", routeName: "academic.recognition" },
     ];
 
     const PROGRAM_METRICS = [
-        { label: "Review Center", value: "Review Center", url: "/review-center" },
-        { label: "Mock Exam Scores", value: "Mock Exam Scores", url: "/mock-board-scores" },
-        { label: "Licensure Exam Results", value: "Licensure Exam Results", url: "/licensure-exam" },
+        { label: "Review Center", value: "Review Center", routeName: "review.center" },
+        { label: "Mock Exam Scores", value: "Mock Exam Scores", routeName: "mock.board.scores" },
+        { label: "Licensure Exam Results", value: "Licensure Exam Results", routeName: "licensure.exam" },
     ];
 
     const activeOptions = type === "program" ? PROGRAM_METRICS : ACADEMIC_METRICS;
@@ -44,21 +45,20 @@ export default function ChangeMetricModal({
         setTimeout(onClose, 300);
     };
 
+    // 2. UPDATED NAVIGATION TO USE INERTIA ROUTER
     const handleChange = () => {
         const target = activeOptions.find((m) => m.value === selectedMetric);
-        if (target) {
-            let url = target.url;
-
-            // Append filter data as query string if provided
-            if (filterData && Object.keys(filterData).length) {
-                const params = new URLSearchParams(filterData).toString();
-                url = `${url}?${params}`;
-            }
-
-            closeModal();
+        if (target && target.routeName) {
+            setAnimate(false);
             setTimeout(() => {
-                router.visit(url);  // use Inertia's router for SPA navigation
-            }, 100);
+                onClose();
+                
+                // Use Inertia's router.get! It automatically converts the filterData 
+                // object into query parameters seamlessly and prevents full page reloads.
+                router.get(route(target.routeName), filterData || {}, {
+                    preserveState: false, // We want to cleanly load the new metric page
+                });
+            }, 300);
         }
     };
 

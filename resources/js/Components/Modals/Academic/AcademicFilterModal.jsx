@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { usePage } from "@inertiajs/react";
 import axios from "axios";
 import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function AcademicFilterModal({ isOpen, onClose, currentFilters, onApply }) {
+    // 1. GRAB USER FROM INERTIA
+    const { auth } = usePage().props;
+    const user = auth.user;
+
+    // 2. DETERMINE RESTRICTIONS
+    const isCollegeRestricted = !!user?.college_id;
+    const isProgramRestricted = !!user?.program_id;
+
     const [values, setValues] = useState({
         academic_year: "",
         college: "",
@@ -11,6 +20,7 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
         semester: "",
         section: "",
     });
+    
     const [academicYears, setAcademicYears] = useState([]);
     const [optionsCache, setOptionsCache] = useState({});
     const [loading, setLoading] = useState(true);
@@ -25,15 +35,17 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
-            // Pre-fill with currentFilters
+            
+            // Pre-fill with currentFilters, but FALLBACK to user's restricted access
             setValues({
                 academic_year: currentFilters?.academic_year || "",
-                college: currentFilters?.college || "",
-                program: currentFilters?.program || "",
-                year_level: currentFilters?.year_level || "",
+                college: currentFilters?.college?.toString() || (isCollegeRestricted ? user.college_id.toString() : ""),
+                program: currentFilters?.program?.toString() || (isProgramRestricted ? user.program_id.toString() : ""),
+                year_level: currentFilters?.year_level?.toString() || "",
                 semester: currentFilters?.semester || "",
                 section: currentFilters?.section || "",
             });
+            
             if (academicYears.length === 0) {
                 axios.get(route('academic.filter-options'), { params: {} })
                     .then(res => setAcademicYears(res.data.academic_years || []))
@@ -42,7 +54,7 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
         } else {
             setAnimate(false);
         }
-    }, [isOpen, currentFilters]);
+    }, [isOpen, currentFilters, isCollegeRestricted, isProgramRestricted, user]);
 
     useEffect(() => {
         if (academicYears.length === 0) return;
@@ -110,14 +122,16 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
 
     const handleChange = (field, value) => {
         let newValues = { ...values, [field]: value };
+        
+        // Ensure restrictions aren't wiped out when higher-level dropdowns change
         if (field === "academic_year") {
-            newValues.college = "";
-            newValues.program = "";
+            newValues.college = isCollegeRestricted ? user.college_id.toString() : "";
+            newValues.program = isProgramRestricted ? user.program_id.toString() : "";
             newValues.year_level = "";
             newValues.semester = "";
             newValues.section = "";
         } else if (field === "college") {
-            newValues.program = "";
+            newValues.program = isProgramRestricted ? user.program_id.toString() : "";
             newValues.year_level = "";
             newValues.semester = "";
             newValues.section = "";
@@ -131,6 +145,7 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
         } else if (field === "semester") {
             newValues.section = "";
         }
+        
         setValues(newValues);
     };
 
@@ -170,22 +185,27 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
                                 onChange={(e) => handleChange("academic_year", e.target.value)}
                                 options={academicYears.map(ay => ({ value: ay, label: ay }))}
                             />
+                            
                             <CustomSelectGroup
                                 label="College"
                                 value={values.college}
                                 onChange={(e) => handleChange("college", e.target.value)}
                                 options={collegeOptions}
-                                disabled={!values.academic_year}
+                                // 3. LOCK IF RESTRICTED OR A.Y. NOT SELECTED
+                                disabled={!values.academic_year || isCollegeRestricted}
                                 placeholder={!values.academic_year ? "Select Academic Year first" : "Select College"}
                             />
+                            
                             <CustomSelectGroup
                                 label="Program"
                                 value={values.program}
                                 onChange={(e) => handleChange("program", e.target.value)}
                                 options={programOptions}
-                                disabled={!values.college}
+                                // 3. LOCK IF RESTRICTED OR COLLEGE NOT SELECTED
+                                disabled={!values.college || isProgramRestricted}
                                 placeholder={!values.college ? "Select College first" : "Select Program"}
                             />
+                            
                             <CustomSelectGroup
                                 label="Year Level"
                                 value={values.year_level}
@@ -194,6 +214,7 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
                                 disabled={!values.program}
                                 placeholder={!values.program ? "Select Program first" : "Select Year Level"}
                             />
+                            
                             <CustomSelectGroup
                                 label="Semester"
                                 value={values.semester}
@@ -202,6 +223,7 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
                                 disabled={!values.year_level}
                                 placeholder={!values.year_level ? "Select Year Level first" : "Select Semester"}
                             />
+                            
                             <CustomSelectGroup
                                 label="Section"
                                 value={values.section}

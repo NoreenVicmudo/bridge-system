@@ -19,42 +19,42 @@ export default function AcademicProfileFilter() {
     });
 
     const [academicYears, setAcademicYears] = useState([]);
-    const [optionsCache, setOptionsCache] = useState({}); // { "2025-2026": {...}, "2026-2027": {...} }
+    const [optionsCache, setOptionsCache] = useState({});
     const [loading, setLoading] = useState(true);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
 
     const isCollegeRestricted = !!user?.college_id;
     const isProgramRestricted = !!user?.program_id;
 
-    // Helper: ordinal suffix
     const getOrdinal = (n) => {
         const s = ['th', 'st', 'nd', 'rd'];
         const v = n % 100;
         return s[(v - 20) % 10] || s[v] || s[0];
     };
 
-    // 1. Fetch all academic years first
+    // 1. Fetch academic years once
     useEffect(() => {
         axios.get(route('academic.filter-options'), { params: {} })
             .then(res => setAcademicYears(res.data.academic_years || []))
             .catch(err => console.error(err));
     }, []);
 
-    // 2. Once academic years are known, fetch options for each year in parallel
+    // 2. Pre‑fetch options for each academic year (only when academicYears changes)
     useEffect(() => {
         if (academicYears.length === 0) return;
+        let isMounted = true;
         const fetchAll = async () => {
             setLoading(true);
             const promises = academicYears.map(year =>
                 axios.get(route('academic.filter-options'), { params: { academic_year: year } })
                     .then(res => ({ year, data: res.data }))
-                    .catch(err => ({ year, data: null }))
+                    .catch(() => ({ year, data: null }))
             );
             const results = await Promise.all(promises);
+            if (!isMounted) return;
             const cache = {};
             results.forEach(({ year, data }) => {
                 if (data) {
-                    // Transform programs array into map by college_id
                     const programsMap = {};
                     (data.programs || []).forEach(p => {
                         const collegeId = p.college_id;
@@ -74,6 +74,7 @@ export default function AcademicProfileFilter() {
             setLoading(false);
         };
         fetchAll();
+        return () => { isMounted = false; };
     }, [academicYears]);
 
     // Options for the selected academic year
@@ -82,7 +83,6 @@ export default function AcademicProfileFilter() {
         return optionsCache[values.academic_year] || null;
     }, [values.academic_year, optionsCache]);
 
-    // Client‑side filtered options (already scoped to academic year)
     const collegeOptions = currentOptions?.colleges || [];
     const programOptions = useMemo(() => {
         if (!values.college || !currentOptions) return [];
@@ -104,19 +104,17 @@ export default function AcademicProfileFilter() {
 
     const sectionOptions = useMemo(() => {
         if (!currentOptions || !values.year_level) return [];
-        // Sections are named like "1-1", "1-2", "2-1", etc.
-        // Only show sections that start with the selected year level
         const filtered = currentOptions.sections.filter(s => s.startsWith(`${values.year_level}-`));
         return filtered.map(s => ({ value: s, label: s }));
     }, [currentOptions, values.year_level]);
 
-    // Apply user restrictions once
+    // Apply user restrictions only once on mount
     useEffect(() => {
         let initial = { ...values };
         if (isCollegeRestricted) initial.college = user.college_id.toString();
         if (isProgramRestricted) initial.program = user.program_id.toString();
         setValues(initial);
-    }, []);
+    }, []); // ✅ Empty array – runs once
 
     const handleChange = (field, value) => {
         let newValues = { ...values, [field]: value };
@@ -162,24 +160,14 @@ export default function AcademicProfileFilter() {
         setValues(newValues);
     };
 
-    // Inside the component, after programOptions and collegeOptions are defined
-    const handleSubmit = () => {
+    // ✅ Correct handleSubmit – only saves to localStorage and opens modal
+    const handleSubmit = (e) => {
+        e.preventDefault();
         if (!values.academic_year || !values.college || !values.program || !values.year_level || !values.semester || !values.section) {
             return;
         }
-
-        // Resolve names from the current options
-        const collegeOption = collegeOptions.find(c => c.value === values.college);
-        const programOption = programOptions.find(p => p.value === values.program);
-
-        const enrichedFilter = {
-            ...values,
-            college_name: collegeOption?.label || values.college,
-            program_name: programOption?.label || values.program,
-        };
-
-        onApply(enrichedFilter);
-        closeModal();
+        localStorage.setItem("academicFilterData", JSON.stringify(values));
+        setIsMetricModalOpen(true);
     };
 
     const isFormComplete = !!(
@@ -199,13 +187,6 @@ export default function AcademicProfileFilter() {
         );
     }
 
-    const isAcademicYearDisabled = false;
-    const isCollegeDisabled = !values.academic_year || isCollegeRestricted;
-    const isProgramDisabled = !values.college || isProgramRestricted;
-    const isYearLevelDisabled = !values.program;
-    const isSemesterDisabled = !values.year_level;
-    const isSectionDisabled = !values.semester;
-
     return (
         <AuthenticatedLayout>
             <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
@@ -221,7 +202,6 @@ export default function AcademicProfileFilter() {
                                 value={values.academic_year}
                                 onChange={(e) => handleChange("academic_year", e.target.value)}
                                 options={academicYears.map(ay => ({ value: ay, label: ay }))}
-                                disabled={isAcademicYearDisabled}
                             />
 
                             <CustomSelectGroup
@@ -229,7 +209,7 @@ export default function AcademicProfileFilter() {
                                 value={values.college}
                                 onChange={(e) => handleChange("college", e.target.value)}
                                 options={collegeOptions}
-                                disabled={isCollegeDisabled}
+                                disabled={isCollegeRestricted}
                                 placeholder={!values.academic_year ? "Select Academic Year first" : "Select College"}
                             />
 
@@ -238,7 +218,7 @@ export default function AcademicProfileFilter() {
                                 value={values.program}
                                 onChange={(e) => handleChange("program", e.target.value)}
                                 options={programOptions}
-                                disabled={isProgramDisabled}
+                                disabled={!values.college || isProgramRestricted}
                                 placeholder={!values.college ? "Select College first" : "Select Program"}
                             />
 
@@ -247,7 +227,7 @@ export default function AcademicProfileFilter() {
                                 value={values.year_level}
                                 onChange={(e) => handleChange("year_level", e.target.value)}
                                 options={yearLevelOptions}
-                                disabled={isYearLevelDisabled}
+                                disabled={!values.program}
                                 placeholder={!values.program ? "Select Program first" : "Select Year Level"}
                             />
 
@@ -256,7 +236,7 @@ export default function AcademicProfileFilter() {
                                 value={values.semester}
                                 onChange={(e) => handleChange("semester", e.target.value)}
                                 options={semesterOptions}
-                                disabled={isSemesterDisabled}
+                                disabled={!values.year_level}
                                 placeholder={!values.year_level ? "Select Year Level first" : "Select Semester"}
                             />
 
@@ -265,7 +245,7 @@ export default function AcademicProfileFilter() {
                                 value={values.section}
                                 onChange={(e) => handleChange("section", e.target.value)}
                                 options={sectionOptions}
-                                disabled={isSectionDisabled}
+                                disabled={!values.semester}
                                 placeholder={!values.semester ? "Select Semester first" : "Select Section"}
                             />
                         </div>
@@ -281,7 +261,14 @@ export default function AcademicProfileFilter() {
                     </form>
                 </div>
             </div>
-            <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="" type="academic" filterData={values} />
+
+            <ChangeMetricModal
+                isOpen={isMetricModalOpen}
+                onClose={() => setIsMetricModalOpen(false)}
+                currentMetric=""
+                type="academic"
+                filterData={values}
+            />
         </AuthenticatedLayout>
     );
 }

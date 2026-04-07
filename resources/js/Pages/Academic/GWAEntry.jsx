@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { useForm, Head } from "@inertiajs/react";
+import { useForm, Head, router } from "@inertiajs/react"; // <-- Added router
 import UpdateGWAForm from "@/Components/Forms/UpdateGWAForm";
 
 export default function UpdateGWAPage({ student, gwaRecords = [] }) {
@@ -11,24 +11,24 @@ export default function UpdateGWAPage({ student, gwaRecords = [] }) {
         gwa: "",
     });
 
-    // If editing an existing record, pre-fill
-    useEffect(() => {
-        if (gwaRecords.length > 0) {
-            const record = gwaRecords[0];
-            setData({
-                student_number: student.student_number,
-                year_level: record.year_level,   // was 'academic_year'
-                semester: record.semester,
-                gwa: record.gwa,
+    const handleSubmit = () => {
+        if (student?.student_id) { 
+            put(route("gwa.update", student.student_id), {
+                onSuccess: () => {
+                    // Grab the exact filters the user used to generate the table
+                    const saved = localStorage.getItem("academicFilterData");
+                    const filters = saved ? JSON.parse(saved) : {};
+                    
+                    // Route directly back to the table with fresh data
+                    router.get(route('gwa.info'), filters);
+                }
             });
         }
-    }, [gwaRecords]);
-
-    const handleSubmit = () => {
-        if (student?.id) {
-            put(route("gwa.update", student.id));
-        }
     };
+
+    const fullName = student 
+        ? `${student.student_lname}, ${student.student_fname}` 
+        : "Unknown Student";
 
     return (
         <AuthenticatedLayout>
@@ -40,7 +40,7 @@ export default function UpdateGWAPage({ student, gwaRecords = [] }) {
                     errors={errors}
                     processing={processing}
                     submit={handleSubmit}
-                    studentName={`${student?.last_name}, ${student?.first_name}`}
+                    studentName={fullName}
                     gwaRecords={gwaRecords}
                 />
             </div>
