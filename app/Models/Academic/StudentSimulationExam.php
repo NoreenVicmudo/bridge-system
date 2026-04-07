@@ -15,7 +15,6 @@ class StudentSimulationExam extends Model
         'student_number',
         'simulation_id',
         'student_score',
-        'total_score',
         'date_created',
         'is_active',
     ];

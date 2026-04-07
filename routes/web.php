@@ -1,10 +1,16 @@
 <?php
 
 use App\Http\Controllers\Academic\AcademicController;
+use App\Http\Controllers\Academic\AttendanceController;
+use App\Http\Controllers\Academic\BackSubjectsController;
 use App\Http\Controllers\Academic\BoardGradeController;
 use App\Http\Controllers\Academic\GwaController;
 use App\Http\Controllers\Academic\PerformanceRatingController;
+use App\Http\Controllers\Academic\RecognitionController;
+use App\Http\Controllers\Academic\SimulationExamController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Program\ProgramFilterController;
+use App\Http\Controllers\Program\ReviewCenterController;
 use App\Http\Controllers\Student\StudentController;
 use App\Models\College;
 use App\Models\Program;
@@ -120,7 +126,49 @@ Route::middleware('auth')->group(function () {
         Route::put('/performance-rating/{student}', [PerformanceRatingController::class, 'update'])->name('performance-rating.update');
         Route::post('/performance-rating/import', [PerformanceRatingController::class, 'import'])->name('performance-rating.import');
         Route::get('/performance-rating/export', [PerformanceRatingController::class, 'export'])->name('performance-rating.export');
-        });
+        
+        // Simulation Exam
+        Route::get('/simulation-exam', [SimulationExamController::class, 'index'])->name('simulation.exam');
+        Route::get('/simulation-exam-entry', [SimulationExamController::class, 'edit'])->name('simulation.exam.entry');
+        Route::put('/simulation-exam/{student}', [SimulationExamController::class, 'update'])->name('simulation-exam.update');
+        Route::post('/simulation-exam/import', [SimulationExamController::class, 'import'])->name('simulation-exam.import');
+        Route::get('/simulation-exam/export', [SimulationExamController::class, 'export'])->name('simulation-exam.export');
+    
+        Route::get('/retakes-info', [BackSubjectsController::class, 'index'])->name('retakes.info');
+        Route::get('/retakes-entry', [BackSubjectsController::class, 'edit'])->name('retakes.entry');
+        Route::put('/retakes/{student}', [BackSubjectsController::class, 'update'])->name('retakes.update');
+        Route::post('/retakes/import', [BackSubjectsController::class, 'import'])->name('retakes.import');
+        Route::get('/retakes/export', [BackSubjectsController::class, 'export'])->name('retakes.export');
+    
+        Route::get('/review-attendance', [AttendanceController::class, 'index'])->name('review.attendance');
+        Route::get('/review-attendance-entry', [AttendanceController::class, 'edit'])->name('review.attendance.entry');
+        Route::put('/review-attendance/{student}', [AttendanceController::class, 'update'])->name('review.attendance.update');
+        Route::post('/review-attendance/import', [AttendanceController::class, 'import'])->name('review.attendance.import');
+        Route::get('/review-attendance/export', [AttendanceController::class, 'export'])->name('review.attendance.export');
+
+        // Academic Recognition
+        Route::get('/academic-recognition', [RecognitionController::class, 'index'])->name('academic.recognition');
+        Route::get('/recognition-entry', [RecognitionController::class, 'edit'])->name('academic.recognition.entry');
+        Route::put('/recognition/{student}', [RecognitionController::class, 'update'])->name('academic.recognition.update');
+        Route::post('/recognition/import', [RecognitionController::class, 'import'])->name('academic.recognition.import');
+        Route::get('/recognition/export', [RecognitionController::class, 'export'])->name('academic.recognition.export');
+
+    });
+
+    // --- PROGRAM METRICS GROUP ---
+    Route::prefix('program')->group(function () {
+        Route::get('/filter-options', [ProgramFilterController::class, 'getOptions'])
+        ->name('program.filter-options');
+        
+        // Review Center Routes
+        Route::get('/review-center', [ReviewCenterController::class, 'index'])->name('review.center');
+        Route::get('/review-center-entry', [ReviewCenterController::class, 'edit'])->name('review.center.entry');
+        Route::put('/review-center/{student}', [ReviewCenterController::class, 'update'])->name('review.center.update');
+        Route::post('/review-center/import', [ReviewCenterController::class, 'import'])->name('review.center.import');
+        Route::get('/review-center/export', [ReviewCenterController::class, 'export'])->name('review.center.export');
+        
+        // You can add Mock Boards and Licensure here later...
+    });
 
     // --- ACADEMIC METRICS (Placeholders) ---
     // (Kept outside the prefix so your current frontend URLs do not break!)

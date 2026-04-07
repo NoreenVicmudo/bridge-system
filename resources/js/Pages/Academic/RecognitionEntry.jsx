@@ -1,6 +1,6 @@
 import React from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { useForm, Head } from "@inertiajs/react";
+import { useForm, Head, router } from "@inertiajs/react";
 import UpdateRecognitionForm from "@/Components/Forms/UpdateRecognitionForm";
 
 export default function RecognitionEntry({ student, awardCount }) {
@@ -10,27 +10,25 @@ export default function RecognitionEntry({ student, awardCount }) {
     });
 
     const handleSubmit = () => {
-        if (student?.id) {
-            put(route("academic-recognition.update", student.id));
+        if (student?.student_id) { // FIXED ID
+            put(route("academic.recognition.update", student.student_id), {
+                onSuccess: () => {
+                    const saved = localStorage.getItem("academicFilterData");
+                    router.get(route('academic.recognition'), saved ? JSON.parse(saved) : {});
+                }
+            });
         }
     };
 
-    const fullName = student
-        ? `${student.last_name}, ${student.first_name}`
-        : "";
+    const fullName = student ? `${student.student_lname}, ${student.student_fname}` : "Unknown Student";
 
     return (
         <AuthenticatedLayout>
             <Head title="Update Academic Recognition" />
             <div className="w-full max-w-7xl mx-auto px-4 py-2">
                 <UpdateRecognitionForm
-                    data={data}
-                    setData={setData}
-                    errors={errors}
-                    processing={processing}
-                    submit={handleSubmit}
-                    studentName={fullName}
-                    currentCount={awardCount}
+                    data={data} setData={setData} errors={errors} processing={processing}
+                    submit={handleSubmit} studentName={fullName} currentCount={awardCount}
                 />
             </div>
         </AuthenticatedLayout>

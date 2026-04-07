@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student\StudentInfo;
 use App\Models\Academic\RatingCategory;
 use App\Models\Academic\StudentPerformanceRating;
+use App\Models\College;
+use App\Models\Program;
+use App\Models\Student\StudentInfo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -23,8 +25,8 @@ class PerformanceRatingController extends Controller
             'section'       => 'required|string',
         ]);
 
-        $college = \App\Models\College::where('college_id', $filter['college'])->first();
-        $program = \App\Models\Program::where('program_id', $filter['program'])->first();
+        $college = College::where('college_id', $filter['college'])->first();
+        $program = Program::where('program_id', $filter['program'])->first();
         $filter['college_name'] = $college ? $college->name : 'N/A';
         $filter['program_name'] = $program ? $program->name : 'N/A';
 
