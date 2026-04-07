@@ -161,7 +161,7 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
             Object.entries(values).filter(([_, v]) => v !== "")
         );
 
-        router.get('/student-info', filteredParams, {
+        router.get('/students/filtered-info', filteredParams, {
             preserveState: true, 
             preserveScroll: true,
         });
@@ -174,10 +174,19 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
 
     // Hardcoded mock options for the fields we haven't built database tables for yet
     const mockSemesters = [{ value: "1st", label: "1st Semester" }, { value: "2nd", label: "2nd Semester" }, { value: "Summer", label: "Summer" }];
-    const mockBatches = [{ value: "2025", label: "Batch 2025" }, { value: "2026", label: "Batch 2026" }];
-
-// 1. Get the current year dynamically (e.g., 2026)
+    // 1. Get the current year dynamically (e.g., 2026)
     const currentYear = new Date().getFullYear(); 
+    
+    const mockBatches = Array.from(
+        { length: currentYear - 2000 + 1 }, 
+        (_, i) => {
+            const startYear = currentYear - i;
+            return {
+                value: startYear.toString(),
+                label: `Batch ${startYear}`
+            };
+        }
+    );
     
     // 2. Generate Academic Years from the Current Year down to 2000
     const dynamicAcademicYears = Array.from(
@@ -312,7 +321,7 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
 
                         <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 w-full">
                             <Link
-                                href="/student-masterlist"
+                                href={route('student.masterlist')}
                                 className="inline-flex justify-center items-center px-6 py-3 bg-[#5c297c] text-white font-medium rounded-md hover:bg-[#ffb736] hover:text-white transition-all duration-300 text-center text-base"
                             >
                                 View Masterlist

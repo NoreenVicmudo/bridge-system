@@ -18,7 +18,7 @@ class StudentInfoController extends Controller
     {
         $user = auth()->user();
 
-        return Inertia::render('Student/StudentInformationEntry', [
+        return Inertia::render('Entry/StudentInformationEntry', [
             'initialData' => [
                 'Colleges' => \App\Models\College::all(),
                 'Programs' => \App\Models\Program::with('college')->get(),

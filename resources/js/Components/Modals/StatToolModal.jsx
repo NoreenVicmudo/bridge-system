@@ -1,78 +1,30 @@
 import React, { useState, useEffect } from "react";
 import CustomSelectGroup from "@/Components/SelectGroup";
 
-export default function StatToolModal({ isOpen, onClose, onGenerate }) {
+export default function StatToolModal({ 
+    isOpen, 
+    onClose, 
+    onGenerate, 
+    subMetricMap = {}, filters // <-- Now injected dynamically from the backend!
+}) {
     const [animate, setAnimate] = useState(false);
+    const [categories, setCategories] = useState([]);
+    const [expectedRatios, setExpectedRatios] = useState({});
     
-    // State is initialized once here, and will now persist!
     const [config, setConfig] = useState({
         tool: "",
         inferentialType: "",
-        descCategory: "",
         descField: "",
         descSub: "",
-        var1Category: "",
         var1Field: "",
         var1Sub: "",
-        var2Category: "",
         var2Field: "",
         var2Sub: "",
     });
 
-    const INFERENTIAL_TYPES = [
-        { value: "regression", label: "Regression" },
-        { value: "pearson", label: "Pearson R" },
-        { value: "chiSquareGOF", label: "Chi Square - Goodness of Fit" },
-        { value: "chiSquareTOI", label: "Chi Square - Test of Independence" },
-        { value: "tTestIND", label: "Independent T Test" },
-        { value: "tTestDEP", label: "Dependent T Test" },
-    ];
-
-    const FIELDS_REQUIRING_SUB = [
-        "GWA",
-        "BoardGrades",
-        "Retakes",
-        "PerformanceRating",
-        "SimExam",
-        "MockScores",
-    ];
-
-    // MOCK DATA for sub-metrics
-    const MOCK_SUB_METRICS = {
-        GWA: [
-            { value: "avg", label: "Average GWA" },
-            { value: "1y1s", label: "1st Year - 1st Semester" },
-            { value: "1y2s", label: "1st Year - 2nd Semester" },
-        ],
-        BoardGrades: [
-            { value: "subj1", label: "Clinical Chemistry" },
-            { value: "subj2", label: "Microbiology" },
-        ],
-        Retakes: [
-            { value: "gen1", label: "Anatomy" },
-            { value: "gen2", label: "Physiology" },
-        ],
-        PerformanceRating: [
-            { value: "cat1", label: "Laboratory" },
-            { value: "cat2", label: "Lecture" },
-        ],
-        SimExam: [
-            { value: "sim1", label: "Simulation Exam 1" },
-            { value: "sim2", label: "Simulation Exam 2" },
-        ],
-        MockScores: [
-            { value: "mock1", label: "Mock Board 1" },
-            { value: "mock2", label: "Mock Board 2" },
-        ],
-    };
-
     useEffect(() => {
-        if (isOpen) {
-            setAnimate(true);
-            // FIX: Removed the setConfig reset here so it remembers previous choices!
-        } else {
-            setAnimate(false);
-        }
+        if (isOpen) setAnimate(true);
+        else setAnimate(false);
     }, [isOpen]);
 
     const closeModal = () => {
@@ -80,460 +32,329 @@ export default function StatToolModal({ isOpen, onClose, onGenerate }) {
         setTimeout(onClose, 300);
     };
 
-    const getBaseFieldOptions = (category, varType, currentState) => {
-        if (!category) return [];
+    // --- STATIC OPTIONS ---
+    const TOOL_OPTIONS = [
+        { value: "descriptive", label: "Descriptive Statistics" },
+        { value: "inferential", label: "Inferential Statistics" },
+    ];
 
-        if (currentState.tool === "descriptive") {
-            if (category === "studentInfo")
-                return [
-                    { value: "age", label: "Age" },
-                    { value: "socioeconomicStatus", label: "Socioeconomic Status" },
-                ];
-            if (category === "academicProfile")
-                return [
-                    { value: "GWA", label: "GWA" },
-                    { value: "BoardGrades", label: "Grades in Board Subjects" },
-                    { value: "Retakes", label: "Back Subjects/Retakes" },
-                    { value: "PerformanceRating", label: "Performance Rating" },
-                    { value: "SimExam", label: "Simulation Exam Results" },
-                    { value: "Attendance", label: "Attendance in Review Classes" },
-                    { value: "Recognition", label: "Academic Recognition" },
-                ];
-            if (category === "programMetrics")
-                return [
-                    { value: "MockScores", label: "Mock Board Scores" },
-                    { value: "TakeAttempt", label: "Number of Exam Attempts" },
-                ];
+    const INFERENTIAL_TYPES = [
+        { value: "pearson", label: "Pearson R Correlation" },
+        { value: "regression", label: "Regression Analysis" },
+        { value: "ttest_ind", label: "Independent Samples T-Test" },
+        { value: "ttest_dep", label: "Dependent (Paired) Samples T-Test" },
+        { value: "chi_sq_gof", label: "Chi-Square (Goodness of Fit)" },
+        { value: "chi_sq_toi", label: "Chi-Square (Test of Independence)" },
+    ];
+
+    const METRIC_OPTIONS = [
+        { value: "Gender", label: "Gender (Male/Female)", type: "categorical", hasSub: false },
+        { value: "Age", label: "Age", type: "numerical", hasSub: false },
+        { value: "Socioeconomic", label: "Socioeconomic Status", type: "numerical", hasSub: false },
+        { value: "WorkStatus", label: "Work Status", type: "categorical", hasSub: false },
+        { value: "GWA", label: "General Weighted Average (GWA)", type: "numerical", hasSub: false },
+        // These four now support sub-selection + overall
+        { value: "BoardGrades", label: "Grades in Board Subjects", type: "numerical", hasSub: true },
+        { value: "MockScores", label: "Mock Board Exam Scores", type: "numerical", hasSub: true },
+        { value: "PerformanceRating", label: "Performance Rating", type: "numerical", hasSub: true },
+        { value: "SimExam", label: "Simulation Exam Results", type: "numerical", hasSub: true },
+        
+        { value: "Attendance", label: "Review Attendance", type: "numerical", hasSub: false },
+        { value: "Retakes", label: "Back Subjects / Retakes", type: "numerical", hasSub: false },
+        { value: "Licensure", label: "Licensure Exam Result", type: "categorical", hasSub: false },
+    ];
+
+    const getFilteredMetrics = (variableNum = 1) => {
+        const type = config.inferentialType;
+
+        // 1. Descriptive only makes sense for Numerical data (Mean, Std Dev, etc.)
+        if (config.tool === "descriptive") {
+            return METRIC_OPTIONS.filter(m => m.type === "numerical");
         }
 
-        if (currentState.tool === "inferential") {
-            const inf = currentState.inferentialType;
-
-            if (inf === "regression" || inf === "pearson") {
-                if (category === "studentInfo") return [{ value: "age", label: "Age" }];
-                if (category === "academicProfile")
-                    return [
-                        { value: "GWA", label: "GWA" },
-                        { value: "BoardGrades", label: "Grades in Board Subjects" },
-                        { value: "Retakes", label: "Back Subjects/Retakes" },
-                        { value: "PerformanceRating", label: "Performance Rating" },
-                        { value: "SimExam", label: "Simulation Exam Results" },
-                        { value: "Attendance", label: "Attendance in Review Classes" },
-                        { value: "Recognition", label: "Academic Recognition" },
-                    ];
-                if (category === "programMetrics")
-                    return [
-                        { value: "MockScores", label: "Mock Board Scores" },
-                        { value: "TakeAttempt", label: "Number of Exam Attempts" },
-                    ];
-            }
-
-            if (inf === "chiSquareGOF" || inf === "chiSquareTOI") {
-                if (category === "studentInfo")
-                    return [
-                        { value: "gender", label: "Gender" },
-                        { value: "socioeconomicStatus", label: "Socioeconomic Status" },
-                        { value: "livingArrangement", label: "Current Living Arrangement" },
-                        { value: "workStatus", label: "Work Status" },
-                        { value: "scholarship", label: "Scholarship/Grant" },
-                        { value: "language", label: "Language Spoken at Home" },
-                        { value: "lastSchool", label: "Last School Attended" },
-                    ];
-                if (category === "academicProfile")
-                    return [
-                        { value: "BoardGrades", label: "Grades in Board Subjects" },
-                        { value: "PerformanceRating", label: "Performance Rating" },
-                        { value: "SimExam", label: "Simulation Exam Results" },
-                        { value: "Attendance", label: "Attendance in Review Classes" },
-                    ];
-                if (category === "programMetrics")
-                    return [
-                        { value: "ReviewCenter", label: "Student Review Center" },
-                        { value: "MockScores", label: "Mock Board Scores" },
-                        { value: "LicensureResult", label: "Licensure Exam Result" },
-                    ];
-            }
-
-            if (inf === "tTestIND") {
-                if (varType === "var1") {
-                    if (category === "studentInfo")
-                        return [
-                            { value: "gender", label: "Gender" },
-                            { value: "scholarship", label: "Scholarship/Grant" },
-                            { value: "language", label: "Language Spoken at Home" },
-                            { value: "lastSchool", label: "Last School Attended" },
-                        ];
-                    if (category === "academicProfile")
-                        return [{ value: "Retakes", label: "Back Subjects/Retakes" }];
-                    if (category === "programMetrics")
-                        return [
-                            { value: "LicensureResult", label: "Licensure Exam Result" },
-                            { value: "TakeAttempt", label: "Number of Exam Attempts" },
-                        ];
-                } else {
-                    if (category === "studentInfo") return [{ value: "age", label: "Age" }];
-                    if (category === "academicProfile")
-                        return [
-                            { value: "BoardGrades", label: "Grades in Board Subjects" },
-                            { value: "PerformanceRating", label: "Performance Rating" },
-                            { value: "SimExam", label: "Simulation Exam Results" },
-                            { value: "Attendance", label: "Attendance in Review Classes" },
-                        ];
-                    if (category === "programMetrics")
-                        return [{ value: "MockScores", label: "Mock Board Scores" }];
-                }
-            }
-
-            if (inf === "tTestDEP") {
-                if (category === "academicProfile")
-                    return [
-                        { value: "BoardGrades", label: "Grades in Board Subjects" },
-                        { value: "PerformanceRating", label: "Performance Rating" },
-                        { value: "SimExam", label: "Simulation Exam Results" },
-                    ];
-                if (category === "programMetrics")
-                    return [{ value: "MockScores", label: "Mock Board Scores" }];
-            }
+        // 2. Pearson R & Regression REQUIRE both variables to be Numerical
+        if (type === "pearson" || type === "regression") {
+            return METRIC_OPTIONS.filter(m => m.type === "numerical");
         }
-        return [];
+
+        // 3. Independent T-Test: Var 1 MUST be Categorical (Groups), Var 2 MUST be Numerical (Scores)
+        if (type === "ttest_ind") {
+            return variableNum === 1 
+                ? METRIC_OPTIONS.filter(m => m.type === "categorical")
+                : METRIC_OPTIONS.filter(m => m.type === "numerical");
+        }
+
+        // 4. Dependent T-Test: BOTH must be Numerical (e.g., Pre-test vs Post-test)
+        if (type === "ttest_dep") {
+            return METRIC_OPTIONS.filter(m => m.type === "numerical");
+        }
+
+        // 5. Chi-Square: BOTH must be Categorical (Counting frequencies)
+        if (type === "chi_sq_gof" || type === "chi_sq_toi") {
+            return METRIC_OPTIONS.filter(m => m.type === "categorical");
+        }
+
+        return METRIC_OPTIONS;
     };
 
-    const getAvailableFields = (category, varType, currentState = config) => {
-        const baseFields = getBaseFieldOptions(category, varType, currentState);
-        if (varType === "var2" && currentState.var1Category === category) {
-            return baseFields.filter((option) => {
-                const requiresSub = FIELDS_REQUIRING_SUB.includes(option.value);
-                if (!requiresSub) {
-                    if (currentState.var1Field === option.value) return false;
-                } else {
-                    const subMetrics = MOCK_SUB_METRICS[option.value] || [];
-                    if (subMetrics.length === 1 && currentState.var1Field === option.value && currentState.var1Sub === subMetrics[0].value) {
-                        return false;
-                    }
-                }
-                return true;
-            });
+    // --- DYNAMIC SUB-METRIC LOOKUP ---
+    // If the backend didn't provide sub-metrics for a field (e.g., GWA just has one generic value), we provide a default single option.
+    const getSubOptions = (metricKey) => {
+        if (!metricKey) return [];
+
+        const metricLabel = METRIC_OPTIONS.find(m => m.value === metricKey)?.label || metricKey;
+        const overallOption = { value: "overall", label: `Overall ${metricLabel}` };
+
+        // If the map has entries for this key, combine them with the overall option
+        if (subMetricMap[metricKey] && subMetricMap[metricKey].length > 0) {
+            return [overallOption, ...subMetricMap[metricKey]];
         }
-        return baseFields;
+
+        // Fallback for GWA, Age, etc.
+        return [overallOption];
     };
 
-    const getAvailableCategories = (varType, currentState = config) => {
-        let all = [
-            { value: "studentInfo", label: "Student Information" },
-            { value: "academicProfile", label: "Academic Profile" },
-            { value: "programMetrics", label: "Program Metrics" },
-        ];
-        if (currentState.tool === "inferential" && currentState.inferentialType === "tTestDEP") {
-            all = all.filter((c) => c.value !== "studentInfo");
+    // --- HANDLERS ---
+    const handleChange = (field, value) => {
+        let newConfig = { ...config, [field]: value };
+
+        // Reset downstream fields when parents change
+        if (field === "tool") {
+            newConfig = { tool: value, inferentialType: "", descField: "", descSub: "", var1Field: "", var1Sub: "", var2Field: "", var2Sub: "" };
+        } else if (field === "inferentialType") {
+            newConfig = { ...newConfig, var1Field: "", var1Sub: "", var2Field: "", var2Sub: "" };
+        } else if (field === "descField") {
+            newConfig.descSub = ""; // Reset sub-metric when main metric changes
+        } else if (field === "var1Field") {
+            newConfig.var1Sub = "";
+        } else if (field === "var2Field") {
+            newConfig.var2Sub = "";
         }
-        if (varType === "var2") {
-            all = all.filter((category) => {
-                const fields = getAvailableFields(category.value, "var2", currentState);
-                return fields.length > 0;
-            });
-        }
-        return all;
-    };
 
-    const getAvailableSubMetrics = (field, varType, currentState = config) => {
-        const baseSubMetrics = MOCK_SUB_METRICS[field] || [];
-        if (varType === "var2" && currentState.var1Category === currentState.var2Category && currentState.var1Field === field) {
-            return baseSubMetrics.filter((sub) => sub.value !== currentState.var1Sub);
-        }
-        return baseSubMetrics;
-    };
-
-    const getSubMetricLabel = (field) => {
-        if (field === "GWA") return "Select Year and Semester:";
-        if (field === "BoardGrades") return "Select Board Subject:";
-        if (field === "Retakes") return "Select Subject:";
-        if (field === "PerformanceRating") return "Select Category:";
-        if (field === "SimExam") return "Select Simulation:";
-        if (field === "MockScores") return "Select Mock Subject:";
-        return "Select Option:";
-    };
-
-    const handleConfigChange = (field, value) => {
-        setConfig((prev) => {
-            const next = { ...prev, [field]: value };
-            if (field === "descCategory") { next.descField = ""; next.descSub = ""; }
-            if (field === "descField") { next.descSub = ""; }
-            if (field === "var1Category") { next.var1Field = ""; next.var1Sub = ""; }
-            if (field === "var1Field") { next.var1Sub = ""; }
-            if (field === "var2Category") { next.var2Field = ""; next.var2Sub = ""; }
-            if (field === "var2Field") { next.var2Sub = ""; }
-
-            if (field.startsWith("var1") && next.tool === "inferential") {
-                const validVar2Cats = getAvailableCategories("var2", next).map((c) => c.value);
-                if (next.var2Category && !validVar2Cats.includes(next.var2Category)) {
-                    next.var2Category = ""; next.var2Field = ""; next.var2Sub = "";
-                } else if (next.var2Category) {
-                    const validVar2Fields = getAvailableFields(next.var2Category, "var2", next).map((f) => f.value);
-                    if (next.var2Field && !validVar2Fields.includes(next.var2Field)) {
-                        next.var2Field = ""; next.var2Sub = "";
-                    } else if (next.var2Field) {
-                        const validVar2Subs = getAvailableSubMetrics(next.var2Field, "var2", next).map((s) => s.value);
-                        if (next.var2Sub && !validVar2Subs.includes(next.var2Sub)) {
-                            next.var2Sub = "";
-                        }
-                    }
-                }
-            }
-            return next;
-        });
+        setConfig(newConfig);
     };
 
     const isFormValid = () => {
         if (!config.tool) return false;
         if (config.tool === "descriptive") {
-            if (!config.descCategory || !config.descField) return false;
-            if (FIELDS_REQUIRING_SUB.includes(config.descField) && !config.descSub) return false;
-            return true;
+            return config.descField !== "" && config.descSub !== "";
         }
         if (config.tool === "inferential") {
-            if (!config.inferentialType) return false;
-            if (config.inferentialType === "chiSquareGOF") {
-                if (!config.var1Category || !config.var1Field) return false;
-                if (FIELDS_REQUIRING_SUB.includes(config.var1Field) && !config.var1Sub) return false;
-                return true;
+            if (config.inferentialType === "chi_sq_gof") {
+                // Goodness of fit only needs ONE variable
+                return config.inferentialType !== "" && config.var1Field !== "" && config.var1Sub !== "";
+            } else {
+                // All other inferential tests need TWO variables
+                return (
+                    config.inferentialType !== "" &&
+                    config.var1Field !== "" && config.var1Sub !== "" &&
+                    config.var2Field !== "" && config.var2Sub !== ""
+                );
             }
-            if (!config.var1Category || !config.var1Field || !config.var2Category || !config.var2Field) return false;
-            if (FIELDS_REQUIRING_SUB.includes(config.var1Field) && !config.var1Sub) return false;
-            if (FIELDS_REQUIRING_SUB.includes(config.var2Field) && !config.var2Sub) return false;
-            if (config.var1Field === config.var2Field && config.var1Sub === config.var2Sub) return false;
-            return true;
         }
         return false;
     };
 
+        // Triggered when Var1 changes
+    useEffect(() => {
+        if (config.inferentialType === 'chi_sq_gof' && config.var1Field && filters?.program) {
+            axios.post(route('report.categories'), { ...filters, field: config.var1Field })
+                .then(res => {
+                    setCategories(res.data.categories);
+                    const fetchedCats = res.data.categories;
+                    if (fetchedCats.length > 0) {
+                        const equal = (100 / fetchedCats.length).toFixed(0);
+                        const initial = {};
+                        fetchedCats.forEach(cat => initial[cat] = equal);
+                        setExpectedRatios(initial);
+                    }
+                });
+        } else {
+            // Reset if we switch away from GoF
+            setCategories([]);
+            setExpectedRatios({});
+        }
+    }, [config.inferentialType, config.var1Field]);
+
     const handleGenerate = () => {
-        onGenerate(config);
+        if (!isFormValid()) return;
+
+        // Enrich the config with Human-Readable Labels for the PDF Report titles
+        const enrichedConfig = { 
+            ...config, 
+            expected_ratios: config.inferentialType === 'chi_sq_gof' ? expectedRatios : null 
+        };
+
+        if (config.tool === "descriptive") {
+            enrichedConfig.descFieldLabel = METRIC_OPTIONS.find(m => m.value === config.descField)?.label;
+            enrichedConfig.descSubLabel = getSubOptions(config.descField).find(s => s.value === config.descSub)?.label;
+        } else {
+            enrichedConfig.inferentialLabel = INFERENTIAL_TYPES.find(m => m.value === config.inferentialType)?.label;
+            enrichedConfig.var1FieldLabel = METRIC_OPTIONS.find(m => m.value === config.var1Field)?.label;
+            enrichedConfig.var1SubLabel = getSubOptions(config.var1Field).find(s => s.value === config.var1Sub)?.label;
+            
+            // Only look for Var 2 labels if it's NOT a GoF test
+            if (config.inferentialType !== 'chi_sq_gof') {
+                enrichedConfig.var2FieldLabel = METRIC_OPTIONS.find(m => m.value === config.var2Field)?.label;
+                enrichedConfig.var2SubLabel = getSubOptions(config.var2Field).find(s => s.value === config.var2Sub)?.label;
+            }
+        }
+
         closeModal();
+        setTimeout(() => onGenerate(enrichedConfig), 300);
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            <style>{`
-                .stat-modal-scroll::-webkit-scrollbar { width: 6px; }
-                .stat-modal-scroll::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; }
-                .stat-modal-scroll::-webkit-scrollbar-track { background: transparent; }
-                @keyframes snapIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-                .animate-snap { animation: snapIn 0.2s ease-out forwards; }
-            `}</style>
-
-            <div className={`bg-white rounded-2xl w-full max-w-[550px] shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+            <div className={`bg-white rounded-2xl w-[90%] max-w-[600px] shadow-2xl relative flex flex-col transition-all duration-300 transform overflow-visible ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"} max-h-[90vh]`}>
                 
-                <div className="p-6 pb-4 text-center border-b border-gray-100 relative z-[70] flex-shrink-0 bg-white">
-                    <h2 className="text-[22px] font-bold text-[#5c297c] tracking-wide">
-                        Statistical Tools
-                    </h2>
-                    <button onClick={closeModal} className="absolute top-6 right-6 text-gray-400 hover:text-[#5c297c] transition-all duration-300 ease-in-out">
+                <div className="bg-[#5c297c] p-6 text-center relative rounded-t-2xl shrink-0">
+                    <h2 className="text-2xl font-bold text-white tracking-wide">Statistical Tool Setup</h2>
+                    <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto stat-modal-scroll flex flex-col relative">
-                    <div className="px-8 pt-6 pb-6 flex flex-col gap-6 relative z-[30]">
-                        
-                        {/* Tool Selection */}
-                        <div className="w-full relative z-[60]">
-                            <div className="relative z-[30]">
+                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                    <style>{`
+                        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; }
+                    `}</style>
+
+                    <div className="space-y-6">
+                        <CustomSelectGroup
+                            label="Type of Statistical Tool:"
+                            value={config.tool}
+                            onChange={(e) => handleChange("tool", e.target.value)}
+                            options={TOOL_OPTIONS}
+                            placeholder="Select Tool Type"
+                            vertical={true}
+                        />
+
+                        {/* DESCRIPTIVE SETUP */}
+                        {config.tool === "descriptive" && (
+                            <div className="p-5 bg-purple-50 rounded-lg border border-purple-100 space-y-4 animate-fade-in-up">
+                                <h3 className="font-bold text-[#5c297c] border-b border-purple-200 pb-2 mb-4">Descriptive Analysis Setup</h3>
+                                
                                 <CustomSelectGroup
-                                    label="Statistical Tool:"
-                                    value={config.tool}
-                                    onChange={(e) => {
-                                        setConfig({
-                                            tool: e.target.value, inferentialType: "",
-                                            descCategory: "", descField: "", descSub: "",
-                                            var1Category: "", var1Field: "", var1Sub: "",
-                                            var2Category: "", var2Field: "", var2Sub: "",
-                                        });
-                                    }}
-                                    options={[
-                                        { value: "descriptive", label: "Descriptive" },
-                                        { value: "inferential", label: "Inferential" },
-                                    ]}
-                                    placeholder="Select Tool"
+                                    label="Select Variable:"
+                                    value={config.descField}
+                                    onChange={(e) => handleChange("descField", e.target.value)}
+                                    options={getFilteredMetrics()} // Filters for Numerical
                                     vertical={true}
-                                    className="mb-0"
+                                />
+                                
+                                <CustomSelectGroup
+                                    label="Specific Metric / Subject:"
+                                    value={config.descSub}
+                                    onChange={(e) => handleChange("descSub", e.target.value)}
+                                    options={getSubOptions(config.descField)}
+                                    disabled={!config.descField}
+                                    vertical={true}
                                 />
                             </div>
-
-                            {config.tool === "inferential" && (
-                                <div className="mt-4 pt-4 border-t border-gray-200 animate-snap relative z-[20]">
-                                    <CustomSelectGroup
-                                        label="Inferential Type:"
-                                        value={config.inferentialType}
-                                        onChange={(e) => setConfig((prev) => ({
-                                            ...prev, inferentialType: e.target.value,
-                                            var1Category: "", var1Field: "", var1Sub: "",
-                                            var2Category: "", var2Field: "", var2Sub: "",
-                                        }))}
-                                        options={INFERENTIAL_TYPES}
-                                        placeholder="Select Type"
-                                        vertical={true}
-                                        className="mb-0"
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Descriptive Mode Variables */}
-                        {config.tool === "descriptive" && (
-                            <div className="bg-purple-50 p-5 rounded-xl border border-purple-100 animate-snap relative z-[50]">
-                                <h4 className="font-bold text-[#5c297c] mb-3 text-sm">Variable to Analyze</h4>
-
-                                <div className="relative z-[30]">
-                                    <CustomSelectGroup
-                                        label="Category:"
-                                        value={config.descCategory}
-                                        onChange={(e) => handleConfigChange("descCategory", e.target.value)}
-                                        options={getAvailableCategories("desc")}
-                                        placeholder="Select Category"
-                                        vertical={true}
-                                    />
-                                </div>
-
-                                {config.descCategory && (
-                                    <div className="mt-4 animate-snap relative z-[20]">
-                                        <CustomSelectGroup
-                                            label={config.descCategory === "studentInfo" ? "Field:" : "Metric:"}
-                                            value={config.descField}
-                                            onChange={(e) => handleConfigChange("descField", e.target.value)}
-                                            options={getAvailableFields(config.descCategory, "desc")}
-                                            placeholder="Select Field"
-                                            vertical={true}
-                                        />
-                                    </div>
-                                )}
-
-                                {config.descField && FIELDS_REQUIRING_SUB.includes(config.descField) && (
-                                    <div className="mt-4 pt-4 border-t border-purple-200 animate-snap relative z-[10]">
-                                        <CustomSelectGroup
-                                            label={getSubMetricLabel(config.descField)}
-                                            value={config.descSub}
-                                            onChange={(e) => handleConfigChange("descSub", e.target.value)}
-                                            options={getAvailableSubMetrics(config.descField, "desc")}
-                                            placeholder="Select Option"
-                                            vertical={true}
-                                        />
-                                    </div>
-                                )}
-                            </div>
                         )}
 
-                        {/* Inferential Mode Variables */}
-                        {config.tool === "inferential" && config.inferentialType && (
-                            <div className="space-y-6">
-                                {/* VARIABLE 1 */}
-                                <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 relative z-[40]">
-                                    <h4 className="font-bold text-[#5c297c] mb-3 text-sm">Variable 1</h4>
-                                    <div className="relative z-[30]">
-                                        <CustomSelectGroup
-                                            label="Category:"
-                                            value={config.var1Category}
-                                            onChange={(e) => handleConfigChange("var1Category", e.target.value)}
-                                            options={getAvailableCategories("var1")}
-                                            placeholder="Select Category"
-                                            vertical={true}
-                                        />
-                                    </div>
+                        {/* INFERENTIAL SETUP */}
+                        {config.tool === "inferential" && (
+                            <div className="space-y-6 animate-fade-in-up">
+                                <CustomSelectGroup
+                                    label="Specific Inferential Tool:"
+                                    value={config.inferentialType}
+                                    onChange={(e) => handleChange("inferentialType", e.target.value)}
+                                    options={INFERENTIAL_TYPES}
+                                    vertical={true}
+                                />
 
-                                    {config.var1Category && (
-                                        <div className="mt-4 animate-snap relative z-[20]">
+                                {config.inferentialType && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Variable 1 */}
+                                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 space-y-4">
+                                            <h4 className="font-bold text-blue-800 text-sm border-b border-blue-200 pb-1">Variable 1 (X)</h4>
                                             <CustomSelectGroup
-                                                label={config.var1Category === "studentInfo" ? "Field:" : "Metric:"}
+                                                label="Metric Category:"
                                                 value={config.var1Field}
-                                                onChange={(e) => handleConfigChange("var1Field", e.target.value)}
-                                                options={getAvailableFields(config.var1Category, "var1")}
-                                                placeholder="Select Field"
+                                                onChange={(e) => handleChange("var1Field", e.target.value)}
+                                                options={getFilteredMetrics(1)} // Pass 1 for Var 1 logic
                                                 vertical={true}
                                             />
-                                        </div>
-                                    )}
-
-                                    {config.var1Field && FIELDS_REQUIRING_SUB.includes(config.var1Field) && (
-                                        <div className="mt-4 pt-4 border-t border-blue-200 animate-snap relative z-[10]">
                                             <CustomSelectGroup
-                                                label={getSubMetricLabel(config.var1Field)}
+                                                label="Specific Subject:"
                                                 value={config.var1Sub}
-                                                onChange={(e) => handleConfigChange("var1Sub", e.target.value)}
-                                                options={getAvailableSubMetrics(config.var1Field, "var1")}
-                                                placeholder="Select Option"
-                                                vertical={true}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* VARIABLE 2 */}
-                                {config.inferentialType !== "chiSquareGOF" && (
-                                    <div className="bg-green-50 p-5 rounded-xl border border-green-100 relative z-[30]">
-                                        <h4 className="font-bold text-[#5c297c] mb-3 text-sm">Variable 2</h4>
-                                        <div className="relative z-[30]">
-                                            <CustomSelectGroup
-                                                label="Category:"
-                                                value={config.var2Category}
-                                                onChange={(e) => handleConfigChange("var2Category", e.target.value)}
-                                                options={getAvailableCategories("var2")}
-                                                placeholder="Select Category"
+                                                onChange={(e) => handleChange("var1Sub", e.target.value)}
+                                                options={getSubOptions(config.var1Field)}
+                                                disabled={!config.var1Field}
                                                 vertical={true}
                                             />
                                         </div>
 
-                                        {config.var2Category && (
-                                            <div className="mt-4 animate-snap relative z-[20]">
-                                                <CustomSelectGroup
-                                                    label={config.var2Category === "studentInfo" ? "Field:" : "Metric:"}
-                                                    value={config.var2Field}
-                                                    onChange={(e) => handleConfigChange("var2Field", e.target.value)}
-                                                    options={getAvailableFields(config.var2Category, "var2")}
-                                                    placeholder="Select Field"
-                                                    vertical={true}
-                                                />
+                                        {config.inferentialType === 'chi_sq_gof' && categories.length > 0 && (
+                                            <div className="mt-4 p-4 bg-purple-50 rounded-xl border border-purple-100">
+                                                <h4 className="text-sm font-bold text-purple-900 mb-3">Target Distribution (%)</h4>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {categories.map(cat => (
+                                                        <div key={cat}>
+                                                            <label className="text-xs font-semibold text-gray-600 block mb-1 uppercase">{cat}</label>
+                                                            <div className="relative">
+                                                                <input 
+                                                                    type="number" 
+                                                                    value={expectedRatios[cat]}
+                                                                    onChange={(e) => setExpectedRatios({...expectedRatios, [cat]: e.target.value})}
+                                                                    className="w-full p-2 pr-8 border rounded-lg focus:ring-2 focus:ring-purple-400"
+                                                                />
+                                                                <span className="absolute right-3 top-2 text-gray-400">%</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-3 text-[10px] text-purple-600 italic">
+                                                    Total: {Object.values(expectedRatios).reduce((a, b) => Number(a) + Number(b), 0)}% (Should equal 100)
+                                                </div>
                                             </div>
                                         )}
 
-                                        {config.var2Field && FIELDS_REQUIRING_SUB.includes(config.var2Field) && (
-                                            <div className="mt-4 pt-4 border-t border-green-200 animate-snap relative z-[10]">
-                                                <CustomSelectGroup
-                                                    label={getSubMetricLabel(config.var2Field)}
-                                                    value={config.var2Sub}
-                                                    onChange={(e) => handleConfigChange("var2Sub", e.target.value)}
-                                                    options={getAvailableSubMetrics(config.var2Field, "var2")}
-                                                    placeholder="Select Option"
-                                                    vertical={true}
-                                                />
-                                            </div>
+                                        {/* Variable 2 */}
+                                        {config.inferentialType !== "chi_sq_gof" && (
+                                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-100 space-y-4">
+                                            <h4 className="font-bold text-emerald-800 text-sm border-b border-emerald-200 pb-1">Variable 2 (Y)</h4>
+                                            <CustomSelectGroup
+                                                label="Metric Category:"
+                                                value={config.var2Field}
+                                                onChange={(e) => handleChange("var2Field", e.target.value)}
+                                                options={getFilteredMetrics(2)} // Pass 2 for Var 2 logic
+                                                vertical={true}
+                                            />
+                                            <CustomSelectGroup
+                                                label="Specific Subject:"
+                                                value={config.var2Sub}
+                                                onChange={(e) => handleChange("var2Sub", e.target.value)}
+                                                options={getSubOptions(config.var2Field)}
+                                                disabled={!config.var2Field}
+                                                vertical={true}
+                                            />
+                                        </div>
                                         )}
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
+                </div>
 
-                    <div className="flex justify-center gap-4 p-5 mt-auto border-t border-gray-100 bg-gray-50 z-10 relative">
-                        <button
-                            onClick={closeModal}
-                            className="w-[120px] py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-[5px] hover:bg-gray-100 transition-all duration-300 ease-in-out shadow-sm"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleGenerate}
-                            disabled={!isFormValid()}
-                            className={`w-[140px] py-2.5 text-sm font-bold text-white border rounded-[5px] shadow-md transition-all duration-300 ease-in-out
-                                ${!isFormValid()
-                                    ? "bg-gray-400 border-gray-400 cursor-not-allowed opacity-70"
-                                    : "bg-[#5c297c] border-[#5c297c] hover:bg-[#4a1f63] cursor-pointer"
-                                }`}
-                        >
-                            Generate Report
-                        </button>
-                    </div>
-
+                <div className="flex justify-center gap-4 p-5 border-t border-gray-100 bg-gray-50 rounded-b-2xl shrink-0">
+                    <button onClick={closeModal} className="w-[120px] py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-[5px] hover:bg-gray-100 transition-all shadow-sm">
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleGenerate}
+                        disabled={!isFormValid()}
+                        className={`w-[160px] py-2.5 text-sm font-bold text-white rounded-[5px] shadow-md transition-all
+                            ${!isFormValid() ? "bg-gray-400 cursor-not-allowed opacity-70" : "bg-[#5c297c] hover:bg-[#4a1f63]"}`}
+                    >
+                        Process Data
+                    </button>
                 </div>
             </div>
         </div>

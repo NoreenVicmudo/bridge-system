@@ -5,6 +5,9 @@ namespace App\Http\Controllers\DataEntry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ProgramMetric\MockSubject;
+use App\Models\College;
+use App\Models\Program;
+use Inertia\Inertia;
 
 class ProgramMetricsController extends Controller
 {
@@ -16,12 +19,14 @@ class ProgramMetricsController extends Controller
         if ($user->program_id) {
             $query->where('program_id', $user->program_id);
         } elseif ($user->college_id) {
-            $programIds = \App\Models\Program::where('college_id', $user->college_id)->pluck('program_id');
+            $programIds = Program::where('college_id', $user->college_id)->pluck('program_id');
             $query->whereIn('program_id', $programIds);
         }
 
-        return Inertia::render('Program/ProgramMetricsEntry', [
+        return Inertia::render('Entry/ProgramMetricsEntry', [
             'initialData' => [
+                'Colleges' => College::where('is_active', true)->get(), // ADDED THIS
+                'Programs' => Program::where('is_active', true)->get(), // ADDED THIS
                 'MockSubjects' => $query->get()
             ]
         ]);
@@ -29,28 +34,33 @@ class ProgramMetricsController extends Controller
 
     public function store(Request $request)
     {
+        $user = auth()->user();
         $validated = $request->validate([
             'metric' => 'required|string',
             'sub_metric' => 'required|string',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
+            'program_id' => 'required|integer|exists:programs,program_id' // ADDED THIS
         ]);
 
-        if ($validated['metric'] === 'MockSubjects') {
-            $isActive = !$validated['is_hidden'];
-            
-            if ($validated['sub_metric'] === 'add') {
-                MockSubject::create([
-                    'mock_subject_name' => $validated['detail_name'], 
-                    'is_active' => $isActive
-                ]);
-            } else {
-                MockSubject::where('mock_subject_id', $validated['sub_metric'])
-                    ->update([
-                        'mock_subject_name' => $validated['detail_name'], 
-                        'is_active' => $isActive
-                    ]);
+        $isNew = $validated['sub_metric'] === 'add';
+        $isActive = !$validated['is_hidden'];
+
+        if (!$isNew) {
+            $item = MockSubject::find($validated['sub_metric']);
+            if ($item) {
+                if ($user->program_id && $item->program_id != $user->program_id) abort(403);
+                if ($user->college_id && $item->program?->college_id != $user->college_id) abort(403);
             }
+        }
+
+        $targetProgramId = $user->program_id ?? $validated['program_id'];
+
+        if ($validated['metric'] === 'MockSubjects') {
+            MockSubject::updateOrCreate(
+                ['mock_subject_id' => $isNew ? null : $validated['sub_metric']],
+                ['mock_subject_name' => $validated['detail_name'], 'is_active' => $isActive, 'program_id' => $targetProgramId]
+            );
         }
 
         return redirect()->back()->with('success', 'Program metrics configuration saved successfully.');

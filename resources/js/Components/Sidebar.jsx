@@ -95,8 +95,8 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
 
                     {/* STUDENT INFO: Active if URL starts with '/student-info' */}
                     <SidebarLink
-                        href="/student-info-filter"
-                        active={url.startsWith("/student-info-filter")}
+                        href={route('student.info.filter')}
+                        active={route().current('student.info.filter')}
                     >
                         <svg
                             className="w-5 h-5"
@@ -116,8 +116,8 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
 
                     {/* ACADEMIC PROFILE */}
                     <SidebarLink
-                        href="/academic-profile-filter"
-                        active={url.startsWith("/academic-profile-filter")}
+                        href={route('academic.profile.filter')}
+                        active={route().current('academic.profile.filter')}
                     >
                         <svg
                             className="w-5 h-5"
@@ -137,8 +137,8 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
 
                     {/* PROGRAM METRICS */}
                     <SidebarLink
-                        href="/program-metrics-filter"
-                        active={url.startsWith("/program-metrics-filter")}
+                        href={route('program.metrics.filter')}
+                        active={route().current('program.metrics.filter')}
                     >
                         <svg
                             className="w-5 h-5"
@@ -158,8 +158,8 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
 
                     {/* GENERATE REPORT */}
                     <SidebarLink
-                        href="/report-generation-filter"
-                        active={url.startsWith("/report-generation-filter")}
+                        href={route('report.filter')}
+                        active={route().current('report.filter')}
                     >
                         <svg
                             className="w-5 h-5"
@@ -177,7 +177,7 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
                         <span>Generate Report</span>
                     </SidebarLink>
 
-                    {/* ADDITIONAL ENTRY */}
+                    {/* ADDITIONAL ENTRY - Now landing on Student Info */}
                     <SidebarLink
                         href="/student-additional"
                         active={url.startsWith("/student-additional")}
@@ -192,7 +192,7 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth="2"
-                                d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                                path d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
                             ></path>
                         </svg>
                         <span>Additional Entry</span>

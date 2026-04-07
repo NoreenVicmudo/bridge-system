@@ -6,6 +6,7 @@ use App\Http\Controllers\Academic\{
     RecognitionController, SimulationExamController
 };
 use App\Http\Controllers\Program\{ProgramFilterController, ReviewCenterController, MockBoardController, LicensureExamController};
+use App\Http\Controllers\Report\{ReportController};
 use App\Http\Controllers\DataEntry\{AcademicProfileController, ProgramMetricsController, StudentInfoController};
 use App\Http\Controllers\{ProfileController, Student\StudentController};
 use App\Models\{College, Program};
@@ -17,7 +18,7 @@ use Inertia\Inertia;
 // ==========================================
 Route::get('/dev-login/{id}', function ($id) {
     Auth::loginUsingId($id);
-    return redirect()->route('dashboard');
+    return redirect()->route('main');
 });
 Route::redirect('/', '/login');
 
@@ -155,19 +156,27 @@ Route::middleware('auth', 'verified')->group(function () {
         'dbPrograms' => Program::where('is_active', true)->get(),
     ]))->name('program.metrics.filter');
 
-    // --- DATA ENTRY & LOGS ---
+    Route::get('/filter/report', fn() => Inertia::render('Reports/ReportGenerationFilter', [
+        'dbColleges' => College::where('is_active', true)->get()->map(fn($c) => ['value' => $c->college_id, 'label' => $c->name]),
+        'dbPrograms' => Program::where('is_active', true)->get(),
+    ]))->name('report.filter');
+
+    Route::get('/report', [ReportController::class, 'index'])->name('report.index');
+    Route::post('/report/generate', [ReportController::class, 'generate'])->name('report.generate');
+    Route::post('/report/categories', [ReportController::class, 'getCategories'])->name('report.categories');
+    // --- DATA ENTRY & LOGS (Aligned with Tabs) ---
+
+    // Student Information Entry (Landing Page)
+    Route::get('/student-additional', [StudentInfoController::class, 'index'])->name('student-info-entry.index');
+    Route::post('/entry/student', [StudentInfoController::class, 'store'])->name('student-info-entry.store');
 
     // Academic Profile Entry
-    Route::get('/entry/academic', [AcademicProfileController::class, 'index'])->name('academic-profile-entry.index');
+    Route::get('/academic-additional', [AcademicProfileController::class, 'index'])->name('academic-profile-entry.index');
     Route::post('/entry/academic', [AcademicProfileController::class, 'store'])->name('academic-profile-entry.store');
 
     // Program Metrics Entry
-    Route::get('/entry/program', [ProgramMetricsController::class, 'index'])->name('program-metrics-entry.index');
+    Route::get('/program-additional', [ProgramMetricsController::class, 'index'])->name('program-metrics-entry.index');
     Route::post('/entry/program', [ProgramMetricsController::class, 'store'])->name('program-metrics-entry.store');
-
-    // Student Info Entry
-    Route::get('/entry/student', [StudentInfoController::class, 'index'])->name('student-info-entry.index');
-    Route::post('/entry/student', [StudentInfoController::class, 'store'])->name('student-info-entry.store');
 
     // --- PROFILE ---
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
