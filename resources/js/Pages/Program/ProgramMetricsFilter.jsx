@@ -5,112 +5,173 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 
-export default function ProgramMetricsFilter({ dbColleges = [] }) {
+export default function ProgramMetricsFilter({ dbColleges = [], dbPrograms = [] }) {
     const { auth } = usePage().props;
     const user = auth.user;
 
-    // --- 1. STATE & SECURITY ---
     const isCollegeRestricted = !!user?.college_id;
     const isProgramRestricted = !!user?.program_id;
 
+    // ✅ FIXED PARAM NAMES
     const [values, setValues] = useState({
-        college: "",
-        program: "",
-        calendar_year: "", // Literal year: 2025
-        batch_number: "",  // Batch: 1 or 2
+        batch_college: "",
+        batch_program: "",
+        batch_year: "",
+        board_batch: "",
     });
 
-    // 2. Initialize options with the props so they are not empty on start
-    const [options, setOptions] = useState({
-        colleges: dbColleges,
-        programs: {},
-        programYears: {}, // Program duration (e.g. 4)
-        calendarYears: [], // Database years
-        batchNumbers: [],  // Database batches
-    });
+    const [combinations, setCombinations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
 
-    // --- 2. FETCH OPTIONS & APPLY RESTRICTIONS ---
+    // --- FETCH COMBINATIONS ---
     useEffect(() => {
-        if (isCollegeRestricted || isProgramRestricted) {
-            setValues(prev => ({
-                ...prev,
-                college: isCollegeRestricted ? user.college_id.toString() : prev.college,
-                program: isProgramRestricted ? user.program_id.toString() : prev.program,
-            }));
-        }
-
-        // Updated route name to match the new Controller location
         axios.get(route('program.filter-options')) 
             .then(res => {
-                setOptions(res.data);
-                
-                setValues(prev => ({
-                    ...prev,
-                    college: isCollegeRestricted ? user.college_id.toString() : "",
-                    program: isProgramRestricted ? user.program_id.toString() : "",
-                }));
+                setCombinations(res.data.combinations || []);
                 setLoading(false);
             })
-            .catch(err => console.error(err));
+            .catch(err => {
+                console.error(err);
+                setLoading(false);
+            });
     }, []);
 
-    // --- 3. DYNAMIC DROPDOWNS ---
+    // --- APPLY USER RESTRICTIONS ---
+    useEffect(() => {
+        let initial = { ...values };
+
+        if (isCollegeRestricted) initial.batch_college = user.college_id.toString();
+        if (isProgramRestricted) initial.batch_program = user.program_id.toString();
+
+        setValues(prev => ({ ...prev, ...initial }));
+    }, [user]);
+
+    // --- OPTIONS ---
+
+    const collegeOptions = useMemo(() => {
+        return dbColleges.map(c => ({
+            value: c.value ? c.value.toString() : (c.college_id ? c.college_id.toString() : ""),
+            label: c.label || c.name || "Unknown College"
+        }));
+    }, [dbColleges]);
+
     const programOptions = useMemo(() => {
-        if (!values.college) return [];
-        return options.programs[values.college] || [];
-    }, [values.college, options.programs]);
+        if (!values.batch_college) return [];
+
+        return dbPrograms
+            .filter(p => p.college_id && p.college_id.toString() === values.batch_college)
+            .map(p => ({
+                value: p.program_id?.toString() || "",
+                label: p.name || "Unknown Program"
+            }));
+    }, [values.batch_college, dbPrograms]);
 
     const yearOptions = useMemo(() => {
-        if (!values.program) return [];
-        const maxYears = options.years[values.program] || 4;
-        return Array.from({ length: maxYears }, (_, i) => ({
-            value: (i + 1).toString(),
-            label: `Year ${i + 1}`,
-        }));
-    }, [values.program, options.years]);
+        if (!values.batch_program) return [];
 
-    // --- 4. HANDLERS ---
+        const activeYears = new Set(
+            combinations
+                .filter(c => c.program_id.toString() === values.batch_program)
+                .map(c => c.year.toString())
+        );
+
+        if (activeYears.size === 0) {
+            const currentYear = new Date().getFullYear();
+            return [
+                { value: currentYear.toString(), label: currentYear.toString() },
+                { value: (currentYear + 1).toString(), label: (currentYear + 1).toString() }
+            ];
+        }
+
+        return Array.from(activeYears)
+            .sort((a, b) => b - a)
+            .map(y => ({ value: y, label: y }));
+    }, [values.batch_program, combinations]);
+
+    const batchOptions = useMemo(() => {
+        if (!values.batch_year) return [];
+
+        const activeBatches = new Set(
+            combinations
+                .filter(c =>
+                    c.program_id.toString() === values.batch_program &&
+                    c.year.toString() === values.batch_year
+                )
+                .map(c => c.batch_number.toString())
+        );
+
+        if (activeBatches.size === 0) {
+            return [
+                { value: "1", label: "Batch 1" },
+                { value: "2", label: "Batch 2" }
+            ];
+        }
+
+        return Array.from(activeBatches)
+            .sort((a, b) => a - b)
+            .map(b => ({ value: b, label: `Batch ${b}` }));
+    }, [values.batch_program, values.batch_year, combinations]);
+
+    // --- HANDLERS ---
     const handleChange = (field, value) => {
         let newValues = { ...values, [field]: value };
 
-        if (field === "college") {
-            newValues.program = isProgramRestricted ? user.program_id.toString() : "";
-            newValues.year = "";
+        if (field === "batch_college") {
+            newValues.batch_program = isProgramRestricted ? user.program_id.toString() : "";
+            newValues.batch_year = "";
             newValues.board_batch = "";
-        } else if (field === "program") {
-            newValues.year = "";
+        } else if (field === "batch_program") {
+            newValues.batch_year = "";
             newValues.board_batch = "";
-        } else if (field === "calendar_year") {
-            newValues.batch_number = "";
+        } else if (field === "batch_year") {
+            newValues.board_batch = "";
         }
 
         setValues(newValues);
     };
 
+    const handleClear = () => {
+        let resetValues = {
+            batch_college: "",
+            batch_program: "",
+            batch_year: "",
+            board_batch: ""
+        };
+
+        if (isCollegeRestricted) resetValues.batch_college = user.college_id.toString();
+        if (isProgramRestricted) resetValues.batch_program = user.program_id.toString();
+
+        setValues(resetValues);
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Inject names for the InfoCards on the next pages
-        const collegeName = options.colleges.find(c => c.value.toString() === values.college)?.label;
-        const programName = programOptions.find(p => p.value.toString() === values.program)?.label;
-        
-        const filterWithNames = { 
-            ...values, 
-            college_name: collegeName, 
-            program_name: programName 
+
+        const collegeName = collegeOptions.find(c => c.value === values.batch_college)?.label;
+        const programName = programOptions.find(p => p.value === values.batch_program)?.label;
+
+        const filterWithNames = {
+            ...values,
+            college_name: collegeName,
+            program_name: programName
         };
 
         localStorage.setItem("programFilterData", JSON.stringify(filterWithNames));
         setIsMetricModalOpen(true);
     };
 
-    const isFormComplete = values.college && values.program && values.year && values.board_batch;
+    // ✅ FIXED VALIDATION
+    const isFormComplete =
+        values.batch_college &&
+        values.batch_program &&
+        values.batch_year &&
+        values.board_batch;
 
     if (loading) return (
         <AuthenticatedLayout>
             <div className="flex justify-center items-center h-screen text-[#5c297c] font-bold">
-                Loading Program Options...
+                Loading Program Data...
             </div>
         </AuthenticatedLayout>
     );
@@ -118,59 +179,51 @@ export default function ProgramMetricsFilter({ dbColleges = [] }) {
     return (
         <AuthenticatedLayout>
             <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
-                <div className="w-full max-w-[700px] bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] p-6 md:p-8 animate-fade-in-up">
+                <div className="w-full max-w-[700px] bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] p-6 md:p-8">
                     <form onSubmit={handleSubmit}>
-                        <h2 className="text-center text-2xl md:text-[28px] font-bold text-[#5c297c] mb-6">
+                        <h2 className="text-center text-2xl font-bold text-[#5c297c] mb-6">
                             Program Metrics Filter
                         </h2>
 
                         <div className="space-y-4">
                             <CustomSelectGroup
                                 label="College"
-                                value={values.college}
-                                onChange={(e) => handleChange("college", e.target.value)}
-                                options={options.colleges}
+                                value={values.batch_college}
+                                onChange={(e) => handleChange("batch_college", e.target.value)}
+                                options={collegeOptions}
                                 disabled={isCollegeRestricted}
                             />
 
                             <CustomSelectGroup
                                 label="Program"
-                                value={values.program}
-                                onChange={(e) => handleChange("program", e.target.value)}
+                                value={values.batch_program}
+                                onChange={(e) => handleChange("batch_program", e.target.value)}
                                 options={programOptions}
-                                disabled={!values.college || isProgramRestricted}
-                                placeholder={!values.college ? "Select College first" : "Select Program"}
+                                disabled={!values.batch_college || isProgramRestricted}
                             />
 
                             <CustomSelectGroup
                                 label="Calendar Year"
-                                value={values.calendar_year}
-                                onChange={(e) => handleChange("calendar_year", e.target.value)}
-                                options={options.calendarYears}
-                                disabled={!values.program}
-                                placeholder="Select Year"
+                                value={values.batch_year}
+                                onChange={(e) => handleChange("batch_year", e.target.value)}
+                                options={yearOptions}
+                                disabled={!values.batch_program}
                             />
 
                             <CustomSelectGroup
                                 label="Board Exam Batch"
-                                value={values.batch_number}
-                                onChange={(e) => handleChange("batch_number", e.target.value)}
-                                options={options.batchNumbers}
-                                disabled={!values.calendar_year}
-                                placeholder="Select Batch"
+                                value={values.board_batch}
+                                onChange={(e) => handleChange("board_batch", e.target.value)}
+                                options={batchOptions}
+                                disabled={!values.batch_year}
                             />
                         </div>
 
-                        <div className="mt-8 flex justify-center gap-3 w-full">
+                        <div className="mt-8 flex justify-center gap-3">
                             <button
                                 type="button"
-                                onClick={() => setValues({
-                                    college: isCollegeRestricted ? user.college_id.toString() : "",
-                                    program: isProgramRestricted ? user.program_id.toString() : "",
-                                    year: "",
-                                    board_batch: ""
-                                })}
-                                className="px-10 py-3 bg-white text-gray-600 border border-gray-300 font-bold rounded-md hover:bg-[#ffb736] hover:text-white hover:border-[#ffb736] transition-all shadow-sm"
+                                onClick={handleClear}
+                                className="px-10 py-3 bg-white border border-gray-300 font-bold rounded-md"
                             >
                                 Clear
                             </button>
@@ -178,9 +231,9 @@ export default function ProgramMetricsFilter({ dbColleges = [] }) {
                             <button
                                 type="submit"
                                 disabled={!isFormComplete}
-                                className={`px-10 py-3 font-bold rounded-md transition-all shadow-md
+                                className={`px-10 py-3 font-bold rounded-md
                                     ${isFormComplete 
-                                        ? "bg-[#5c297c] text-white hover:bg-[#ffb736]" 
+                                        ? "bg-[#5c297c] text-white" 
                                         : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
                             >
                                 View Metrics
@@ -195,7 +248,7 @@ export default function ProgramMetricsFilter({ dbColleges = [] }) {
                 onClose={() => setIsMetricModalOpen(false)}
                 currentMetric=""
                 type="program"
-                filterData={values}
+                filterData={values} // ✅ now correct keys
             />
         </AuthenticatedLayout>
     );

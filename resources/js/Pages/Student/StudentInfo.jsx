@@ -119,7 +119,12 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}
-                    exportEndpoint="/students/export/csv"
+                    exportEndpoint={route('students.export', { 
+                        ...activeFilters, 
+                        search: currentSearch,
+                        sort: activeSortColumn,
+                        direction: activeSortDirection
+                    })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode={filterMode} />}
                     headerActions={
                         <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 ease-in-out shadow-sm shrink-0">

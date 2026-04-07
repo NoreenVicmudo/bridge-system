@@ -12,8 +12,6 @@ use App\Http\Requests\Student\StoreStudentRequest;
 use App\Models\College;
 use App\Models\Program;
 use App\Models\Student\StudentInfo;
-use App\Models\Student\StudentSection;
-use App\Models\ProgramMetric\BoardBatch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -506,5 +504,126 @@ class StudentController extends Controller
             return response()->json(['id' => $student->student_id]);
         }
         return response()->json(['error' => 'Not found'], 404);
+    }
+
+    /**
+     * Export students to CSV based on current filters and mode.
+     */
+    public function export(Request $request)
+    {
+        $user = $request->user();
+        $mode = $request->get('mode'); // 'section', 'batch', or empty (masterlist)
+
+        $query = StudentInfo::query()->with(['college', 'program', 'living', 'language']);
+
+        // 1. Apply Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"])
+                ->orWhere('student_info.student_lname', 'LIKE', "%{$search}%")
+                ->orWhere('student_info.student_fname', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // 2. Apply Filters & Role Restrictions based on Mode
+        if ($mode === 'batch') {
+            $query->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
+                ->distinct()
+                ->select('student_info.*')
+                ->where('student_info.is_active', 1)
+                ->where('board_batch.is_active', 1);
+
+            if ($user->college_id) $query->where('student_info.college_id', $user->college_id);
+            if ($user->program_id) $query->where('student_info.program_id', $user->program_id);
+            if ($request->filled('batch_college')) $query->where('student_info.college_id', $request->batch_college);
+            if ($request->filled('batch_program')) $query->where('student_info.program_id', $request->batch_program);
+            if ($request->filled('batch_year')) $query->where('board_batch.year', $request->batch_year);
+            if ($request->filled('board_batch')) $query->where('board_batch.batch_number', $request->board_batch);
+
+        } elseif ($mode === 'section') {
+            $query->join('student_section', 'student_info.student_number', '=', 'student_section.student_number')
+                ->distinct()
+                ->select('student_info.*')
+                ->where('student_info.is_active', 1)
+                ->where('student_section.is_active', 1);
+
+            if ($user->college_id) $query->where('student_info.college_id', $user->college_id);
+            if ($user->program_id) $query->where('student_info.program_id', $user->program_id);
+            if ($request->filled('college')) $query->where('student_info.college_id', $request->college);
+            if ($request->filled('program')) $query->where('student_info.program_id', $request->program);
+            if ($request->filled('academic_year')) $query->where('student_section.academic_year', $request->academic_year);
+            if ($request->filled('semester')) $query->where('student_section.semester', $request->semester);
+            if ($request->filled('year_level')) $query->where('student_section.year_level', $request->year_level);
+            if ($request->filled('section')) $query->where('student_section.section', $request->section);
+
+        } else {
+            // Masterlist Mode
+            $query->where('student_info.is_active', 1);
+            if ($user->college_id) $query->where('student_info.college_id', $user->college_id);
+            if ($user->program_id) $query->where('student_info.program_id', $user->program_id);
+        }
+
+        // 3. Apply Sort
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $sortDirection = $request->get('direction', 'desc');
+        $allowedSorts = [
+            'student_info.student_number', 'student_info.student_lname', 'student_info.college_id',
+            'student_info.program_id', 'student_info.student_birthdate', 'student_info.student_sex',
+            'student_info.student_socioeconomic'
+        ];
+        
+        if (in_array($sortColumn, $allowedSorts)) {
+            $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
+        } else {
+            $query->orderBy('student_info.student_id', 'desc');
+        }
+
+        $students = $query->get();
+
+        // 4. Generate CSV
+        $headers = [
+            'Student ID', 'Student Name', 'College', 'Program', 'Age', 'Sex', 
+            'Socioeconomic', 'Address', 'Living Arrangement', 'Work Status', 
+            'Scholarship', 'Language', 'Last School'
+        ];
+
+        $callback = function() use ($students, $headers) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $headers);
+            
+            foreach ($students as $s) {
+                $age = $s->student_birthdate ? \Carbon\Carbon::parse($s->student_birthdate)->age : 'N/A';
+                $address = trim("{$s->student_address_number} {$s->student_address_street}, {$s->student_address_barangay}, {$s->student_address_city}");
+                
+                fputcsv($file, [
+                    $s->student_number,
+                    "{$s->student_lname}, {$s->student_fname} " . ($s->student_mname ? substr($s->student_mname, 0, 1) . '.' : ''),
+                    $s->college?->name ?? 'N/A',
+                    $s->program?->name ?? 'N/A',
+                    $age,
+                    $s->student_sex ?? 'N/A',
+                    $s->socioeconomic_category ?? $s->student_socioeconomic ?? 'N/A',
+                    $address ?: 'N/A',
+                    $s->living?->name ?? 'N/A',
+                    $s->student_work ?? 'N/A',
+                    $s->student_scholarship ?? 'N/A',
+                    $s->language?->name ?? 'N/A',
+                    $s->student_last_school ?? 'N/A',
+                ]);
+            }
+            fclose($file);
+        };
+
+        $filename = $mode ? "Filtered_Students_Export.csv" : "Student_Masterlist_Export.csv";
+
+        return response()->stream($callback, 200, [
+            "Content-type" => "text/csv", 
+            "Content-Disposition" => "attachment; filename={$filename}",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        ]);
     }
 }

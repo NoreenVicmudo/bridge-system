@@ -179,8 +179,8 @@ export default function Sidebar({ isOpen, onClose, alwaysOverlay = false }) {
 
                     {/* ADDITIONAL ENTRY */}
                     <SidebarLink
-                        href="/student-information-entry"
-                        active={url.startsWith("/student-information-entry")}
+                        href="/student-additional"
+                        active={url.startsWith("/student-additional")}
                     >
                         <svg
                             className="w-5 h-5"

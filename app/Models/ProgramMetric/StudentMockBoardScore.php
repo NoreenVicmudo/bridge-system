@@ -13,14 +13,14 @@ class StudentMockBoardScore extends Model
     protected $fillable = [
         'batch_id',
         'mock_subject_id',
-        'student_score',
-        'total_score',
+        'score', // Changed to single score
         'date_created',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'score'     => 'float',
     ];
 
     public function batch()

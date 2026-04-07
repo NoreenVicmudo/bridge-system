@@ -96,7 +96,11 @@ export default function StudentMasterlist({ students }) {
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}
-                    exportEndpoint="/students/export/csv"
+                    exportEndpoint={route('students.export', { 
+                        search: currentSearch,
+                        sort: activeSortColumn,
+                        direction: activeSortDirection
+                    })}
                     footerActions={
                         !isRemoveMode ? (
                             <>

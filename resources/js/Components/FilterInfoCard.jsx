@@ -50,18 +50,18 @@ export default function FilterInfoCard({ filters, mode = "section" }) {
         );
     }
 
-    // --- BATCH MODE (existing student info) ---
+    // --- BATCH MODE (existing student info & program metrics) ---
     if (mode === "batch") {
         return (
             <div className="bg-white border border-gray-200 border-l-4 border-l-[#5c297c] rounded-r-lg shadow-sm p-5 w-full max-w-5xl mx-auto mb-6 font-['Montserrat'] animate-fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-6">
                     <div className="flex flex-col gap-3">
-                        <InfoItem label="Year" value={filters.batch_year} icon="bi-calendar3" />
-                        <InfoItem label="Board Batch" value={filters.board_batch} icon="bi-award" />
+                        <InfoItem label="Year" value={filters.batch_year || filters.calendar_year} icon="bi-calendar3" />
+                        <InfoItem label="Board Batch" value={filters.board_batch || filters.batch_number} icon="bi-award" />
                     </div>
                     <div className="flex flex-col gap-3 md:col-span-2">
-                        <InfoItem label="College" value={filters.batch_college_name || filters.batch_college} icon="bi-building" />
-                        <InfoItem label="Program" value={filters.batch_program_name || filters.batch_program} icon="bi-book" />
+                        <InfoItem label="College" value={filters.batch_college_name || filters.college_name || filters.batch_college || filters.college} icon="bi-building" />
+                        <InfoItem label="Program" value={filters.batch_program_name || filters.program_name || filters.batch_program || filters.program} icon="bi-book" />
                     </div>
                 </div>
             </div>
