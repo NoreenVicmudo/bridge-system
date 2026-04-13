@@ -32,12 +32,10 @@ class ImportBatchAction
                     continue;
                 }
 
-                // Optional: verify college/program match
-                if ($student->college_id != $context['college_id'] || $student->program_id != $context['program_id']) {
-                    $errorCount++;
-                    $errors[] = "Student $studentNumber does not belong to the selected college/program";
-                    continue;
-                }
+                // NEW: Sync the program to the pivot table just in case they are a shifter
+                $student->programs()->syncWithoutDetaching([
+                    $context['program_id'] => ['status' => 'Active', 'updated_at' => $now]
+                ]);
 
                 $exists = BoardBatch::where('student_number', $studentNumber)
                     ->where('year', $context['year'])

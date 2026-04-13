@@ -11,6 +11,7 @@ use App\Models\Student\StudentInfo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Services\AuditService; // ADDED AUDIT SERVICE
 
 class SimulationExamController extends Controller
 {
@@ -40,7 +41,7 @@ class SimulationExamController extends Controller
               ->where('semester', $filter['semester'])
               ->where('section', $filter['section'])
               ->where('is_active', 1);
-        })->with(['college', 'program']);
+        });
 
         if (!empty($request->search)) {
             $search = $request->search;
@@ -55,9 +56,13 @@ class SimulationExamController extends Controller
         $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
 
         $students = $query->paginate(10)->withQueryString();
+        $period = $request->get('exam_period', 'Default'); 
 
         $scores = StudentSimulationExam::whereIn('student_number', $students->pluck('student_number'))
-            ->where('is_active', 1)->get()->groupBy('student_number');
+            ->where('exam_period', $period) 
+            ->where('is_active', 1)
+            ->get()
+            ->groupBy('student_number');
 
         $students->getCollection()->transform(function ($student) use ($scores, $simulations) {
             $studentScores = $scores->get($student->student_number) ?? collect();
@@ -84,15 +89,32 @@ class SimulationExamController extends Controller
 
     public function edit(Request $request)
     {
-        $student = StudentInfo::findOrFail($request->query('student_id'));
-        $simulations = SimulationExam::where('program_id', $student->program_id)
-            ->where('is_active', 1)->get()->map(fn($sim) => ['value' => $sim->simulation_id, 'label' => $sim->simulation_name]);
+        $studentId = $request->query('student_id');
+        $examPeriod = $request->query('exam_period', 'Default');
+        $programId = $request->query('program_id'); 
+
+        $student = StudentInfo::findOrFail($studentId);
+        
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $programId);
+
+        $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
+
+        $simulations = SimulationExam::where('program_id', $targetProgram)
+            ->where('is_active', 1)
+            ->get()
+            ->map(fn($sim) => ['value' => $sim->simulation_id, 'label' => $sim->simulation_name]);
 
         $scores = StudentSimulationExam::where('student_number', $student->student_number)
-            ->where('is_active', 1)->pluck('student_score', 'simulation_id');
+            ->where('exam_period', $examPeriod) 
+            ->where('is_active', 1)
+            ->pluck('student_score', 'simulation_id');
 
         return Inertia::render('Academic/SimExamResultsEntry', [
-            'student' => $student, 'simulationOptions' => $simulations, 'currentResults' => $scores,
+            'student' => $student, 
+            'simulationOptions' => $simulations, 
+            'currentResults' => $scores,
+            'examPeriod' => $examPeriod 
         ]);
     }
 
@@ -101,13 +123,27 @@ class SimulationExamController extends Controller
         $validated = $request->validate([
             'student_number' => 'required|exists:student_info,student_number',
             'simulation_id'  => 'required|integer|exists:simulation_exams,simulation_id',
-            'score'          => 'required|numeric', // Mapped to student_score
+            'score'          => 'required|numeric', 
+            'exam_period'    => 'required|string|max:50'
         ]);
 
+        $student = StudentInfo::findOrFail($studentId);
+        $simulation = SimulationExam::findOrFail($validated['simulation_id']);
+
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $simulation->program_id);
+
         StudentSimulationExam::updateOrCreate(
-            ['student_number' => $validated['student_number'], 'simulation_id' => $validated['simulation_id']],
+            [
+                'student_number' => $validated['student_number'], 
+                'simulation_id'  => $validated['simulation_id'],
+                'exam_period'    => $validated['exam_period']
+            ],
             ['student_score' => $validated['score'], 'date_created' => now(), 'is_active' => 1]
         );
+
+        // 📝 AUDIT LOG
+        AuditService::logStudentAcademic($student->student_number, "Updated {$validated['exam_period']} Simulation Exam Score ({$simulation->simulation_name})");
 
         return redirect()->back()->with('success', 'Simulation score updated.');
     }
@@ -124,7 +160,6 @@ class SimulationExamController extends Controller
 
         $simulations = SimulationExam::where('program_id', $filter['program'])->where('is_active', 1)->get();
         
-        // ADD FULL FILTERS HERE
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])
             ->where('program_id', $filter['program'])
@@ -165,7 +200,9 @@ class SimulationExamController extends Controller
         $headers = fgetcsv($handle);
         if (!$headers) return response()->json(['success' => false, 'message' => 'Empty file'], 422);
 
-        $simulations = SimulationExam::where('program_id', $request->filter['program'])->where('is_active', 1)->get();
+        $targetProgram = $request->filter['program'];
+        $simulations = SimulationExam::where('program_id', $targetProgram)->where('is_active', 1)->get();
+        
         $simMap = [];
         foreach ($simulations as $sim) $simMap[strtolower(trim($sim->simulation_name))] = $sim->simulation_id;
 
@@ -179,22 +216,71 @@ class SimulationExamController extends Controller
 
         $recordsProcessed = 0;
         $now = now();
+        $examPeriod = $request->filter['exam_period'] ?? 'Default';
+
         while (($row = fgetcsv($handle)) !== false) {
             $studentNumber = $row[0] ?? null;
-            if (!$studentNumber || !StudentInfo::where('student_number', $studentNumber)->exists()) continue;
+            if (!$studentNumber) continue;
+
+            $student = StudentInfo::where('student_number', $studentNumber)->first();
+            if (!$student) continue;
+
+            // 🔒 THE TRY-CATCH BOUNCER
+            try {
+                $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+            } catch (\Exception $e) {
+                continue;
+            }
 
             foreach ($simColumns as $col) {
                 $scoreValue = $row[$col['index']] ?? null;
                 if ($scoreValue !== null && $scoreValue !== '') {
                     StudentSimulationExam::updateOrCreate(
-                        ['student_number' => $studentNumber, 'simulation_id' => $col['simulation_id']],
+                        [
+                            'student_number' => $studentNumber, 
+                            'simulation_id'  => $col['simulation_id'],
+                            'exam_period'    => $examPeriod 
+                        ],
                         ['student_score' => (float)$scoreValue, 'date_created' => $now, 'is_active' => 1]
                     );
+
+                    // 📝 AUDIT LOG
+                    AuditService::logStudentAcademic($studentNumber, "Imported CSV {$examPeriod} Simulation Exam Score for ID: {$col['simulation_id']}");
+                    
                     $recordsProcessed++;
                 }
             }
         }
         fclose($handle);
         return response()->json(['success' => true, 'message' => 'Import completed', 'records_processed' => $recordsProcessed]);
+    }
+
+    private function authorizeStudentAccess($user, $student, $requestedProgramId = null)
+    {
+        if (!$user->college_id && !$user->program_id) return;
+
+        if ($user->college_id) {
+            $hasCollegeRecord = $student->programs()
+                ->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')
+                ->where('p.college_id', $user->college_id)
+                ->exists();
+            if (!$hasCollegeRecord) abort(403, 'Unauthorized: Student has no historical or active records in your College.');
+        }
+
+        if ($user->program_id) {
+            $hasProgramRecord = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $user->program_id)
+                ->exists();
+            if (!$hasProgramRecord) abort(403, 'Unauthorized: Student has no historical or active records in your Program.');
+        }
+
+        if ($requestedProgramId) {
+            $isValidRequest = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $requestedProgramId)
+                ->exists();
+            if (!$isValidRequest) abort(404, 'Invalid Context: Student has never been enrolled in the requested program.');
+        }
     }
 }

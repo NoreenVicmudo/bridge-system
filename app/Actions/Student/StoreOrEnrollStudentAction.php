@@ -34,8 +34,6 @@ class StoreOrEnrollStudentAction
                     'student_mname' => $data['middle_name'] ?? null,
                     'student_lname' => $data['last_name'] ?? 'Unknown',
                     'student_suffix' => $data['suffix'] ?? null,
-                    'college_id' => $data['college'],
-                    'program_id' => $data['program'],
                     'student_birthdate' => $data['birthdate'] ?? null,
                     'student_sex' => $data['sex'] ?? null,
                     'student_socioeconomic' => $data['socioeconomic_status'] ?? null,
@@ -52,6 +50,15 @@ class StoreOrEnrollStudentAction
                     'student_last_school' => $data['last_school_type'] ?? null,
                     'date_created' => $now,
                     'is_active' => 1,
+                ]);
+
+                // Delete the two college_id / program_id lines from the student_info insert array, then add:
+                DB::table('student_programs')->insert([
+                    'student_number' => $studentNumber,
+                    'program_id' => $data['program'],
+                    'status' => 'Active',
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]);
                 
                 $message = 'New student profile created and enrolled successfully!';

@@ -14,14 +14,13 @@ class StoreStudentAction
             $now = Carbon::now();
             $studentNumber = $data['student_number'];
 
-            StudentInfo::create([
+            $student = StudentInfo::create([
                 'student_number' => $studentNumber,
                 'student_fname'  => $data['first_name'] ?? 'Unknown',
                 'student_mname'  => $data['middle_name'] ?? null,
                 'student_lname'  => $data['last_name'] ?? 'Unknown',
                 'student_suffix' => $data['suffix'] ?? null,
-                'college_id'     => $data['college'] ?? null,
-                'program_id'     => $data['program'] ?? null,
+                // Removed college_id and program_id from here!
                 'student_birthdate' => $data['birthdate'] ?? null,
                 'student_sex'        => $data['sex'] ?? null,
                 'student_socioeconomic' => $data['socioeconomic_status'] ?? null,
@@ -39,6 +38,15 @@ class StoreStudentAction
                 'date_created'       => $now,
                 'is_active'          => true,
             ]);
+
+            // Add the program to the pivot table
+            if (!empty($data['program'])) {
+                $student->programs()->attach($data['program'], [
+                    'status' => 'Active',
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ]);
+            }
 
             return 'Student profile created successfully.';
         });

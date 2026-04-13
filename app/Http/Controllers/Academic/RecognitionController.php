@@ -8,7 +8,9 @@ use App\Models\College;
 use App\Models\Program;
 use App\Models\Student\StudentInfo;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Services\AuditService; // ADDED AUDIT SERVICE
 
 class RecognitionController extends Controller
 {
@@ -35,7 +37,7 @@ class RecognitionController extends Controller
               ->where('semester', $filter['semester'])
               ->where('section', $filter['section'])
               ->where('is_active', 1);
-        })->with(['college', 'program']);
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -75,8 +77,18 @@ class RecognitionController extends Controller
 
     public function edit(Request $request)
     {
-        $student = StudentInfo::findOrFail($request->query('student_id'));
+        $studentId = $request->query('student_id');
+        $programId = $request->query('program_id');
+
+        $student = StudentInfo::findOrFail($studentId);
+
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $programId);
+
+        $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
+
         $record = StudentAcademicRecognition::where('student_number', $student->student_number)
+            ->where('program_id', $targetProgram)
             ->where('is_active', 1)->first();
 
         return Inertia::render('Academic/RecognitionEntry', [
@@ -90,10 +102,20 @@ class RecognitionController extends Controller
         $validated = $request->validate([
             'student_number' => 'required|exists:student_info,student_number',
             'award_count'    => 'required|integer|min:0',
+            'program_id'     => 'nullable|integer' 
         ]);
 
+        $student = StudentInfo::findOrFail($studentId);
+        $targetProgram = $validated['program_id'] ?? $student->activeProgram->first()?->program_id;
+
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+
         StudentAcademicRecognition::updateOrCreate(
-            ['student_number' => $validated['student_number']],
+            [
+                'student_number' => $validated['student_number'],
+                'program_id'     => $targetProgram 
+            ],
             [
                 'award_count'  => $validated['award_count'],
                 'date_created' => now(),
@@ -101,12 +123,14 @@ class RecognitionController extends Controller
             ]
         );
 
+        // 📝 AUDIT LOG
+        AuditService::logStudentAcademic($student->student_number, "Updated Academic Recognition (Count: {$validated['award_count']}) for Program ID: {$targetProgram}");
+
         return redirect()->back()->with('success', 'Recognition record updated.');
     }
 
     public function export(Request $request)
     {
-        // 1. Validate ALL necessary filters
         $filter = $request->validate([
             'academic_year' => 'required|string',
             'program'       => 'required|integer',
@@ -115,7 +139,6 @@ class RecognitionController extends Controller
             'section'       => 'required|string',
         ]);
 
-        // 2. Apply the EXACT same query as your index method
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])
             ->where('program_id', $filter['program'])
@@ -126,6 +149,7 @@ class RecognitionController extends Controller
         })->get();
 
         $records = StudentAcademicRecognition::whereIn('student_number', $students->pluck('student_number'))
+            ->where('program_id', $filter['program']) // SHIFTER-PROOF FILTER
             ->where('is_active', 1)->get()->keyBy('student_number');
 
         $headers = ['Student Number', 'Student Name', 'Dean\'s List Count'];
@@ -152,24 +176,85 @@ class RecognitionController extends Controller
 
     public function import(Request $request)
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+        if (is_string($request->filter)) {
+            $request->merge(['filter' => json_decode($request->filter, true)]);
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt',
+            'filter' => 'required|array',
+            'filter.program' => 'required|integer'
+        ]);
+
         $handle = fopen($request->file('file')->getRealPath(), 'r');
-        fgetcsv($handle); // Skip headers
+        fgetcsv($handle); 
 
         $processed = 0;
+        $targetProgram = $request->filter['program'];
+
         while (($row = fgetcsv($handle)) !== false) {
             $sNum = $row[0] ?? null;
-            $count = $row[2] ?? 0; // Assuming format: student_number, name, count
+            $count = $row[2] ?? 0; 
 
-            if ($sNum && StudentInfo::where('student_number', $sNum)->exists()) {
-                StudentAcademicRecognition::updateOrCreate(
-                    ['student_number' => $sNum],
-                    ['award_count' => (int)$count, 'date_created' => now(), 'is_active' => 1]
-                );
-                $processed++;
+            if (!$sNum) continue;
+
+            $student = StudentInfo::where('student_number', $sNum)->first();
+            if (!$student) continue;
+
+            // 🔒 THE TRY-CATCH BOUNCER
+            try {
+                $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+            } catch (\Exception $e) {
+                continue; // Skip invalid students safely
             }
+
+            StudentAcademicRecognition::updateOrCreate(
+                [
+                    'student_number' => $sNum,
+                    'program_id'     => $targetProgram
+                ],
+                [
+                    'award_count' => (int)$count, 
+                    'date_created' => now(), 
+                    'is_active' => 1
+                ]
+            );
+
+            // 📝 AUDIT LOG
+            AuditService::logStudentAcademic($sNum, "Imported Academic Recognition via CSV (Count: {$count}) for Program ID: {$targetProgram}");
+
+            $processed++;
         }
         fclose($handle);
         return response()->json(['success' => true, 'message' => 'Imported ' . $processed . ' recognition records.']);
+    }
+
+    private function authorizeStudentAccess($user, $student, $requestedProgramId = null)
+    {
+        if (!$user->college_id && !$user->program_id) return;
+
+        if ($user->college_id) {
+            $hasCollegeRecord = $student->programs()
+                ->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')
+                ->where('p.college_id', $user->college_id)
+                ->exists();
+            if (!$hasCollegeRecord) abort(403, 'Unauthorized: Student has no historical or active records in your College.');
+        }
+
+        if ($user->program_id) {
+            $hasProgramRecord = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $user->program_id)
+                ->exists();
+            if (!$hasProgramRecord) abort(403, 'Unauthorized: Student has no historical or active records in your Program.');
+        }
+
+        if ($requestedProgramId) {
+            $isValidRequest = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $requestedProgramId)
+                ->exists();
+            if (!$isValidRequest) abort(404, 'Invalid Context: Student has never been enrolled in the requested program.');
+        }
     }
 }

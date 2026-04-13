@@ -74,13 +74,18 @@ class ImportStudentsAction
                         'student_scholarship'      => trim($row[16] ?? null),
                         'student_language'         => $languageId, // Using our translated ID!
                         'student_last_school'      => trim($row[18] ?? null),
-                        
-                        'college_id'          => $context['college'],
-                        'program_id'          => $context['program'],
-                        
+                                                
                         'date_created'             => $now,
                         'is_active'                => 1,
                     ]);
+                    DB::table('student_programs')->insert([
+                        'student_number' => $studentNumber,
+                        'program_id'     => $context['program'],
+                        'status'         => 'Active',
+                        'created_at'     => $now,
+                        'updated_at'     => $now
+                    ]);
+
                     $successCount++;
                 }
 

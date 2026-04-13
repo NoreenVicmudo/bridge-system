@@ -9,7 +9,6 @@ use App\Models\Academic\StudentBoardGrade;
 use App\Models\Academic\StudentGwa;
 use App\Models\Academic\StudentPerformanceRating;
 use App\Models\Academic\StudentSimulationExam;
-use App\Models\College;
 use App\Models\Program;
 use App\Models\ProgramMetric\BoardBatch;
 use App\Models\Student\Language;
@@ -30,8 +29,8 @@ class StudentInfo extends Model
         'student_mname',
         'student_lname',
         'student_suffix',
-        'college_id',
-        'program_id',
+        // 'college_id', // REMOVED
+        // 'program_id', // REMOVED
         'student_birthdate',
         'student_sex',
         'student_socioeconomic',
@@ -56,15 +55,65 @@ class StudentInfo extends Model
         'student_birthdate' => 'date:Y-m-d',
     ];
 
-    public function college()
+    // ==========================================
+    // NEW PIVOT RELATIONSHIPS
+    // ==========================================
+    
+    /**
+     * Get ALL programs the student has ever been enrolled in (Historical)
+     */
+    public function programs()
     {
-        return $this->belongsTo(College::class, 'college_id', 'college_id');
+        return $this->belongsToMany(
+            Program::class, 
+            'student_programs', 
+            'student_number', 
+            'program_id',
+            'student_number', 
+            'program_id'
+        )->withPivot('status', 'created_at', 'updated_at');
     }
 
-    public function program()
+    /**
+     * Get ONLY the currently active program (for Masterlist and default views)
+     */
+    public function activeProgram()
     {
-        return $this->belongsTo(Program::class, 'program_id', 'program_id');
+        return $this->belongsToMany(
+            Program::class, 
+            'student_programs', 
+            'student_number', 
+            'program_id',
+            'student_number', 
+            'program_id'
+        )->wherePivot('status', 'Active')->limit(1);
     }
+
+    // ==========================================
+    // VIRTUAL ACCESSORS (Backward Compatibility)
+    // ==========================================
+
+    /**
+     * Emulates $student->program for existing frontend code
+     */
+    public function getProgramAttribute()
+    {
+        return $this->activeProgram->first();
+    }
+
+    /**
+     * Emulates $student->college for existing frontend code
+     * Derives the college from the active program
+     */
+    public function getCollegeAttribute()
+    {
+        $program = $this->getProgramAttribute();
+        return $program ? $program->college : null;
+    }
+
+    // ==========================================
+    // EXISTING RELATIONSHIPS
+    // ==========================================
 
     public function living()
     {

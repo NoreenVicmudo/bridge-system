@@ -13,6 +13,7 @@ class StudentAttendanceReview extends Model
 
     protected $fillable = [
         'student_number',
+        'program_id',
         'sessions_attended',
         'sessions_total',
         'date_created',

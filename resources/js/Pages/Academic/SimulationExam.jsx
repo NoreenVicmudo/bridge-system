@@ -20,24 +20,27 @@ export default function SimulationExamPage({ students, filter, search: backendSe
     const sortDirection = isBackendReady ? direction : mock.sortDirection;
 
     const handleSearch = isBackendReady ? (val) => {
-        router.get(route('simulation.exam'), { ...filter, search: val, sort, direction }, { preserveState: true, preserveScroll: true });
+        router.get(route('simulation.exam'), { ...filter, search: val, sort, direction, exam_period: examPeriod }, { preserveState: true, preserveScroll: true });
     } : mock.setSearch;
 
     const handlePageChange = isBackendReady ? (url) => {
-        if(url) router.get(url, { ...filter, search, sort, direction }, { preserveScroll: true, preserveState: true });
+        if(url) router.get(url, { ...filter, search, sort, direction, exam_period: examPeriod }, { preserveScroll: true, preserveState: true });
     } : mock.setPage;
 
     const handleSort = isBackendReady ? (sortKey) => {
         const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
         const dbColumn = dbColumnMap[sortKey] || 'student_info.student_id';
         const newDir = sort === dbColumn && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('simulation.exam'), { ...filter, search, sort: dbColumn, direction: newDir }, { preserveState: true, preserveScroll: true });
+        router.get(route('simulation.exam'), { ...filter, search, sort: dbColumn, direction: newDir, exam_period: examPeriod }, { preserveState: true, preserveScroll: true });
     } : mock.handleSort;
 
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    
+    // --- NEW: UI States for filtering ---
     const [selectedSim, setSelectedSim] = useState("All");
+    const [examPeriod, setExamPeriod] = useState(filter?.exam_period || "Default"); // Pre-Test, Post-Test, etc.
 
     const [activeFilters, setActiveFilters] = useState(filter || {
         academic_year: "2025-2026", semester: "1st Semester", college: "1", program: "1", year_level: "4", section: "4-1",
@@ -46,7 +49,15 @@ export default function SimulationExamPage({ students, filter, search: backendSe
     const handleApplyFilter = (newFilters) => {
         setActiveFilters(newFilters);
         localStorage.setItem("academicFilterData", JSON.stringify(newFilters));
-        router.get(route('simulation.exam'), newFilters, { preserveState: false });
+        // Pass the exam period along with the filters!
+        router.get(route('simulation.exam'), { ...newFilters, exam_period: examPeriod }, { preserveState: false });
+    };
+
+    // Handler for changing the Exam Period
+    const handlePeriodChange = (e) => {
+        const newPeriod = e.target.value;
+        setExamPeriod(newPeriod);
+        router.get(route('simulation.exam'), { ...activeFilters, search, sort, direction, exam_period: newPeriod }, { preserveState: true, preserveScroll: true });
     };
 
     const simHeaders = isBackendReady ? students.simulations : MOCK_SIMULATION_EXAMS;
@@ -60,10 +71,23 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                     title="Simulation Exam Results"
                     search={search} onSearch={handleSearch}
                     paginationData={paginator} onPageChange={handlePageChange}
-                    exportEndpoint={route('simulation-exam.export', filter)}
+                    exportEndpoint={route('simulation-exam.export', { ...filter, exam_period: examPeriod })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}
                     headerActions={
                         <>
+                            {/* NEW: Exam Period Dropdown */}
+                            <select 
+                                value={examPeriod} 
+                                onChange={handlePeriodChange}
+                                className="px-4 h-[40px] border border-[#ffb736] text-[#ffb736] bg-white rounded-[5px] text-sm font-bold focus:ring-[#ffb736] outline-none shadow-sm cursor-pointer shrink-0"
+                            >
+                                <option value="Default">Default Period</option>
+                                <option value="Diagnostic">Diagnostic</option>
+                                <option value="Pre-Test">Pre-Test</option>
+                                <option value="Midterm">Midterm</option>
+                                <option value="Post-Test">Post-Test</option>
+                            </select>
+
                             {simHeaders.length > 0 && (
                                 <select 
                                     value={selectedSim} onChange={(e) => setSelectedSim(e.target.value)}
@@ -99,7 +123,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                     <tbody className="text-gray-600 text-sm font-medium">
                         {records?.length > 0 ? records.map((student, i) => (
                             <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
-                                <td className="py-3 px-6 sticky left-0 bg-inherit z-10"><Link href={route('simulation.exam.entry', { student_id: student.id })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all text-center">{student.student_number}</Link></td>
+                                <td className="py-3 px-6 sticky left-0 bg-inherit z-10"><Link href={route('simulation.exam.entry', { student_id: student.id, exam_period: examPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all text-center">{student.student_number}</Link></td>
                                 <td className="py-3 px-6 text-gray-800 uppercase font-bold sticky left-[150px] bg-inherit z-10 shadow-md">{student.name}</td>
                                 {visibleSims.map((header, idx) => {
                                     const value = student.results[header];
@@ -118,7 +142,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
 
                 <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={handleApplyFilter} />
                 <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Simulation Exam Results" filterData={filter} />
-                <SimAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={filter} subjectHeaders={simHeaders} />
+                <SimAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={{...filter, exam_period: examPeriod}} subjectHeaders={simHeaders} />
             </div>
         </AuthenticatedLayout>
     );

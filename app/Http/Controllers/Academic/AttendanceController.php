@@ -7,7 +7,9 @@ use App\Models\Academic\StudentAttendanceReview;
 use App\Models\College;
 use App\Models\Program;
 use App\Models\Student\StudentInfo;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AttendanceController extends Controller
@@ -35,7 +37,7 @@ class AttendanceController extends Controller
               ->where('semester', $filter['semester'])
               ->where('section', $filter['section'])
               ->where('is_active', 1);
-        })->with(['college', 'program']);
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -82,8 +84,18 @@ class AttendanceController extends Controller
 
     public function edit(Request $request)
     {
-        $student = StudentInfo::findOrFail($request->query('student_id'));
+        $studentId = $request->query('student_id');
+        $programId = $request->query('program_id'); 
+
+        $student = StudentInfo::findOrFail($studentId);
+        
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $programId);
+
+        $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
+
         $record = StudentAttendanceReview::where('student_number', $student->student_number)
+            ->where('program_id', $targetProgram)
             ->where('is_active', 1)->first();
 
         return Inertia::render('Academic/AttendanceEntry', [
@@ -101,10 +113,21 @@ class AttendanceController extends Controller
             'student_number' => 'required|exists:student_info,student_number',
             'attended'       => 'required|integer|min:0',
             'total'          => 'required|integer|min:1',
+            'program_id'     => 'nullable|integer'
         ]);
 
+        $student = StudentInfo::findOrFail($studentId);
+        
+        $targetProgram = $validated['program_id'] ?? $student->activeProgram->first()?->program_id;
+
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+
         StudentAttendanceReview::updateOrCreate(
-            ['student_number' => $validated['student_number']],
+            [
+                'student_number' => $validated['student_number'],
+                'program_id'     => $targetProgram
+            ],
             [
                 'sessions_attended' => $validated['attended'],
                 'sessions_total'    => $validated['total'],
@@ -113,12 +136,14 @@ class AttendanceController extends Controller
             ]
         );
 
+        // 📝 AUDIT LOG
+        AuditService::logStudentAcademic($student->student_number, "Updated Attendance: {$validated['attended']}/{$validated['total']} for Program ID: {$targetProgram}");
+
         return redirect()->back()->with('success', 'Attendance record updated.');
     }
 
     public function export(Request $request)
     {
-        // Standard filter validation...
         $students = StudentInfo::whereHas('sections', function ($q) use ($request) {
             $q->where('academic_year', $request->academic_year)->where('program_id', $request->program)
               ->where('year_level', $request->year_level)->where('semester', $request->semester)
@@ -126,6 +151,7 @@ class AttendanceController extends Controller
         })->get();
 
         $records = StudentAttendanceReview::whereIn('student_number', $students->pluck('student_number'))
+            ->where('program_id', $request->program)
             ->where('is_active', 1)->get()->keyBy('student_number');
 
         $headers = ['Student Number', 'Student Name', 'Attended', 'Total Sessions', 'Percentage'];
@@ -156,25 +182,88 @@ class AttendanceController extends Controller
 
     public function import(Request $request)
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+        if (is_string($request->filter)) {
+            $request->merge(['filter' => json_decode($request->filter, true)]);
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt',
+            'filter' => 'required|array',
+            'filter.program' => 'required|integer'
+        ]);
+
         $handle = fopen($request->file('file')->getRealPath(), 'r');
-        fgetcsv($handle); // Skip headers: student_number, attended, total
+        fgetcsv($handle); 
 
         $processed = 0;
+        $targetProgram = $request->filter['program'];
+
         while (($row = fgetcsv($handle)) !== false) {
             $sNum = $row[0] ?? null;
             $att = $row[2] ?? 0;
             $tot = $row[3] ?? 0;
 
-            if ($sNum && StudentInfo::where('student_number', $sNum)->exists()) {
-                StudentAttendanceReview::updateOrCreate(
-                    ['student_number' => $sNum],
-                    ['sessions_attended' => (int)$att, 'sessions_total' => (int)$tot, 'date_created' => now(), 'is_active' => 1]
-                );
-                $processed++;
+            if (!$sNum) continue;
+
+            // 1. Fetch the actual student model instead of just checking if they exist globally
+            $student = StudentInfo::where('student_number', $sNum)->first();
+            if (!$student) continue;
+
+            // 2. 🔒 THE BOUNCER: Try/Catch wrapper
+            try {
+                $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+            } catch (\Exception $e) {
+                // If the user is unauthorized, or the student never took this program, SKIP them safely!
+                continue;
             }
+
+            // 3. It passed the bouncer! Safe to insert.
+            StudentAttendanceReview::updateOrCreate(
+                [
+                    'student_number' => $sNum,
+                    'program_id'     => $targetProgram 
+                ],
+                [
+                    'sessions_attended' => (int)$att, 
+                    'sessions_total' => (int)$tot, 
+                    'date_created' => now(), 
+                    'is_active' => 1
+                ]
+            );
+            // 📝 AUDIT LOG
+            AuditService::logStudentAcademic($sNum, "Imported Attendance via CSV ({$att}/{$tot}) for Program ID: {$targetProgram}");
+            $processed++;
         }
         fclose($handle);
         return response()->json(['success' => true, 'message' => 'Imported ' . $processed . ' records.']);
+    }
+
+    private function authorizeStudentAccess($user, $student, $requestedProgramId = null)
+    {
+        if (!$user->college_id && !$user->program_id) return;
+
+        if ($user->college_id) {
+            $hasCollegeRecord = $student->programs()
+                ->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')
+                ->where('p.college_id', $user->college_id)
+                ->exists();
+            if (!$hasCollegeRecord) abort(403, 'Unauthorized: Student has no historical or active records in your College.');
+        }
+
+        if ($user->program_id) {
+            $hasProgramRecord = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $user->program_id)
+                ->exists();
+            if (!$hasProgramRecord) abort(403, 'Unauthorized: Student has no historical or active records in your Program.');
+        }
+
+        if ($requestedProgramId) {
+            $isValidRequest = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $requestedProgramId)
+                ->exists();
+            if (!$isValidRequest) abort(404, 'Invalid Context: Student has never been enrolled in the requested program.');
+        }
     }
 }

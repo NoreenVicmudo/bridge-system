@@ -13,6 +13,7 @@ class StudentGwa extends Model
 
     protected $fillable = [
         'student_number',
+        'program_id',
         'year_level',
         'semester',
         'gwa',

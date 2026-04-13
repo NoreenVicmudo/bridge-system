@@ -21,6 +21,13 @@ class DirectEnrollStudentAction
                 return 'Student not found.';
             }
 
+            // Ensure the pivot table knows this student is now Active in this program
+            $programId = $data['mode'] === 'section' ? $data['program'] : $data['batch_program'];
+            
+            $student->programs()->syncWithoutDetaching([
+                $programId => ['status' => 'Active', 'updated_at' => $now]
+            ]);
+
             if ($data['mode'] === 'section') {
                 $exists = StudentSection::where('student_number', $studentNumber)
                     ->where('academic_year', $data['academic_year'])

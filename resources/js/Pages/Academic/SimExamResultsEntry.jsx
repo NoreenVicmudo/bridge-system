@@ -8,6 +8,7 @@ export default function SimExamResultsEntry({ student, simulationOptions, curren
         student_number: student?.student_number || "",
         simulation_id: "",
         score: "",
+        exam_period: "Default",
     });
 
     const handleSubmit = () => {

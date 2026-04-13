@@ -3,18 +3,16 @@
 namespace App\Http\Controllers\Academic;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student\StudentInfo;
 use App\Models\Academic\StudentGwa;
+use App\Models\Program;
+use App\Models\Student\StudentInfo;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use App\Models\Program;
 
 class GwaController extends Controller
 {
-    /**
-     * Display GWA table for a filtered section.
-     */
     public function index(Request $request)
     {
         $filter = $request->validate([
@@ -29,7 +27,6 @@ class GwaController extends Controller
         $college = \App\Models\College::where('college_id', $filter['college'])->first();
         $program = \App\Models\Program::where('program_id', $filter['program'])->first();
 
-        // Inject names into the filter object so FilterInfoCard can find them
         $filter['college_name'] = $college ? $college->name : 'N/A';
         $filter['program_name'] = $program ? $program->name : 'N/A';
 
@@ -43,11 +40,10 @@ class GwaController extends Controller
                 ->where('semester', $filter['semester'])
                 ->where('section', $filter['section'])
                 ->where('is_active', 1);
-        })->with(['college', 'program'])
+        })
         ->paginate(10)
         ->withQueryString();
 
-        // Fetch ALL active GWA records for these students (not just the filtered semester)
         $allGwaRecords = StudentGwa::whereIn('student_number', $students->pluck('student_number'))
             ->where('is_active', 1)
             ->get()
@@ -56,7 +52,6 @@ class GwaController extends Controller
         $students->getCollection()->transform(function ($student) use ($allGwaRecords, $filter, $dbSemester) {
             $studentGwas = $allGwaRecords->get($student->student_number) ?? collect();
             
-            // Find the GWA for the specifically filtered semester
             $currentGwa = $studentGwas->where('year_level', $filter['year_level'])
                                     ->where('semester', $dbSemester)
                                     ->first();
@@ -66,7 +61,7 @@ class GwaController extends Controller
                 'student_number' => $student->student_number,
                 'name' => $student->student_lname . ', ' . $student->student_fname,
                 'gwa' => $currentGwa ? $currentGwa->gwa : null,
-                'all_gwas' => $studentGwas, // Pass the whole collection for the toggle
+                'all_gwas' => $studentGwas, 
             ];
         });
 
@@ -79,53 +74,67 @@ class GwaController extends Controller
         ]);
     }
 
-    /**
-     * Manual update/create GWA for a single student.
-     */
+    public function edit(Request $request)
+    {
+        $studentId = $request->query('student_id');
+        $programId = $request->query('program_id');
+
+        $student = StudentInfo::findOrFail($studentId);
+
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $programId);
+
+        $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
+
+        $gwaRecords = StudentGwa::where('student_number', $student->student_number)
+                    ->where('program_id', $targetProgram) // Fetch historical GWA!
+                    ->where('is_active', 1)
+                    ->get();
+
+        return Inertia::render('Academic/GWAEntry', [
+            'student' => $student,
+            'gwaRecords' => $gwaRecords,
+        ]);
+    }
+
     public function update(Request $request, $studentId)
     {
         $validated = $request->validate([
             'student_number' => 'required|exists:student_info,student_number',
             'year_level'     => 'required|integer|min:1|max:6',
-            'semester'       => 'required|string', // Changed to string to handle "1ST"/"2ND"
-            'gwa'            => 'required|numeric|min:1.0|max:5.0', // Adjust range based on your school's system
+            'semester'       => 'required|string', 
+            'gwa'            => 'required|numeric|min:1.0|max:5.0', 
+            'program_id'     => 'nullable|integer' 
         ]);
 
-        // Map the "1ST"/"2ND" from your React form to "1"/"2" for the database
-        $semesterMap = [
-            '1ST' => '1',
-            '2ND' => '2',
-            '1'   => '1',
-            '2'   => '2',
-            'summer' => 'summer'
-        ];
+        $semesterMap = ['1ST' => '1', '2ND' => '2', '1' => '1', '2' => '2', 'summer' => 'summer'];
         $dbSemester = $semesterMap[$validated['semester']] ?? $validated['semester'];
 
         $student = StudentInfo::findOrFail($studentId);
+        
+        $targetProgram = $validated['program_id'] ?? $student->activeProgram->first()?->program_id;
 
-        // Update or create the record
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+
         StudentGwa::updateOrCreate(
             [
                 'student_number' => $validated['student_number'],
                 'year_level'     => $validated['year_level'],
                 'semester'       => $dbSemester,
+                'program_id'     => $targetProgram
             ],
-            [
-                'gwa'          => $validated['gwa'],
-                'date_created' => now(), // Or use updated_at if your migration has it
-                'is_active'    => 1,
-            ]
+            ['gwa' => $validated['gwa'], 'date_created' => now(), 'is_active' => 1]
         );
+
+        // 📝 AUDIT LOG
+        AuditService::logStudentAcademic($student->student_number, "Updated GWA for Year {$validated['year_level']} Sem {$dbSemester}: {$validated['gwa']}");
 
         return redirect()->back()->with('success', 'GWA updated successfully.');
     }
 
-    /**
-     * Import CSV with flexible headers.
-     */
     public function import(Request $request)
     {
-        // Convert JSON string back to array for validation if necessary
         if (is_string($request->filter)) {
             $request->merge(['filter' => json_decode($request->filter, true)]);
         }
@@ -139,14 +148,10 @@ class GwaController extends Controller
         $file = $request->file('file');
         $handle = fopen($file->getRealPath(), 'r');
         $headers = fgetcsv($handle);
-        if (!$headers) {
-            return response()->json(['success' => false, 'message' => 'Empty file'], 422);
-        }
+        if (!$headers) return response()->json(['success' => false, 'message' => 'Empty file'], 422);
 
-        // Parse headers to detect GWA columns
         $gwaColumns = [];
         foreach ($headers as $index => $header) {
-            // Matches patterns like 1Y-1S, 2Y-2S, 4Y-1S
             if (preg_match('/^(\d+)Y-(\d+)S$/', $header, $matches)) {
                 $gwaColumns[] = [
                     'year' => (int)$matches[1], 
@@ -156,13 +161,10 @@ class GwaController extends Controller
             }
         }
 
-        // 2. Map filters and check program duration
         $filterData = is_string($request->filter) ? json_decode($request->filter, true) : $request->filter;
         $program = Program::find($filterData['program'] ?? null);
 
-        if (!$program) {
-            return response()->json(['success' => false, 'message' => 'Invalid program selected.'], 422);
-        }
+        if (!$program) return response()->json(['success' => false, 'message' => 'Invalid program selected.'], 422);
 
         $maxYears = $program->years ?? 4;
 
@@ -177,24 +179,34 @@ class GwaController extends Controller
         $recordsProcessed = 0;
         $now = now();
         
+        $targetProgram = $request->filter['program']; // Make sure you have this variable defined above the loop!
+
         while (($row = fgetcsv($handle)) !== false) {
             $studentNumber = $row[0] ?? null;
             if (!$studentNumber) continue;
 
-            // Ensure student exists
-            $studentExists = StudentInfo::where('student_number', $studentNumber)->exists();
-            if (!$studentExists) continue;
+            // 1. Fetch the actual student model
+            $student = StudentInfo::where('student_number', $studentNumber)->first();
+            if (!$student) continue;
+
+            // 2. 🔒 THE BOUNCER: Test the student against the user's permissions and the target program
+            try {
+                $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+            } catch (\Exception $e) {
+                // If the user doesn't have access, or the student was never in this program, SKIP them!
+                continue; 
+            }
 
             foreach ($gwaColumns as $col) {
                 $gwaValue = $row[$col['index']] ?? null;
                 
                 if ($gwaValue !== null && $gwaValue !== '') {
-                    // Safely update or insert without needing database constraints!
                     StudentGwa::updateOrCreate(
                         [
                             'student_number' => $studentNumber,
                             'year_level'     => $col['year'],
                             'semester'       => $col['semester'],
+                            'program_id'     => $filterData['program']
                         ],
                         [
                             'gwa'          => (float)$gwaValue,
@@ -202,34 +214,17 @@ class GwaController extends Controller
                             'is_active'    => 1,
                         ]
                     );
+                    // 📝 AUDIT LOG
+                    AuditService::logStudentAcademic($studentNumber, "Imported CSV GWA for Y{$col['year']} S{$col['semester']}");
                     $recordsProcessed++;
                 }
             }
         }
         fclose($handle);
 
-        return response()->json([
-            'success' => true, 
-            'message' => 'Import completed successfully.', 
-            'records_processed' => $recordsProcessed
-        ]);
+        return response()->json(['success' => true, 'message' => 'Import completed successfully.', 'records_processed' => $recordsProcessed]);
     }
 
-    public function edit(Request $request)
-    {
-        $studentId = $request->query('student_id');
-        $student = StudentInfo::findOrFail($studentId);
-        $gwaRecords = StudentGwa::where('student_number', $student->student_number)
-                    ->where('is_active', 1)
-                    ->get();
-
-        return Inertia::render('Academic/GWAEntry', [
-            'student' => $student,
-            'gwaRecords' => $gwaRecords,
-        ]);
-    }
-
-    // Inside App\Http\Controllers\Academic\GwaController.php
     public function export(Request $request)
     {
         $filter = $request->validate([
@@ -241,7 +236,6 @@ class GwaController extends Controller
             'section' => 'required|string',
         ]);
 
-        // 1. Fetch Students (No pagination for export)
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])
             ->where('program_id', $filter['program'])
@@ -251,8 +245,9 @@ class GwaController extends Controller
             ->where('is_active', 1);
         })->get();
 
-        // 2. Fetch all GWA records for these students to avoid N+1 queries
+        // 🔒 SHIFTER-PROOF FILTER INCLUDED
         $gwaRecords = StudentGwa::whereIn('student_number', $students->pluck('student_number'))
+            ->where('program_id', $filter['program'])
             ->where('is_active', 1)
             ->get()
             ->groupBy('student_number');
@@ -260,14 +255,12 @@ class GwaController extends Controller
         $program = Program::find($filter['program']);
         $maxYears = $program->years ?? 4;
 
-        // 3. Prepare CSV Headers
         $headers = ['Student Number', 'Student Name'];
         for ($y = 1; $y <= $maxYears; $y++) {
             $headers[] = "{$y}Y-1S";
             $headers[] = "{$y}Y-2S";
         }
 
-        // 4. Generate CSV Stream
         $callback = function() use ($students, $gwaRecords, $headers, $maxYears) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $headers);
@@ -280,7 +273,6 @@ class GwaController extends Controller
                     "{$student->student_lname}, {$student->student_fname}"
                 ];
 
-                // Fill GWA columns based on the pattern
                 for ($y = 1; $y <= $maxYears; $y++) {
                     foreach (['1', '2'] as $sem) {
                         $record = $studentGwas->where('year_level', $y)->where('semester', $sem)->first();
@@ -301,5 +293,37 @@ class GwaController extends Controller
             "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
             "Expires"             => "0"
         ]);
+    }
+
+    /**
+     * Prevent IDOR: Check if the logged-in user is allowed to access this student.
+     */
+    private function authorizeStudentAccess($user, $student, $requestedProgramId = null)
+    {
+        if (!$user->college_id && !$user->program_id) return;
+
+        if ($user->college_id) {
+            $hasCollegeRecord = $student->programs()
+                ->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')
+                ->where('p.college_id', $user->college_id)
+                ->exists();
+            if (!$hasCollegeRecord) abort(403, 'Unauthorized: Student has no historical or active records in your College.');
+        }
+
+        if ($user->program_id) {
+            $hasProgramRecord = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $user->program_id)
+                ->exists();
+            if (!$hasProgramRecord) abort(403, 'Unauthorized: Student has no historical or active records in your Program.');
+        }
+
+        if ($requestedProgramId) {
+            $isValidRequest = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $requestedProgramId)
+                ->exists();
+            if (!$isValidRequest) abort(404, 'Invalid Context: Student has never been enrolled in the requested program.');
+        }
     }
 }

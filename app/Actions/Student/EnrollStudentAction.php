@@ -15,8 +15,11 @@ class EnrollStudentAction
         return DB::transaction(function () use ($data) {
             $now = Carbon::now();
             $studentNumber = $data['student_number'];
+            
+            // Determine the program from context
+            $programId = $data['mode'] === 'section' ? $data['program'] : $data['batch_program'];
 
-            // 1. Create or update student profile
+            // 1. Create/Update Profile (NO program_id or college_id here!)
             $student = StudentInfo::updateOrCreate(
                 ['student_number' => $studentNumber],
                 [
@@ -24,8 +27,6 @@ class EnrollStudentAction
                     'student_mname'  => $data['middle_name'] ?? null,
                     'student_lname'  => $data['last_name'] ?? 'Unknown',
                     'student_suffix' => $data['suffix'] ?? null,
-                    'college_id'     => $data['mode'] === 'section' ? $data['college'] : $data['batch_college'],
-                    'program_id'     => $data['mode'] === 'section' ? $data['program'] : $data['batch_program'],
                     'student_birthdate' => $data['birthdate'] ?? null,
                     'student_sex'        => $data['sex'] ?? null,
                     'student_socioeconomic' => $data['socioeconomic_status'] ?? null,
@@ -40,10 +41,19 @@ class EnrollStudentAction
                     'student_scholarship'=> $data['scholarship'] ?? null,
                     'student_language'   => $data['language'] ?? null,
                     'student_last_school'=> $data['last_school_type'] ?? null,
-                    'date_created'       => $now,
+                    'date_created'       => $student ? $student->date_created : $now,
                     'is_active'          => true,
                 ]
             );
+
+            // 2. Pivot Table Sync
+            // We use syncWithoutDetaching to ensure we don't delete old historical programs
+            $student->programs()->syncWithoutDetaching([
+                $programId => [
+                    'status' => 'Active',
+                    'updated_at' => $now
+                ]
+            ]);
 
             // 2. Enroll in section or batch
             if ($data['mode'] === 'section') {

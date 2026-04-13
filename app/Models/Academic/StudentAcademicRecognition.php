@@ -13,6 +13,7 @@ class StudentAcademicRecognition extends Model
 
     protected $fillable = [
         'student_number',
+        'program_id',
         'award_count',
         'date_created',
         'is_active',

@@ -8,17 +8,13 @@ use App\Models\Academic\StudentBackSubject;
 use App\Models\College;
 use App\Models\Program;
 use App\Models\Student\StudentInfo;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class BackSubjectsController extends Controller
 {
-    /**
-     * Display list of students with retake counts per subject.
-     */
-    // Inside App\Http\Controllers\Academic\BackSubjectsController.php
-
     public function index(Request $request)
     {
         $filter = $request->validate([
@@ -47,7 +43,7 @@ class BackSubjectsController extends Controller
                 ->where('semester', $filter['semester'])
                 ->where('section', $filter['section'])
                 ->where('is_active', 1);
-        })->with(['college', 'program']);
+        });
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -85,7 +81,6 @@ class BackSubjectsController extends Controller
         });
 
         return Inertia::render('Academic/RetakesInfo', [
-            // FIXED: Separate the paginator from the headers to match your TableContainer usage
             'students' => $students,
             'subjects' => $subjectHeaders,
             'filter'   => $filter,
@@ -95,15 +90,19 @@ class BackSubjectsController extends Controller
         ]);
     }
 
-    /**
-     * Show the edit form for a single student.
-     */
     public function edit(Request $request)
     {
-        $student = StudentInfo::findOrFail($request->query('student_id'));
+        $studentId = $request->query('student_id');
+        $programId = $request->query('program_id');
 
-        // Get all general subjects for the student's program
-        $subjectOptions = GeneralSubject::where('program_id', $student->program_id)
+        $student = StudentInfo::findOrFail($studentId);
+
+        // 🔒 THE BOUNCER
+        $this->authorizeStudentAccess($request->user(), $student, $programId);
+
+        $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
+
+        $subjectOptions = GeneralSubject::where('program_id', $targetProgram)
             ->where('is_active', 1)
             ->get()
             ->map(fn($subj) => [
@@ -111,7 +110,6 @@ class BackSubjectsController extends Controller
                 'label' => $subj->general_subject_name,
             ]);
 
-        // Get existing retake counts for this student
         $currentRetakes = StudentBackSubject::where('student_number', $student->student_number)
             ->where('is_active', 1)
             ->pluck('terms_repeated', 'general_subject_id')
@@ -124,9 +122,6 @@ class BackSubjectsController extends Controller
         ]);
     }
 
-    /**
-     * Update or create a retake record for a student.
-     */
     public function update(Request $request, $studentId)
     {
         $validated = $request->validate([
@@ -134,6 +129,14 @@ class BackSubjectsController extends Controller
             'general_subject_id'  => 'required|integer|exists:general_subjects,general_subject_id',
             'terms_repeated'      => 'required|integer|min:0',
         ]);
+
+        $student = StudentInfo::findOrFail($studentId);
+        
+        // 1. Fetch the subject to find out what Program it belongs to
+        $subject = GeneralSubject::findOrFail($validated['general_subject_id']);
+
+        // 2. 🔒 THE BOUNCER: Check if the student has EVER been in that program!
+        $this->authorizeStudentAccess($request->user(), $student, $subject->program_id);
 
         StudentBackSubject::updateOrCreate(
             [
@@ -146,13 +149,12 @@ class BackSubjectsController extends Controller
                 'is_active'      => true,
             ]
         );
+        // 📝 AUDIT LOG
+        AuditService::logStudentAcademic($student->student_number, "Updated Retake Count for {$subject->general_subject_name}: {$validated['terms_repeated']} times");
 
         return redirect()->back()->with('success', 'Retake count updated successfully.');
     }
 
-    /**
-     * Export current filtered data to CSV.
-     */
     public function export(Request $request)
     {
         $filter = $request->validate([
@@ -164,12 +166,10 @@ class BackSubjectsController extends Controller
             'section'       => 'required|string',
         ]);
 
-        // Get subjects for this program
         $subjects = GeneralSubject::where('program_id', $filter['program'])
             ->where('is_active', 1)
             ->get();
 
-        // Get students
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])
                 ->where('program_id', $filter['program'])
@@ -179,13 +179,11 @@ class BackSubjectsController extends Controller
                 ->where('is_active', 1);
         })->get();
 
-        // Fetch all retakes for these students
         $retakes = StudentBackSubject::whereIn('student_number', $students->pluck('student_number'))
             ->where('is_active', 1)
             ->get()
             ->groupBy('student_number');
 
-        // Prepare CSV headers
         $headers = ['Student Number', 'Student Name'];
         foreach ($subjects as $subject) {
             $headers[] = $subject->general_subject_name;
@@ -219,13 +217,8 @@ class BackSubjectsController extends Controller
         ]);
     }
 
-    /**
-     * Import retake data from CSV.
-     * Expected columns: student_number, SubjectName1, SubjectName2, ...
-     */
     public function import(Request $request)
     {
-        // Decode filter if sent as JSON string
         if (is_string($request->filter)) {
             $request->merge(['filter' => json_decode($request->filter, true)]);
         }
@@ -238,22 +231,17 @@ class BackSubjectsController extends Controller
 
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         $headers = fgetcsv($handle);
-        if (!$headers) {
-            return response()->json(['success' => false, 'message' => 'Empty file'], 422);
-        }
+        if (!$headers) return response()->json(['success' => false, 'message' => 'Empty file'], 422);
 
-        // Get all active subjects for this program
         $subjects = GeneralSubject::where('program_id', $request->filter['program'])
             ->where('is_active', 1)
             ->get();
 
-        // Build map: subject_name -> subject_id
         $subjectMap = [];
         foreach ($subjects as $subject) {
             $subjectMap[strtolower(trim($subject->general_subject_name))] = $subject->general_subject_id;
         }
 
-        // Identify which CSV columns correspond to subjects
         $subjectColumns = [];
         foreach ($headers as $index => $header) {
             $cleanHeader = strtolower(trim($header));
@@ -265,20 +253,27 @@ class BackSubjectsController extends Controller
             }
         }
 
-        if (empty($subjectColumns)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No matching subject columns found in CSV headers.'
-            ], 422);
-        }
+        if (empty($subjectColumns)) return response()->json(['success' => false, 'message' => 'No matching subject columns found in CSV headers.'], 422);
 
         $recordsProcessed = 0;
         $now = now();
 
+        $targetProgram = $request->filter['program']; // Make sure you have this variable defined above the loop!
+
         while (($row = fgetcsv($handle)) !== false) {
             $studentNumber = $row[0] ?? null;
-            if (!$studentNumber || !StudentInfo::where('student_number', $studentNumber)->exists()) {
-                continue;
+            if (!$studentNumber) continue;
+
+            // 1. Fetch the actual student model
+            $student = StudentInfo::where('student_number', $studentNumber)->first();
+            if (!$student) continue;
+
+            // 2. 🔒 THE BOUNCER: Test the student against the user's permissions and the target program
+            try {
+                $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
+            } catch (\Exception $e) {
+                // If the user doesn't have access, or the student was never in this program, SKIP them!
+                continue; 
             }
 
             foreach ($subjectColumns as $col) {
@@ -295,6 +290,8 @@ class BackSubjectsController extends Controller
                             'is_active'      => true,
                         ]
                     );
+                    // 📝 AUDIT LOG
+                    AuditService::logStudentAcademic($studentNumber, "Imported CSV Retake count for Subject ID: {$col['subject_id']}");
                     $recordsProcessed++;
                 }
             }
@@ -307,5 +304,34 @@ class BackSubjectsController extends Controller
             'message'           => 'Import completed successfully.',
             'records_processed' => $recordsProcessed,
         ]);
+    }
+
+    private function authorizeStudentAccess($user, $student, $requestedProgramId = null)
+    {
+        if (!$user->college_id && !$user->program_id) return;
+
+        if ($user->college_id) {
+            $hasCollegeRecord = $student->programs()
+                ->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')
+                ->where('p.college_id', $user->college_id)
+                ->exists();
+            if (!$hasCollegeRecord) abort(403, 'Unauthorized: Student has no historical or active records in your College.');
+        }
+
+        if ($user->program_id) {
+            $hasProgramRecord = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $user->program_id)
+                ->exists();
+            if (!$hasProgramRecord) abort(403, 'Unauthorized: Student has no historical or active records in your Program.');
+        }
+
+        if ($requestedProgramId) {
+            $isValidRequest = DB::table('student_programs')
+                ->where('student_number', $student->student_number)
+                ->where('program_id', $requestedProgramId)
+                ->exists();
+            if (!$isValidRequest) abort(404, 'Invalid Context: Student has never been enrolled in the requested program.');
+        }
     }
 }

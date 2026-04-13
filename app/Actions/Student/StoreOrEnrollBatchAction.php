@@ -33,8 +33,6 @@ class StoreOrEnrollBatchAction
                     'student_mname'  => $data['middle_name'] ?? null,
                     'student_lname'  => $data['last_name'] ?? 'Unknown',
                     'student_suffix' => $data['suffix'] ?? null,
-                    'college_id'     => $data['college_id'],
-                    'program_id'     => $data['program_id'],
                     'date_created'   => $now,
                     'is_active'      => true,
                 ]);

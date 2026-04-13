@@ -27,7 +27,8 @@ export default function UpdateSimExamForm({
     const selectLabelOverride =
         "!w-full !text-left !font-bold !text-[#5c297c] !mb-0 !whitespace-nowrap";
 
-    const isFormValid = data.simulation_id && data.score;
+    // Form is now valid ONLY if simulation, score, AND exam_period are provided
+    const isFormValid = data.simulation_id && data.score && data.exam_period;
 
     // Auto-fill existing result when an exam is selected
     useEffect(() => {
@@ -126,19 +127,44 @@ export default function UpdateSimExamForm({
                             <h3 className="text-[11px] font-bold mb-3 uppercase tracking-widest opacity-70">
                                 Update Exam Score
                             </h3>
-                            <div className="w-full">
-                                <CustomSelectGroup
-                                    label="Select Simulation Exam:"
-                                    value={data.simulation_id}
-                                    onChange={(e) =>
-                                        setData("simulation_id", e.target.value)
-                                    }
-                                    options={simulationOptions}
-                                    placeholder="Choose Simulation"
-                                    vertical={true}
-                                    className={selectGroupOverride}
-                                    labelClassName={selectLabelOverride}
-                                />
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {/* NEW: Exam Period Dropdown */}
+                                <div className="w-full">
+                                    <CustomSelectGroup
+                                        label="Exam Period / Attempt:"
+                                        value={data.exam_period}
+                                        onChange={(e) => setData("exam_period", e.target.value)}
+                                        options={[
+                                            { value: "Default", label: "Default Period" },
+                                            { value: "Diagnostic", label: "Diagnostic" },
+                                            { value: "Pre-Test", label: "Pre-Test" },
+                                            { value: "Midterm", label: "Midterm" },
+                                            { value: "Post-Test", label: "Post-Test" },
+                                        ]}
+                                        placeholder="Select Period"
+                                        vertical={true}
+                                        className={selectGroupOverride}
+                                        labelClassName={selectLabelOverride}
+                                    />
+                                    {errors.exam_period && <div className="text-red-500 text-xs mt-1">{errors.exam_period}</div>}
+                                </div>
+
+                                {/* Simulation Exam Dropdown */}
+                                <div className="w-full">
+                                    <CustomSelectGroup
+                                        label="Select Simulation Exam:"
+                                        value={data.simulation_id}
+                                        onChange={(e) =>
+                                            setData("simulation_id", e.target.value)
+                                        }
+                                        options={simulationOptions}
+                                        placeholder="Choose Simulation"
+                                        vertical={true}
+                                        className={selectGroupOverride}
+                                        labelClassName={selectLabelOverride}
+                                    />
+                                </div>
                             </div>
 
                             <div className="mt-3 w-full">
@@ -195,8 +221,7 @@ export default function UpdateSimExamForm({
                     onConfirm={submit}
                     message={
                         <>
-                            Are you sure you want to update the simulation exam
-                            result for <br />
+                            Are you sure you want to update the <strong>{data.exam_period || 'exam'}</strong> result for <br />
                             <strong>{studentName}</strong>?
                         </>
                     }
