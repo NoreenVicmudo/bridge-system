@@ -25,8 +25,8 @@ class ProgramMetricsController extends Controller
 
         return Inertia::render('Entry/ProgramMetricsEntry', [
             'initialData' => [
-                'Colleges' => College::where('is_active', true)->get(), // ADDED THIS
-                'Programs' => Program::where('is_active', true)->get(), // ADDED THIS
+                'Colleges' => College::where('is_active', true)->get(), 
+                'Programs' => Program::where('is_active', true)->get(), 
                 'MockSubjects' => $query->get()
             ]
         ]);
@@ -40,7 +40,8 @@ class ProgramMetricsController extends Controller
             'sub_metric' => 'required|string',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
-            'program_id' => 'required|integer|exists:programs,program_id' // ADDED THIS
+            // 🧠 FIXED: Made nullable
+            'program_id' => 'nullable|integer|exists:programs,program_id' 
         ]);
 
         $isNew = $validated['sub_metric'] === 'add';
@@ -55,6 +56,10 @@ class ProgramMetricsController extends Controller
         }
 
         $targetProgramId = $user->program_id ?? $validated['program_id'];
+
+        if (!$targetProgramId) {
+            return redirect()->back()->withErrors(['program_id' => 'A specific program must be selected.']);
+        }
 
         if ($validated['metric'] === 'MockSubjects') {
             MockSubject::updateOrCreate(

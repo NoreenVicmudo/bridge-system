@@ -89,23 +89,39 @@ export default function StudentInformationEntry({ initialData }) {
     };
 
     // 4. Auto-Fill Logic when selecting existing items
+    // 4. Auto-Fill Logic when selecting existing items
     useEffect(() => {
         if (data.sub_metric && data.sub_metric !== "add") {
             const selectedOption = subMetrics[data.metric]?.find(opt => String(opt.value) === String(data.sub_metric));
+            
             if (selectedOption) {
                 setData("detail_name", selectedOption.label);
                 
+                // 🧠 Find the original DB item to get its properties
+                let originalItem = null;
+                if (data.metric === "College") originalItem = initialData?.Colleges?.find(c => String(c.college_id) === String(data.sub_metric));
+                else if (data.metric === "Program") originalItem = initialData?.Programs?.find(p => String(p.program_id) === String(data.sub_metric));
+                else if (data.metric === "CurrentLivingArrangement") originalItem = initialData?.LivingArrangements?.find(l => String(l.id) === String(data.sub_metric));
+                else if (data.metric === "LanguageSpoken") originalItem = initialData?.Languages?.find(l => String(l.id) === String(data.sub_metric));
+
                 // If editing a Program as SuperAdmin, auto-select its current College
-                if (data.metric === "Program" && isSuperAdmin) {
-                    const program = initialData?.Programs?.find(p => String(p.program_id) === String(data.sub_metric));
-                    if (program) setData("college_id", program.college_id || "");
+                if (data.metric === "Program" && isSuperAdmin && originalItem) {
+                    setData("college_id", originalItem.college_id || "");
+                }
+
+                // 🧠 Map the is_active state to the checkbox
+                if (originalItem && originalItem.is_active !== undefined) {
+                    setData("is_hidden", !originalItem.is_active);
+                } else {
+                    setData("is_hidden", false);
                 }
             }
         } else {
             setData("detail_name", "");
             setData("college_id", "");
+            setData("is_hidden", false); // Default to visible for new entries
         }
-    }, [data.sub_metric, data.metric]);
+    }, [data.sub_metric, data.metric, subMetrics, initialData, isSuperAdmin]);
 
     // 5. Pre-fill Socioeconomic ranges if data exists
     useEffect(() => {

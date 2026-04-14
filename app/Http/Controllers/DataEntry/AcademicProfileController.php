@@ -39,8 +39,8 @@ class AcademicProfileController extends Controller
 
         return Inertia::render('Entry/AcademicProfileEntry', [
             'initialData' => [
-                'Colleges' => College::where('is_active', true)->get(), // ADDED THIS
-                'Programs' => Program::where('is_active', true)->get(), // ADDED THIS
+                'Colleges' => College::where('is_active', true)->get(),
+                'Programs' => Program::where('is_active', true)->get(),
                 'BoardSubjects' => $queryBoard->get(),
                 'GeneralSubjects' => $queryGeneral->get(),
                 'TypeOfRating' => $queryRating->get(),
@@ -57,7 +57,8 @@ class AcademicProfileController extends Controller
             'sub_metric' => 'required|string',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
-            'program_id' => 'required|integer|exists:programs,program_id' // Made required
+            // 🧠 FIXED: Must be nullable so Program Heads don't trigger a 422 crash
+            'program_id' => 'nullable|integer|exists:programs,program_id' 
         ]);
 
         $isActive = !$validated['is_hidden'];
@@ -67,8 +68,12 @@ class AcademicProfileController extends Controller
             $this->authorizeAccess($validated['metric'], $validated['sub_metric'], $user);
         }
 
-        // Lock to user's assigned program if they have one, otherwise use the dropdown selection
+        // 🧠 SMART FALLBACK: Use User's Program ID first, then fallback to Request Payload
         $targetProgramId = $user->program_id ?? $validated['program_id'];
+
+        if (!$targetProgramId) {
+            return redirect()->back()->withErrors(['program_id' => 'A specific program must be selected.']);
+        }
 
         switch ($validated['metric']) {
             case 'BoardSubjects':

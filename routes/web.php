@@ -8,7 +8,7 @@ use App\Http\Controllers\Academic\{
 use App\Http\Controllers\Program\{ProgramFilterController, ReviewCenterController, MockBoardController, LicensureExamController};
 use App\Http\Controllers\Report\{ReportController};
 use App\Http\Controllers\DataEntry\{AcademicProfileController, ProgramMetricsController, StudentInfoController};
-use App\Http\Controllers\{ProfileController, Student\StudentController};
+use App\Http\Controllers\{ProfileController, TransactionController, UserController, Student\StudentController};
 use App\Models\{College, Program};
 use Illuminate\Support\Facades\{Auth, DB, Route};
 use Inertia\Inertia;
@@ -182,6 +182,22 @@ Route::middleware('auth', 'verified')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // --- TRANSACTION LOGS (COMBINED AUDIT TRAIL) ---
+    Route::get('/transaction-logs', [TransactionController::class, 'index'])->name('transactions.index');
+
+    // --- USER MANAGEMENT ---
+    Route::prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index'])->name('users.index');
+        
+        // Add these two!
+        Route::get('/create', [UserController::class, 'create'])->name('users.create');
+        Route::post('/', [UserController::class, 'store'])->name('users.store');
+        
+        Route::get('/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
+        Route::put('/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::post('/bulk-destroy', [UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
+    });
 
     // --- APIS ---
     Route::get('/api/check-student/{student_number}', [StudentController::class, 'checkStudent'])->name('api.check.student');

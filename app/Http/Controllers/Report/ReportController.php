@@ -7,6 +7,7 @@ use App\Models\Student\StudentInfo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Services\StatisticsService;
 
 class ReportController extends Controller
 {
@@ -18,13 +19,11 @@ class ReportController extends Controller
             return redirect()->route('report.filter');
         }
 
-        // 1. Fetch Mock Subjects
         $mockSubjects = \App\Models\ProgramMetric\MockSubject::where('program_id', $filters['program'])
             ->where('is_active', 1)
             ->get()
             ->map(fn($s) => ['value' => $s->mock_subject_id, 'label' => $s->mock_subject_name]);
 
-        // 2. Fetch Board Subjects (From your subject grades table or subjects table)
         $boardSubjects = DB::table('student_board_subjects_grades')
             ->join('board_subjects', 'student_board_subjects_grades.subject_id', '=', 'board_subjects.subject_id')
             ->where('board_subjects.program_id', $filters['program'])
@@ -32,23 +31,40 @@ class ReportController extends Controller
             ->distinct()
             ->get();
 
-        // 3. Fetch Performance Criteria
+        // 🧠 FIXED: Changed to criteria_id so it matches the extraction logic.
+        // NOTE: If you have a separate table with the criteria NAMES, add a ->join() here just like boardSubjects above!
         $performanceCriteria = DB::table('student_performance_rating')
-            ->select('category_id as value', 'category_id as label') // Adjust if you have a separate criteria table
+            ->select('category_id as value', 'category_id as label')
             ->distinct()
             ->get();
 
-        // 4. Fetch Simulation Exams
+        // 🧠 FETCH SIMULATION EXAMS
         $simExams = DB::table('student_simulation_exam')
-            ->select('simulation_id as value', 'simulation_id as label') // Adjust if you have a titles table
+            ->select('simulation_id as value', 'simulation_id as label')
             ->distinct()
             ->get();
+
+        // 🧠 NEW: Fetch distinct Year & Semester combinations for GWA
+        $gwaTerms = DB::table('student_gwa')
+            ->select('year_level', 'semester')
+            ->distinct()
+            ->orderBy('year_level')
+            ->orderBy('semester')
+            ->get()
+            ->map(function ($gwa) {
+                // Creates a value like "1|1st" and a label like "Year 1 - Semester 1st"
+                return [
+                    'value' => $gwa->year_level . '|' . $gwa->semester, 
+                    'label' => "Year {$gwa->year_level} - Semester {$gwa->semester}"
+                ];
+            });
 
         $subMetricMap = [
             'MockScores'        => $mockSubjects,
             'BoardGrades'       => $boardSubjects,
             'PerformanceRating' => $performanceCriteria,
             'SimExam'           => $simExams,
+            'GWA'               => $gwaTerms, // Add to the map!
         ];
 
         return Inertia::render('Reports/ReportGeneration', [
@@ -56,244 +72,30 @@ class ReportController extends Controller
             'subMetricMap' => $subMetricMap
         ]);
     }
-
-    private function processPearsonR($students, $config)
-    {
-        $xData = $this->extractMetricData($students, $config['var1Field'], $config['var1Sub']);
-        $yData = $this->extractMetricData($students, $config['var2Field'], $config['var2Sub']);
-
-        // MAGIC: Find students who have BOTH an X and a Y score by intersecting the keys!
-        $commonKeys = array_intersect_key($xData, $yData);
-        $n = count($commonKeys);
-
-        if ($n < 2) {
-            return response()->json(['error' => 'Not enough paired data points (students with both scores) to calculate Pearson R.'], 400);
-        }
-
-        $sumX = 0; $sumY = 0; $sumXY = 0; $sumX2 = 0; $sumY2 = 0;
-        $rawData = [];
-
-        foreach ($commonKeys as $key => $dummy) {
-            $x = (float) $xData[$key];
-            $y = (float) $yData[$key];
-
-            $sumX += $x; $sumY += $y;
-            $sumXY += ($x * $y);
-            $sumX2 += ($x * $x); $sumY2 += ($y * $y);
-
-            // Save the paired coordinates for the React Scatter Plot
-            $rawData[] = ['x' => $x, 'y' => $y];
-        }
-
-        // Pearson R Formula
-        $numerator = ($n * $sumXY) - ($sumX * $sumY);
-        $denominatorX = ($n * $sumX2) - pow($sumX, 2);
-        $denominatorY = ($n * $sumY2) - pow($sumY, 2);
-        
-        $denominator = sqrt(max(0, $denominatorX)) * sqrt(max(0, $denominatorY));
-        $r = $denominator != 0 ? $numerator / $denominator : 0;
-
-        // Interpretation
-        $absR = abs($r);
-        if ($absR >= 0.9) $interp = 'Very High';
-        elseif ($absR >= 0.7) $interp = 'High';
-        elseif ($absR >= 0.5) $interp = 'Moderate';
-        elseif ($absR >= 0.3) $interp = 'Low';
-        else $interp = 'Negligible';
-
-        $direction = $r < 0 ? 'Negative' : 'Positive';
-        $interpretation = $absR < 0.3 ? 'Negligible Correlation' : "$interp $direction Correlation";
-
-        return response()->json([
-            'success' => true,
-            'title' => 'Pearson R Correlation',
-            'variable_name' => $config['var1FieldLabel'] . ' vs ' . $config['var2FieldLabel'],
-            'statistics' => [
-                'N (Sample Size)' => $n,
-                'Pearson r Value' => round($r, 4),
-                'Interpretation' => $interpretation
-            ],
-            'raw_data' => $rawData,
-            'chart_type' => 'scatter' // Flags React to render the Scatter Plot
-        ]);
-    }
-
-    private function extractMetricData($students, $field, $subField)
-{
-    $batchIds = $students->pluck('batch_id')->toArray();
-    $studentNumbers = $students->pluck('student_number')->toArray();
-    // Map batch_id to student_number for batch-based tables
-    $batchToStudent = $students->pluck('student_number', 'batch_id')->toArray();
-    
-    $records = [];
-
-    switch ($field) {
-        case 'Gender':
-            $records = DB::table('student_info')
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1)
-                ->pluck('student_sex', 'student_number')->toArray();
-            break;
-
-        case 'Age':
-            $records = DB::table('student_info')
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1)
-                ->selectRaw('student_number, TIMESTAMPDIFF(YEAR, student_birthdate, CURDATE()) as age')
-                ->pluck('age', 'student_number')->toArray();
-            break;
-
-        case 'Socioeconomic':
-            $records = DB::table('student_info')
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1)
-                ->pluck('student_socioeconomic', 'student_number')->toArray();
-            break;
-
-        case 'WorkStatus':
-            $records = DB::table('student_info')
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1)
-                ->pluck('student_work', 'student_number')->toArray();
-            break;
-
-        case 'GWA':
-            $records = DB::table('student_gwa')
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1)
-                ->groupBy('student_number')
-                ->selectRaw('student_number, AVG(gwa) as value')
-                ->pluck('value', 'student_number')->toArray();
-            break;
-
-        case 'BoardGrades':
-            $query = DB::table('student_board_subjects_grades')
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1);
-
-            // If a specific subject is chosen, filter by it. 
-            // If 'overall', this is skipped and AVG() gets the mean of all subjects.
-            if ($subField !== 'overall') {
-                $query->where('subject_id', $subField); 
-            }
-
-            $records = $query->groupBy('student_number')
-                ->selectRaw('student_number, AVG(subject_grade) as value')
-                ->pluck('value', 'student_number')->toArray();
-            break;
-
-        case 'MockScores':
-            $query = DB::table('student_mock_board_scores')
-                ->whereIn('batch_id', $batchIds)
-                ->where('is_active', 1);
-
-            if ($subField !== 'overall') {
-                $query->where('mock_subject_id', $subField);
-            }
-
-            $raw = $query->groupBy('batch_id')
-                ->selectRaw('batch_id, AVG(score) as value')
-                ->pluck('value', 'batch_id')->toArray();
-            
-            foreach($raw as $bId => $val) {
-                if(isset($batchToStudent[$bId])) $records[$batchToStudent[$bId]] = $val;
-            }
-            break;
-
-        case 'Licensure':
-            $raw = DB::table('student_licensure_exam') 
-                ->whereIn('batch_id', $batchIds)
-                ->whereIn('exam_result', ['PASSED', 'FAILED'])
-                ->where('is_active', 1)
-                ->pluck('exam_result', 'batch_id')->toArray();
-            
-            foreach($raw as $bId => $result) {
-                if(isset($batchToStudent[$bId])) {
-                    $records[$batchToStudent[$bId]] = strtoupper($result) === 'PASSED' ? 1.0 : 0.0;
-                }
-            }
-            break;
-
-        case 'PerformanceRating':
-            $query = DB::table('student_performance_rating') 
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1);
-
-            // Added subField check for individual criteria vs overall rating
-            if ($subField !== 'overall') {
-                $query->where('criteria_id', $subField); 
-            }
-
-            $records = $query->groupBy('student_number')
-                ->selectRaw('student_number, AVG(rating) as value') 
-                ->pluck('value', 'student_number')->toArray();
-            break;
-
-        case 'SimExam':
-            $query = DB::table('student_simulation_exam') 
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1);
-
-            if ($subField !== 'overall') {
-                $query->where('simulation_id', $subField); 
-            }
-
-            $records = $query->groupBy('student_number')
-                ->selectRaw('student_number, AVG(score) as value') 
-                ->pluck('value', 'student_number')->toArray();
-            break;
-
-        case 'Attendance':
-            $records = DB::table('student_attendance_reviews') 
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1)
-                ->groupBy('student_number')
-                ->selectRaw('student_number, AVG(sessions_attended) as value') 
-                ->pluck('value', 'student_number')->toArray();
-            break;
-
-        case 'Retakes':
-            $records = DB::table('student_back_subjects') 
-                ->whereIn('student_number', $studentNumbers)
-                ->where('is_active', 1)
-                ->groupBy('student_number')
-                ->selectRaw('student_number, SUM(terms_repeated) as value') 
-                ->pluck('value', 'student_number')->toArray();
-            break;
-    }
-
-    // Clean data while preserving student_number keys
-    return array_filter($records, function($val) {
-        return is_numeric($val) || (is_string($val) && strlen($val) > 0);
-    });
-}
-    /**
-     * This is the master endpoint that receives the request from StatToolModal.
-     */
     public function generate(Request $request)
     {
         try {
-            // 1. Accept the new range variables
             $filters = $request->only(['college', 'program', 'year_start', 'year_end']);
             $config = $request->except(['college', 'program', 'year_start', 'year_end']);
 
-            // 2. Query the students
+            // 🛠️ FIXED: Added `programs` join to safely filter by college & program
             $studentQuery = StudentInfo::query()
                 ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
+                ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
                 ->where('student_info.is_active', 1)
                 ->where('board_batch.is_active', 1)
-                ->where('student_info.college_id', $filters['college'])
-                ->where('student_info.program_id', $filters['program'])
+                ->where('programs.college_id', $filters['college'])
+                ->where('board_batch.program_id', $filters['program'])
                 ->whereBetween('board_batch.year', [$filters['year_start'], $filters['year_end']])
                 ->select('board_batch.batch_id', 'student_info.student_number');
 
             $batchStudents = $studentQuery->get();
 
             if ($batchStudents->isEmpty()) {
-                return response()->json(['error' => 'No students found in this range.'], 404);
+                return response()->json(['error' => 'No students found in this primary range.'], 404);
             }
 
-            // 3. Route to the correct statistical treatment
+            // Route to the correct statistical treatment
             if ($config['tool'] === 'descriptive') {
                 return $this->processDescriptive($batchStudents, $config);
             }
@@ -305,7 +107,7 @@ class ReportController extends Controller
                     case 'regression':
                         return $this->processRegression($batchStudents, $config);
                     case 'ttest_ind':
-                        return $this->processTTestIndependent($batchStudents, $config);
+                        return $this->processTTestIndependent($batchStudents, $config, $filters);
                     case 'ttest_dep':
                         return $this->processTTestDependent($batchStudents, $config);
                     case 'chi_sq_gof':
@@ -317,76 +119,89 @@ class ReportController extends Controller
                 }
             }
 
-        return response()->json(['error' => 'Invalid tool configuration.'], 400);
+            return response()->json(['error' => 'Invalid tool configuration.'], 400);
         } catch (\Exception $e) {
-            // THIS WILL CATCH THE CRASH AND SEND IT TO REACT
             return response()->json([
-                'error' => 'PHP Crash: ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')'
+                'error' => 'Calculation Error: ' . $e->getMessage()
             ], 500);
         }
     }
 
     // ==========================================
-    // STATISTICAL PROCESSING METHODS (Placeholders for now)
+    // STATISTICAL PROCESSING METHODS
     // ==========================================
 
     private function processDescriptive($students, $config)
     {
-        // 1. Extract the raw numerical data using our helper
-        $data = $this->extractMetricData($students, $config['descField'], $config['descSub']);
+        $dataAssoc = $this->extractMetricData($students, $config['descField'], $config['descSub']);
+        $data = array_values($dataAssoc);
 
-        $n = count($data);
-
-        // 2. Error handling if no data is found
-        if ($n === 0) {
-            return response()->json([
-                'success' => false,
-                'error' => 'No numerical data found for the selected variable in this batch.'
-            ], 404);
+        if (count($data) === 0) {
+            return response()->json(['error' => 'No numerical data found for the selected variable in this batch.'], 404);
         }
 
-        // 3. Perform the Math
-        $sum = array_sum($data);
-        $mean = $sum / $n;
+        $stats = StatisticsService::descriptive($data);
 
-        // Calculate Sample Variance and Standard Deviation
-        $sumOfSquares = 0.0;
-        foreach ($data as $value) {
-            $sumOfSquares += pow($value - $mean, 2);
-        }
-        
-        $variance = $n > 1 ? $sumOfSquares / ($n - 1) : 0.0;
-        $stdDev = sqrt($variance);
-
-        // Calculate Median
-        $sortedData = $data;
-        sort($sortedData);
-        $middle = floor($n / 2);
-        if ($n % 2 == 0) {
-            $median = ($sortedData[$middle - 1] + $sortedData[$middle]) / 2.0;
-        } else {
-            $median = $sortedData[$middle];
-        }
-
-        $min = min($data);
-        $max = max($data);
-
-        // 4. Return the beautifully formatted JSON response to React
         return response()->json([
             'success' => true,
             'title' => 'Descriptive Statistics Analysis',
             'variable_name' => $config['descFieldLabel'] . ($config['descSubLabel'] !== 'Overall ' . $config['descField'] ? ' - ' . $config['descSubLabel'] : ''),
+            'statistics' => $stats,
+            'raw_data' => $data,
+            'chart_type' => 'descriptive'
+        ]);
+    }
+
+    private function processPearsonR($students, $config)
+    {
+        $xData = $this->extractMetricData($students, $config['var1Field'], $config['var1Sub']);
+        $yData = $this->extractMetricData($students, $config['var2Field'], $config['var2Sub']);
+
+        $commonKeys = array_intersect_key($xData, $yData);
+        if (count($commonKeys) < 3) {
+            return response()->json(['error' => 'Pearson R requires at least 3 students with both scores.'], 400);
+        }
+        
+        $x = []; $y = []; $rawData = [];
+        foreach ($commonKeys as $key => $dummy) {
+            $x[] = (float)$xData[$key];
+            $y[] = (float)$yData[$key];
+            $rawData[] = ['x' => (float)$xData[$key], 'y' => (float)$yData[$key]];
+        }
+
+        $stats = StatisticsService::pearsonR($x, $y);
+        $regStats = StatisticsService::regression($x, $y); // 🧠 Generate Line data
+
+        $absR = abs($stats['R-Value']);
+        if ($absR >= 0.9) $interp = 'Very High';
+        elseif ($absR >= 0.7) $interp = 'High';
+        elseif ($absR >= 0.5) $interp = 'Moderate';
+        elseif ($absR >= 0.3) $interp = 'Low';
+        else $interp = 'Negligible';
+
+        $direction = $stats['R-Value'] < 0 ? 'Negative' : 'Positive';
+        $interpretation = $absR < 0.3 ? 'Negligible Correlation' : "$interp $direction Correlation";
+
+        return response()->json([
+            'success' => true,
+            'title' => 'Pearson R Correlation',
+            'variable_name' => $config['var1FieldLabel'] . ' vs ' . $config['var2FieldLabel'],
             'statistics' => [
-                'N (Sample Size)' => $n,
-                'Mean' => round($mean, 4),
-                'Median' => round($median, 4),
-                'Standard Deviation' => round($stdDev, 4),
-                'Variance' => round($variance, 4),
-                'Minimum' => round($min, 4),
-                'Maximum' => round($max, 4),
+                'N (Sample Size)' => count($x),
+                'Pearson r Value' => $stats['R-Value'],
+                'Degrees of Freedom' => $stats['Degrees of Freedom'],
+                'P-Value' => $stats['P-Value'],
+                'Interpretation' => $interpretation,
+                'Conclusion' => $stats['Significance']
             ],
-            // Sending raw data back is great for drawing charts (like histograms/boxplots) in React later!
-            'raw_data' => $data 
+            'raw_data' => $rawData,
+            'regression_line' => [ // 🧠 Activates the trendline in React!
+                'm' => $regStats['Slope (m)'],
+                'b' => $regStats['Intercept (b)'],
+                'minX' => $regStats['minX'],
+                'maxX' => $regStats['maxX'],
+            ],
+            'chart_type' => 'scatter'
         ]);
     }
 
@@ -396,228 +211,180 @@ class ReportController extends Controller
         $yData = $this->extractMetricData($students, $config['var2Field'], $config['var2Sub']);
 
         $commonKeys = array_intersect_key($xData, $yData);
-        $n = count($commonKeys);
-
-        if ($n < 2) {
-            return response()->json(['error' => 'Insufficient paired data for Regression.'], 400);
+        if (count($commonKeys) < 3) {
+            return response()->json(['error' => 'Regression requires at least 3 students with both scores.'], 400);
         }
-
-        $sumX = 0; $sumY = 0; $sumXY = 0; $sumX2 = 0; $sumY2 = 0;
-        $rawData = [];
-
+        
+        $x = []; $y = []; $rawData = [];
         foreach ($commonKeys as $key => $dummy) {
-            $x = (float) $xData[$key];
-            $y = (float) $yData[$key];
-            $sumX += $x; $sumY += $y;
-            $sumXY += ($x * $y);
-            $sumX2 += ($x * $x);
-            $sumY2 += ($y * $y);
-            $rawData[] = ['x' => $x, 'y' => $y];
+            $x[] = (float)$xData[$key];
+            $y[] = (float)$yData[$key];
+            $rawData[] = ['x' => (float)$xData[$key], 'y' => (float)$yData[$key]];
         }
 
-        // Regression Formula: y = mx + b
-        // Slope (m)
-        $slopeNumerator = ($n * $sumXY) - ($sumX * $sumY);
-        $slopeDenominator = ($n * $sumX2) - pow($sumX, 2);
-        $m = $slopeDenominator != 0 ? $slopeNumerator / $slopeDenominator : 0;
-
-        // Intercept (b)
-        $b = ($sumY - ($m * $sumX)) / $n;
-
-        // R-Squared (Coefficient of Determination)
-        $pearsonNumerator = $slopeNumerator;
-        $pearsonDenominator = sqrt(max(0, ($n * $sumX2 - pow($sumX, 2)) * ($n * $sumY2 - pow($sumY, 2))));
-        $r = $pearsonDenominator != 0 ? $pearsonNumerator / $pearsonDenominator : 0;
-        $rSquared = pow($r, 2);
-
-        $equation = "y = " . round($m, 4) . "x + " . round($b, 4);
+        $stats = StatisticsService::regression($x, $y);
 
         return response()->json([
             'success' => true,
             'title' => 'Linear Regression Analysis',
             'variable_name' => $config['var1FieldLabel'] . ' (X) vs ' . $config['var2FieldLabel'] . ' (Y)',
             'statistics' => [
-                'N (Sample Size)' => $n,
-                'Regression Equation' => $equation,
-                'Slope (m)' => round($m, 4),
-                'Y-Intercept (b)' => round($b, 4),
-                'R-Squared (R²)' => round($rSquared, 4),
-                'Strength' => round($rSquared * 100, 2) . "% of Y variation is explained by X",
+                'N (Sample Size)' => count($x),
+                'Regression Equation' => $stats['Equation'],
+                'Slope (m)' => $stats['Slope (m)'],
+                'Y-Intercept (b)' => $stats['Intercept (b)'],
+                'R-Squared (R²)' => $stats['R-Squared'],
+                'Strength' => round($stats['R-Squared'] * 100, 2) . "% of Y variation is explained by X",
             ],
             'raw_data' => $rawData,
             'regression_line' => [
-                'm' => $m,
-                'b' => $b,
-                'minX' => min(array_column($rawData, 'x')),
-                'maxX' => max(array_column($rawData, 'x')),
+                'm' => $stats['Slope (m)'],
+                'b' => $stats['Intercept (b)'],
+                'minX' => $stats['minX'],
+                'maxX' => $stats['maxX'],
             ],
             'chart_type' => 'regression' 
         ]);
     }
 
-    private function processTTestIndependent($students, $config)
+    private function processTTestIndependent($students, $config, $filters)
     {
-        $xData = $this->extractMetricData($students, $config['var1Field'], $config['var1Sub']); // Grouping Variable (X)
-        $yData = $this->extractMetricData($students, $config['var2Field'], $config['var2Sub']); // Continuous Score (Y)
+        $mode = $config['independent_mode'] ?? 'categories';
+        
+        $group1 = []; $group2 = [];
+        $group1Label = ""; $group2Label = "";
+        $variableName = "";
 
-        $commonKeys = array_intersect_key($xData, $yData);
+        if ($mode === 'batches') {
+            $dataA = $this->extractMetricData($students, $config['metric'], $config['sub_metric']);
+            $group1 = array_values($dataA);
+            $group1Label = "Batch {$config['group_a_start']}-{$config['group_a_end']}";
 
-        $group1 = [];
-        $group2 = [];
-        $group1Label = "Group A";
-        $group2Label = "Group B";
+            $groupBQuery = \App\Models\Student\StudentInfo::query()
+                ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
+                ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
+                ->where('student_info.is_active', 1)
+                ->where('board_batch.is_active', 1)
+                ->where('programs.college_id', $filters['college'])
+                ->where('board_batch.program_id', $filters['program'])
+                ->whereBetween('board_batch.year', [$config['group_b_start'], $config['group_b_end']])
+                ->select('board_batch.batch_id', 'student_info.student_number')
+                ->get();
 
-        // SMART SPLITTING LOGIC
-        // We need to split the Y scores into two groups based on the X variable
-        $uniqueX = array_unique($xData);
+            if ($groupBQuery->isEmpty()) throw new \Exception("No students found in Group B's batch range.");
 
-        if ($config['var1Field'] === 'Licensure') {
-            // Specifically handle Pass (1.0) vs Fail (0.0)
-            foreach ($commonKeys as $key => $dummy) {
-                if ($xData[$key] == 1.0) $group1[] = $yData[$key];
-                else $group2[] = $yData[$key];
-            }
-            $group1Label = "Passed Licensure";
-            $group2Label = "Failed Licensure";
-        } else if (count($uniqueX) > 2) {
-            // If X is continuous (like Retakes or Absences), split by > 0 and 0
-            foreach ($commonKeys as $key => $dummy) {
-                if ($xData[$key] > 0) $group1[] = $yData[$key];
-                else $group2[] = $yData[$key];
-            }
-            $group1Label = $config['var1FieldLabel'] . " (> 0)";
-            $group2Label = "Zero " . $config['var1FieldLabel'];
+            $dataB = $this->extractMetricData($groupBQuery, $config['metric'], $config['sub_metric']);
+            $group2 = array_values($dataB);
+            $group2Label = "Batch {$config['group_b_start']}-{$config['group_b_end']}";
+
+            $variableName = $config['var1FieldLabel'];
+
         } else {
-            // Generic 2-category split (e.g., Gender, Work Status)
-            $vals = array_values($uniqueX);
-            $val1 = $vals[0] ?? null;
-            $val2 = $vals[1] ?? null;
+            $xData = $this->extractMetricData($students, $config['var1Field'], $config['var1Sub']);
+            $yData = $this->extractMetricData($students, $config['var2Field'], $config['var2Sub']);
 
-            foreach ($commonKeys as $key => $dummy) {
-                // Use strtoupper to ensure "male" matches "MALE"
-                $currentX = strtoupper(trim($xData[$key]));
-                
-                if ($currentX === strtoupper(trim($val1))) {
-                    $group1[] = $yData[$key];
-                } else if ($currentX === strtoupper(trim($val2))) {
-                    $group2[] = $yData[$key];
+            $commonKeys = array_intersect_key($xData, $yData);
+            $uniqueX = array_unique($xData);
+
+            if ($config['var1Field'] === 'Licensure') {
+                foreach ($commonKeys as $key => $dummy) {
+                    if ($xData[$key] == 1.0) $group1[] = $yData[$key];
+                    else $group2[] = $yData[$key];
                 }
+                $group1Label = "Passed Licensure"; $group2Label = "Failed Licensure";
+            } else if (count($uniqueX) > 2) {
+                foreach ($commonKeys as $key => $dummy) {
+                    if ($xData[$key] > 0) $group1[] = $yData[$key];
+                    else $group2[] = $yData[$key];
+                }
+                $group1Label = $config['var1FieldLabel'] . " (> 0)"; $group2Label = "Zero " . $config['var1FieldLabel'];
+            } else {
+                $vals = array_values($uniqueX);
+                $val1 = $vals[0] ?? null; $val2 = $vals[1] ?? null;
+                foreach ($commonKeys as $key => $dummy) {
+                    $currentX = strtoupper(trim($xData[$key]));
+                    if ($currentX === strtoupper(trim($val1))) $group1[] = $yData[$key];
+                    else if ($currentX === strtoupper(trim($val2))) $group2[] = $yData[$key];
+                }
+                $group1Label = $val1 ?? "Group 1"; $group2Label = $val2 ?? "Group 2";
             }
-            $group1Label = $val1 ?? "Group 1";
-            $group2Label = $val2 ?? "Group 2";
+
+            $variableName = $config['var2FieldLabel'] . ' grouped by ' . $config['var1FieldLabel'];
         }
 
-        $n1 = count($group1);
-        $n2 = count($group2);
-
-        if ($n1 < 2 || $n2 < 2) {
-            return response()->json(['error' => "Not enough data to compare groups. $group1Label has $n1 records, $group2Label has $n2 records. Both need at least 2."], 400);
+        if (count($group1) < 2 || count($group2) < 2) {
+            return response()->json(['error' => "Not enough data to compare groups. {$group1Label} has " . count($group1) . " records, {$group2Label} has " . count($group2) . " records."], 400);
         }
 
-        // T-Test Mathematics
-        $mean1 = array_sum($group1) / $n1;
-        $mean2 = array_sum($group2) / $n2;
-
-        $ss1 = 0; foreach ($group1 as $y) $ss1 += pow($y - $mean1, 2);
-        $ss2 = 0; foreach ($group2 as $y) $ss2 += pow($y - $mean2, 2);
-
-        $var1 = $ss1 / ($n1 - 1);
-        $var2 = $ss2 / ($n2 - 1);
-
-        $df = $n1 + $n2 - 2;
-        $sp2 = ($ss1 + $ss2) / $df; // Pooled Variance
-        $se = sqrt($sp2 * ((1 / $n1) + (1 / $n2))); // Standard Error
-
-        $t = $se > 0 ? ($mean1 - $mean2) / $se : 0;
-
-        // Significance check (using standard 1.96 roughly for alpha 0.05 two-tailed)
-        // Note: For smaller sample sizes, this uses a generic approximation.
-        $criticalValue = $df > 30 ? 1.96 : 2.0; 
-        $isSignificant = abs($t) >= $criticalValue;
-        $interpretation = $isSignificant 
-            ? "Statistically Significant Difference (Reject Null)" 
-            : "No Statistically Significant Difference (Fail to Reject)";
+        $stats = StatisticsService::independentTTest($group1, $group2);
 
         return response()->json([
             'success' => true,
             'title' => 'Independent Samples T-Test',
-            'variable_name' => $config['var2FieldLabel'] . ' grouped by ' . $config['var1FieldLabel'],
+            'variable_name' => $variableName,
             'statistics' => [
-                'N (' . $group1Label . ')' => $n1,
-                'N (' . $group2Label . ')' => $n2,
-                'Mean (' . $group1Label . ')' => round($mean1, 4),
-                'Mean (' . $group2Label . ')' => round($mean2, 4),
-                't-Statistic' => round($t, 4),
-                'Degrees of Freedom (df)' => $df,
-                'Conclusion' => $interpretation
+                "N ({$group1Label})" => $stats['count1'],
+                "N ({$group2Label})" => $stats['count2'],
+                "Mean ({$group1Label})" => round($stats['mean1'], 4),
+                "Mean ({$group2Label})" => round($stats['mean2'], 4),
+                't-Statistic' => round($stats['t_score'], 4),
+                'Degrees of Freedom (df)' => round($stats['df'], 2),
+                'P-Value' => round($stats['p_value'], 4),
+                'Conclusion' => $stats['is_significant'] ? 'Statistically Significant Difference' : 'No Significant Difference'
             ],
-            'chart_type' => 'ttest_ind', // Flag for React
+            'chart_type' => 'ttest_ind',
             'chart_data' => [
                 'labels' => [$group1Label, $group2Label],
-                'means' => [$mean1, $mean2]
+                'means' => [$stats['mean1'], $stats['mean2']]
+            ],
+            'raw_data' => [ // 🧠 Sends raw points to React to draw the scatter overlay!
+                'group1' => $group1,
+                'group2' => $group2
             ]
         ]);
     }
 
     private function processTTestDependent($students, $config)
     {
-        $xData = $this->extractMetricData($students, $config['var1Field'], $config['var1Sub']);
-        $yData = $this->extractMetricData($students, $config['var2Field'], $config['var2Sub']);
+        $data1 = $this->extractMetricData($students, $config['metric'], $config['sub_metric'], $config['period_1']);
+        $data2 = $this->extractMetricData($students, $config['metric'], $config['sub_metric'], $config['period_2']);
 
-        // INTERSECT: Ensure we only use students who have both scores
-        $commonKeys = array_intersect_key($xData, $yData);
-        $n = count($commonKeys);
-
-        if ($n < 2) {
+        $commonKeys = array_intersect_key($data1, $data2);
+        
+        if (count($commonKeys) < 2) {
             return response()->json(['error' => 'Not enough paired observations for a Dependent T-Test.'], 400);
         }
 
-        $differences = [];
-        foreach ($commonKeys as $key => $dummy) {
-            $differences[] = (float)$yData[$key] - (float)$xData[$key];
+        $paired1 = []; $paired2 = [];
+        foreach ($commonKeys as $k => $d) {
+            $paired1[] = (float)$data1[$k];
+            $paired2[] = (float)$data2[$k];
         }
 
-        $meanX = array_sum($xData) / count($xData);
-        $meanY = array_sum($yData) / count($yData);
-        $sumDiff = array_sum($differences);
-        $meanDiff = $sumDiff / $n;
-
-        $sumSqDiff = 0;
-        foreach ($differences as $d) {
-            $sumSqDiff += pow($d - $meanDiff, 2);
-        }
-
-        $df = $n - 1;
-        $varianceDiff = $sumSqDiff / $df;
-        $sdDiff = sqrt($varianceDiff);
-        $se = $sdDiff / sqrt($n); // Standard Error of the Mean Difference
-
-        $t = $se > 0 ? $meanDiff / $se : 0;
-
-        // Significance check (Approximation for alpha 0.05)
-        $criticalValue = $df > 30 ? 2.042 : 2.145; // Basic t-table lookup approximation
-        $isSignificant = abs($t) >= $criticalValue;
-        $interpretation = $isSignificant 
-            ? "Significant Change/Difference Detected" 
-            : "No Significant Change Detected";
+        $stats = StatisticsService::dependentTTest($paired1, $paired2);
 
         return response()->json([
             'success' => true,
             'title' => 'Dependent (Paired) Samples T-Test',
-            'variable_name' => $config['var1FieldLabel'] . ' to ' . $config['var2FieldLabel'],
+            'variable_name' => "{$config['var1FieldLabel']} ({$config['period_1']} vs {$config['period_2']})",
             'statistics' => [
-                'N (Pairs)' => $n,
-                'Mean (Variable 1)' => round($meanX, 4),
-                'Mean (Variable 2)' => round($meanY, 4),
-                'Mean Difference' => round($meanDiff, 4),
-                't-Statistic' => round($t, 4),
-                'Degrees of Freedom (df)' => $df,
-                'Conclusion' => $interpretation
+                'N (Pairs)' => $stats['paired_count'],
+                "Mean ({$config['period_1']})" => round($stats['mean1'], 4),
+                "Mean ({$config['period_2']})" => round($stats['mean2'], 4),
+                'Mean Difference' => round($stats['mean2'] - $stats['mean1'], 4),
+                't-Statistic' => round($stats['t_score'], 4),
+                'Degrees of Freedom (df)' => $stats['df'],
+                'P-Value' => round($stats['p_value'], 4),
+                'Conclusion' => $stats['is_significant'] ? 'Significant Change/Difference Detected' : 'No Significant Change'
             ],
             'chart_type' => 'ttest_dep',
             'chart_data' => [
-                'labels' => [$config['var1FieldLabel'], $config['var2FieldLabel']],
-                'means' => [$meanX, $meanY]
+                'labels' => [$config['period_1'], $config['period_2']],
+                'means' => [$stats['mean1'], $stats['mean2']]
+            ],
+            'raw_data' => [ // 🧠 Sends raw points to React to draw the scatter overlay!
+                'group1' => $paired1,
+                'group2' => $paired2
             ]
         ]);
     }
@@ -628,67 +395,52 @@ class ReportController extends Controller
         $yData = $this->extractMetricData($students, $config['var2Field'], $config['var2Sub']);
 
         $commonKeys = array_intersect_key($xData, $yData);
-        $n = count($commonKeys);
+        if (count($commonKeys) < 5) return response()->json(['error' => 'Chi-Square requires a larger sample size (N >= 5).'], 400);
 
-        if ($n < 5) {
-            return response()->json(['error' => 'Chi-Square requires a larger sample size (N >= 5).'], 400);
-        }
-
-        // 1. Create Contingency Table (Observed Frequencies)
-        $observed = [];
-        $rows = []; // Unique values of X
-        $cols = []; // Unique values of Y
-
+        $matrix = [];
+        
         foreach ($commonKeys as $key => $dummy) {
             $r = $xData[$key];
             $c = $yData[$key];
             
-            // Format Licensure 1/0 back to Pass/Fail labels for readability
             if ($config['var1Field'] === 'Licensure') $r = $r == 1 ? 'PASSED' : 'FAILED';
             if ($config['var2Field'] === 'Licensure') $c = $c == 1 ? 'PASSED' : 'FAILED';
 
-            if (!isset($observed[$r][$c])) $observed[$r][$c] = 0;
-            $observed[$r][$c]++;
-            
-            $rows[$r] = ($rows[$r] ?? 0) + 1;
-            $cols[$c] = ($cols[$c] ?? 0) + 1;
+            if (!isset($matrix[$r][$c])) $matrix[$r][$c] = 0;
+            $matrix[$r][$c]++;
         }
 
-        // 2. Calculate Chi-Square Statistic
-        $chiSq = 0;
-        $expectedTable = [];
-        foreach ($rows as $rName => $rTotal) {
-            foreach ($cols as $cName => $cTotal) {
-                $exp = ($rTotal * $cTotal) / $n;
-                $obs = $observed[$rName][$cName] ?? 0;
-                
-                $chiSq += $exp > 0 ? pow($obs - $exp, 2) / $exp : 0;
-                $expectedTable[$rName][$cName] = round($exp, 2);
+        $stats = StatisticsService::chiSquareTOI($matrix);
+
+        $labels = array_keys($matrix);
+        $subCategories = [];
+        foreach ($matrix as $row) foreach (array_keys($row) as $col) $subCategories[$col] = true;
+        $subCategories = array_keys($subCategories);
+
+        $datasets = [];
+        foreach ($subCategories as $subCat) {
+            $dataPoints = [];
+            foreach ($labels as $mainCat) {
+                $dataPoints[] = $matrix[$mainCat][$subCat] ?? 0;
             }
+            $datasets[] = ['label' => $subCat, 'data' => $dataPoints];
         }
-
-        $df = (count($rows) - 1) * (count($cols) - 1);
-        $isSignificant = $chiSq > ($df == 1 ? 3.84 : 5.99); // Approx for alpha 0.05
 
         return response()->json([
             'success' => true,
             'title' => 'Chi-Square Test of Independence',
             'variable_name' => $config['var1FieldLabel'] . ' vs ' . $config['var2FieldLabel'],
             'statistics' => [
-                'N (Total Count)' => $n,
-                'Chi-Square Value' => round($chiSq, 4),
-                'Degrees of Freedom' => $df,
-                'Conclusion' => $isSignificant ? "Variables are Dependent (Significant)" : "Variables are Independent (Not Significant)"
+                'N (Total Count)' => count($commonKeys),
+                'Chi-Square Value' => round($stats['chi_square'], 4),
+                'Degrees of Freedom' => $stats['df'],
+                'P-Value' => round($stats['p_value'], 4),
+                'Conclusion' => $stats['is_significant'] ? "Variables are Dependent (Significant)" : "Variables are Independent (Not Significant)"
             ],
             'chart_type' => 'chi_sq',
             'chart_data' => [
-                'labels' => array_keys($cols),
-                'datasets' => array_map(function($rName) use ($observed, $cols) {
-                    return [
-                        'label' => $rName,
-                        'data' => array_map(fn($cName) => $observed[$rName][$cName] ?? 0, array_keys($cols))
-                    ];
-                }, array_keys($rows))
+                'labels' => $labels,
+                'datasets' => $datasets
             ]
         ]);
     }
@@ -696,69 +448,225 @@ class ReportController extends Controller
     private function processChiSquareGoF($students, $config)
     {
         $data = $this->extractMetricData($students, $config['var1Field'], $config['var1Sub']);
-        $observed = array_count_values($data);
-        $n = count($data);
         
-        // FIX: Define numCategories so $df doesn't crash
-        $numCategories = count($observed);
+        // Map 1.0 and 0.0 to PASSED and FAILED to match React Expected Ratios
+        if ($config['var1Field'] === 'Licensure') {
+            $data = array_map(function($val) {
+                return $val == 1.0 ? 'PASSED' : 'FAILED';
+            }, $data);
+        }
 
-        if ($n < 5 || $numCategories < 2) {
+        $observed = array_count_values($data);
+        
+        if (count($data) < 5 || count($observed) < 2) {
             return response()->json(['error' => 'Insufficient data or categories for Chi-Square GoF.'], 400);
         }
 
-        $chiSq = 0;
-        $userRatios = $config['expected_ratios'] ?? []; 
-
-        foreach ($observed as $cat => $obs) {
-            // Use user ratio if provided, otherwise default to equal split
-            $ratio = isset($userRatios[$cat]) ? (float)$userRatios[$cat] / 100 : 1 / $numCategories;
-            $exp = $n * $ratio;
-            
-            $chiSq += ($exp > 0) ? pow($obs - $exp, 2) / $exp : 0;
-        }
-
-        $df = $numCategories - 1;
-        
-        // Critical Value check (Approx for alpha 0.05)
-        // 1 df = 3.84, 2 df = 5.99, 3 df = 7.81
-        $criticalValue = ($df == 1) ? 3.84 : (($df == 2) ? 5.99 : 7.81);
-        $isSignificant = $chiSq > $criticalValue;
+        $stats = StatisticsService::chiSquareGOF($observed, $config['expected_ratios'] ?? []);
 
         return response()->json([
             'success' => true,
             'title' => 'Chi-Square Goodness of Fit',
             'variable_name' => $config['var1FieldLabel'],
             'statistics' => [
-                'N (Total)' => $n,
-                'Chi-Square Value' => round($chiSq, 4),
-                'Degrees of Freedom' => $df,
+                'N (Total)' => count($data),
+                'Chi-Square Value' => round($stats['chi_square'], 4),
+                'Degrees of Freedom' => $stats['df'],
+                'P-Value' => round($stats['p_value'], 4),
                 'Expected Distribution' => !empty($config['expected_ratios']) ? 'Custom Proportions' : 'Equal Split (Uniform)',
-                'Conclusion' => $isSignificant ? "Significant Deviation from Target" : "Fits Target Distribution"
+                'Conclusion' => $stats['is_significant'] ? "Significant Deviation from Target" : "Fits Target Distribution"
             ],
-            'chart_type' => 'bar',
+            'chart_type' => 'chi_sq_gof',
             'raw_data' => $observed 
         ]);
     }
 
+    // ==========================================
+    // DATA EXTRACTION HELPER
+    // ==========================================
+
+    private function extractMetricData($students, $field, $subField, $period = null)
+    {
+        $batchIds = $students->pluck('batch_id')->toArray();
+        $studentNumbers = $students->pluck('student_number')->toArray();
+        $batchToStudent = $students->pluck('student_number', 'batch_id')->toArray();
+        
+        $records = [];
+
+        switch ($field) {
+            case 'Gender':
+                $records = DB::table('student_info')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->pluck('student_sex', 'student_number')->toArray();
+                break;
+
+            case 'Age':
+                $records = DB::table('student_info')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->selectRaw('student_number, TIMESTAMPDIFF(YEAR, student_birthdate, CURDATE()) as age')
+                    ->pluck('age', 'student_number')->toArray();
+                break;
+
+            case 'Socioeconomic':
+                $records = DB::table('student_info')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->pluck('student_socioeconomic', 'student_number')->toArray();
+                break;
+
+            case 'WorkStatus':
+                $records = DB::table('student_info')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->pluck('student_work', 'student_number')->toArray();
+                break;
+
+            case 'GWA':
+                $query = DB::table('student_gwa')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1);
+
+                if ($subField !== 'overall') {
+                    // 🧠 NEW: Split the "1|1st" value back into two separate database filters!
+                    $parts = explode('|', $subField);
+                    if (count($parts) === 2) {
+                        $query->where('year_level', $parts[0])
+                              ->where('semester', $parts[1]);
+                    }
+                }
+
+                $records = $query->groupBy('student_number')
+                    ->selectRaw('student_number, AVG(gwa) as value')
+                    ->pluck('value', 'student_number')->toArray();
+                break;
+
+            case 'BoardGrades':
+                $query = DB::table('student_board_subjects_grades')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1);
+
+                if ($subField !== 'overall') {
+                    $query->where('subject_id', $subField); 
+                }
+
+                $records = $query->groupBy('student_number')
+                    ->selectRaw('student_number, AVG(subject_grade) as value')
+                    ->pluck('value', 'student_number')->toArray();
+                break;
+
+            case 'MockScores':
+                $query = DB::table('student_mock_board_scores')
+                    ->whereIn('batch_id', $batchIds)
+                    ->where('is_active', 1);
+
+                if ($subField !== 'overall') {
+                    $query->where('mock_subject_id', $subField);
+                }
+                
+                if ($period) {
+                    $query->where('exam_period', $period);
+                }
+
+                $raw = $query->groupBy('batch_id')
+                    ->selectRaw('batch_id, AVG(score) as value')
+                    ->pluck('value', 'batch_id')->toArray();
+                
+                foreach($raw as $bId => $val) {
+                    if(isset($batchToStudent[$bId])) $records[$batchToStudent[$bId]] = $val;
+                }
+                break;
+
+            case 'Licensure':
+                $raw = DB::table('student_licensure_exam') 
+                    ->whereIn('batch_id', $batchIds)
+                    ->whereIn('exam_result', ['PASSED', 'FAILED'])
+                    ->where('is_active', 1)
+                    ->pluck('exam_result', 'batch_id')->toArray();
+                
+                foreach($raw as $bId => $result) {
+                    if(isset($batchToStudent[$bId])) {
+                        $records[$batchToStudent[$bId]] = strtoupper($result) === 'PASSED' ? 1.0 : 0.0;
+                    }
+                }
+                break;
+
+            case 'PerformanceRating':
+                $query = DB::table('student_performance_rating') 
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1);
+
+                if ($subField !== 'overall') {
+                    $query->where('category_id', $subField); 
+                }
+
+                $records = $query->groupBy('student_number')
+                    ->selectRaw('student_number, AVG(rating) as value') 
+                    ->pluck('value', 'student_number')->toArray();
+                break;
+
+            case 'SimExam':
+                $query = DB::table('student_simulation_exam') 
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1);
+
+                if ($subField !== 'overall') {
+                    $query->where('simulation_id', $subField); 
+                }
+                
+                if ($period) {
+                    $query->where('exam_period', $period);
+                }
+
+                $records = $query->groupBy('student_number')
+                    ->selectRaw('student_number, AVG(student_score) as value') 
+                    ->pluck('value', 'student_number')->toArray();
+                break;
+
+            case 'Attendance':
+                $records = DB::table('student_attendance_reviews') 
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->groupBy('student_number')
+                    ->selectRaw('student_number, AVG(sessions_attended) as value') 
+                    ->pluck('value', 'student_number')->toArray();
+                break;
+
+            case 'Retakes':
+                $records = DB::table('student_back_subjects') 
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->groupBy('student_number')
+                    ->selectRaw('student_number, SUM(terms_repeated) as value') 
+                    ->pluck('value', 'student_number')->toArray();
+                break;
+        }
+
+        return array_filter($records, function($val) {
+            return is_numeric($val) || (is_string($val) && strlen($val) > 0);
+        });
+    }
+
     public function getCategories(Request $request)
     {
-        // Use input() with defaults to prevent "Undefined array key" crashes
         $collegeId = $request->input('college');
         $programId = $request->input('program');
-        $yearStart = $request->input('year_start');
-        $yearEnd   = $request->input('year_end');
+        $yearStart = $request->input('year_start') ?? $request->input('startYear');
+        $yearEnd   = $request->input('year_end') ?? $request->input('endYear');
         $field     = $request->input('field');
         $subField  = $request->input('subField', 'overall');
 
-        if (!$collegeId || !$programId) {
+        if (!$collegeId || !$programId || !$yearStart || !$yearEnd) {
             return response()->json(['categories' => []]);
         }
 
-        // Query the students
+        // 🛠️ FIXED: Added `programs` join to safely filter by college & program
         $students = \App\Models\Student\StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
-            ->where('student_info.college_id', $collegeId)
-            ->where('student_info.program_id', $programId)
+            ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
+            ->where('programs.college_id', $collegeId)
+            ->where('board_batch.program_id', $programId)
             ->whereBetween('board_batch.year', [$yearStart, $yearEnd])
             ->get();
 
@@ -767,9 +675,16 @@ class ReportController extends Controller
         }
 
         $data = $this->extractMetricData($students, $field, $subField);
-        
-        // Get unique non-empty values
-        $uniqueCategories = array_values(array_unique(array_filter($data)));
+
+        if ($field === 'Licensure') {
+            $data = array_map(function($val) {
+                return $val == 1.0 ? 'PASSED' : 'FAILED';
+            }, $data);
+        }
+
+        $uniqueCategories = array_values(array_unique(array_filter($data, function($val) {
+            return $val !== null && $val !== '';
+        })));
 
         return response()->json(['categories' => $uniqueCategories]);
     }

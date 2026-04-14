@@ -14,6 +14,7 @@ class StudentMockBoardScore extends Model
         'batch_id',
         'mock_subject_id',
         'score', // Changed to single score
+        'exam_period',
         'date_created',
         'is_active',
     ];

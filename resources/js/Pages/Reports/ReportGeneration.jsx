@@ -256,285 +256,299 @@ export default function GenerateReport(props) {
     };
 
     const handleGenerate = async (config) => {
-        setIsGenerating(true);
-        try {
-            const payload = { ...filters, ...config };
-            const response = await axios.post(route('report.generate'), payload);
+            setIsGenerating(true);
+            try {
+                const payload = { ...filters, ...config };
+                const response = await axios.post(route('report.generate'), payload);
 
-            if (response.data.success) {
-                const res = response.data;
+                if (response.data.success) {
+                    const res = response.data;
 
-                // 1. Map Statistics for the Summary Table
-                const statsArray = Object.entries(res.statistics).map(([key, value]) => ({
-                    metric: key, 
-                    val: value.toString()
-                }));
-
-                let datasetArray = [];
-                let chartConfig = {};
-
-                // 2. Determine Chart Type and Data Structure
-                if (res.chart_type === 'regression') {
-                    // --- REGRESSION LOGIC ---
-                    const { m, b, minX, maxX } = res.regression_line;
-                    
-                    const lineData = [
-                        { x: minX, y: m * minX + b },
-                        { x: maxX, y: m * maxX + b }
-                    ];
-
-                    datasetArray = res.raw_data.map((pt, i) => ({ 
-                        label: `Student ${i + 1}`, val: `X: ${pt.x}, Y: ${pt.y}` 
+                    // 1. Map Statistics for the Summary Table
+                    const statsArray = Object.entries(res.statistics).map(([key, value]) => ({
+                        metric: key, 
+                        val: value.toString()
                     }));
 
-                    chartConfig = {
-                        chartType: "scatter", 
-                        chartData: {
-                            datasets: [
-                                {
-                                    label: "Regression Line",
-                                    data: lineData,
-                                    type: 'line', 
-                                    borderColor: '#5c297c',
-                                    borderWidth: 2,
-                                    fill: false,
-                                    pointRadius: 0, 
-                                    showLine: true
+                    let datasetArray = [];
+                    let chartConfig = {};
+
+                    // 2. Determine Chart Type and Data Structure
+                    if (res.chart_type === 'regression' || res.chart_type === 'scatter') {
+                        // --- PEARSON R & REGRESSION LOGIC (Scatter + Trendline) ---
+                        datasetArray = res.raw_data.map((pt, i) => ({ 
+                            label: `Student ${i + 1}`, val: `X: ${pt.x}, Y: ${pt.y}` 
+                        }));
+
+                        const datasets = [];
+
+                        // If Regression Line data is provided, draw the purple trendline
+                        if (res.regression_line) {
+                            const { m, b, minX, maxX } = res.regression_line;
+                            datasets.push({
+                                label: "Trendline",
+                                data: [ { x: minX, y: m * minX + b }, { x: maxX, y: m * maxX + b } ],
+                                type: 'line', 
+                                borderColor: '#5c297c',
+                                borderWidth: 3,
+                                fill: false,
+                                pointRadius: 0, 
+                                showLine: true
+                            });
+                        }
+
+                        // Add the raw scatter dots
+                        datasets.push({
+                            label: "Student Data",
+                            data: res.raw_data,
+                            type: 'scatter',
+                            backgroundColor: "#ffb736",
+                            borderColor: "#d97706",
+                            borderWidth: 1,
+                            pointRadius: 5,
+                            pointHoverRadius: 7
+                        });
+
+                        chartConfig = {
+                            chartType: "scatter", 
+                            chartData: { datasets },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    x: { 
+                                        type: 'linear', 
+                                        position: 'bottom', 
+                                        title: { display: true, text: res.variable_name.split(' vs ')[0] },
+                                        ticks: { beginAtZero: false }
+                                    },
+                                    y: { 
+                                        type: 'linear', 
+                                        title: { display: true, text: res.variable_name.split(' vs ')[1] },
+                                        ticks: { beginAtZero: false }
+                                    }
                                 },
-                                {
-                                    label: "Actual Data Points",
-                                    data: res.raw_data,
-                                    type: 'scatter',
-                                    backgroundColor: "#ffb736",
-                                    pointRadius: 5
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                x: { 
-                                    type: 'linear', 
-                                    position: 'bottom', 
-                                    title: { display: true, text: res.variable_name.split(' vs ')[0] },
-                                    ticks: { beginAtZero: false } // Fixes zoom
-                                },
-                                y: { 
-                                    type: 'linear', 
-                                    title: { display: true, text: res.variable_name.split(' vs ')[1] },
-                                    ticks: { beginAtZero: false } // Fixes zoom
-                                }
+                                plugins: { legend: { display: true, position: 'top' } }
                             }
-                        }
-                    };
+                        };
 
-                } else if (res.chart_type === 'ttest_ind' || res.chart_type === 'ttest_dep') {
-                    // --- INDEPENDENT T-TEST LOGIC ---
-                    datasetArray = res.chart_data.labels.map((label, i) => ({
-                        label: label,
-                        val: `Mean: ${res.chart_data.means[i].toFixed(4)}`
-                    }));
+                    } else if (res.chart_type === 'ttest_ind' || res.chart_type === 'ttest_dep') {
+                        // --- T-TEST LOGIC (Bar + Scatter Overlay) ---
+                        datasetArray = res.chart_data.labels.map((label, i) => ({
+                            label: label,
+                            val: `Mean: ${res.chart_data.means[i].toFixed(4)}`
+                        }));
 
-                    chartConfig = {
-                        chartType: "bar",
-                        chartData: {
-                            labels: res.chart_data.labels,
-                            datasets: [{
-                                label: "Group Mean",
-                                data: res.chart_data.means,
-                                // Use your college colors for the bars!
-                                backgroundColor: ["#5c297c", "#ffb736"], 
+                        // 1. Draw the Means as semi-transparent bars
+                        const datasets = [{
+                            type: 'bar',
+                            label: "Group Mean",
+                            data: res.chart_data.means,
+                            backgroundColor: ["rgba(92, 41, 124, 0.5)", "rgba(255, 183, 54, 0.5)"], 
+                            borderColor: ["#5c297c", "#ffb736"],
+                            borderWidth: 2,
+                            barPercentage: 0.6
+                        }];
+
+                        // 2. Overlay individual student scores as jittered dots
+                        if (res.raw_data && res.raw_data.group1 && res.raw_data.group2) {
+                            const jitter = () => (Math.random() - 0.5) * 0.3; // Spread dots horizontally
+                            
+                            // X axis is categorical (Index 0 = Group 1, Index 1 = Group 2)
+                            const scatter1 = res.raw_data.group1.map(val => ({ x: 0 + jitter(), y: parseFloat(val) }));
+                            const scatter2 = res.raw_data.group2.map(val => ({ x: 1 + jitter(), y: parseFloat(val) }));
+
+                            datasets.push({
+                                type: 'scatter', 
+                                label: res.chart_data.labels[0] + " Scores",
+                                data: scatter1, 
+                                backgroundColor: "#5c297c", 
+                                pointRadius: 4, 
+                                borderColor: "#fff", 
                                 borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    title: { display: true, text: 'Mean Score' }
-                                },
-                                x: {
-                                    title: { display: true, text: 'Compared Groups' }
-                                }
-                            },
-                            plugins: { legend: { display: false } }
+                            });
+                            
+                            datasets.push({
+                                type: 'scatter', 
+                                label: res.chart_data.labels[1] + " Scores",
+                                data: scatter2, 
+                                backgroundColor: "#ffb736", 
+                                pointRadius: 4, 
+                                borderColor: "#fff", 
+                                borderWidth: 1
+                            });
                         }
-                    };
 
-                } else if (res.chart_type === 'chi_sq') {
-                    // --- CHI-SQUARE LOGIC ---
-                    datasetArray = res.chart_data.datasets.flatMap(ds => 
-                        ds.data.map((val, i) => ({
-                            label: `${ds.label} - ${res.chart_data.labels[i]}`,
-                            val: `${val} students`
-                        }))
-                    );
+                        // 3. Connect the means with a dashed line for Dependent T-Test
+                        if (res.chart_type === 'ttest_dep') {
+                            datasets.push({
+                                type: 'line', 
+                                label: "Mean Change Trajectory",
+                                data: res.chart_data.means, 
+                                borderColor: '#374151', 
+                                borderWidth: 2,
+                                borderDash: [5, 5], 
+                                fill: false, 
+                                pointRadius: 6, 
+                                pointBackgroundColor: '#374151'
+                            });
+                        }
 
-                    chartConfig = {
-                        chartType: "bar",
-                        chartData: {
-                            labels: res.chart_data.labels,
-                            datasets: res.chart_data.datasets.map((ds, i) => ({
-                                ...ds,
-                                backgroundColor: i === 0 ? "#5c297c" : "#ffb736"
+                        chartConfig = {
+                            chartType: "bar",
+                            chartData: {
+                                labels: res.chart_data.labels,
+                                datasets: datasets
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: 'Score' }
+                                    },
+                                    x: {
+                                        title: { display: true, text: 'Compared Groups' }
+                                    }
+                                },
+                                plugins: { legend: { display: true, position: 'top' } }
+                            }
+                        };
+
+                    } else if (res.chart_type === 'chi_sq') {
+                        // --- CHI-SQUARE LOGIC ---
+                        datasetArray = res.chart_data.datasets.flatMap(ds => 
+                            ds.data.map((val, i) => ({
+                                label: `${ds.label} - ${res.chart_data.labels[i]}`,
+                                val: `${val} students`
                             }))
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                x: { stacked: true },
-                                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Student Count' } }
-                            }
-                        }
-                    };
-                } else if (res.title.includes('Goodness of Fit')) {
-                    // --- CHI-SQUARE GOODNESS OF FIT LOGIC ---
-                    const categories = Object.keys(res.raw_data);
-                    const counts = Object.values(res.raw_data);
+                        );
 
-                    datasetArray = categories.map((cat, i) => ({
-                        label: cat,
-                        val: `${counts[i]} students`
-                    }));
-
-                    chartConfig = {
-                        chartType: "bar",
-                        chartData: {
-                            labels: categories,
-                            datasets: [{
-                                label: "Observed Frequency",
-                                data: counts,
-                                backgroundColor: "#5c297c",
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: { beginAtZero: true, title: { display: true, text: 'Count' } }
-                            }
-                        }
-                    };
-
-                } else if (res.chart_type === 'scatter') {
-                    // --- PEARSON R LOGIC ---
-                    datasetArray = res.raw_data.map((pt, i) => ({ 
-                        label: `Student ${i + 1}`, 
-                        val: `X: ${pt.x}, Y: ${pt.y}` 
-                    }));
-                    
-                    chartConfig = {
-                        chartType: "scatter",
-                        chartData: {
-                            datasets: [{
-                                label: res.variable_name,
-                                data: res.raw_data,
-                                backgroundColor: "#ffb736",
-                                pointRadius: 6,
-                                pointHoverRadius: 8,
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                x: {
-                                    type: 'linear',
-                                    position: 'bottom',
-                                    title: { display: true, text: res.variable_name.split(' vs ')[0] },
-                                    ticks: { beginAtZero: false }
-                                },
-                                y: {
-                                    type: 'linear',
-                                    title: { display: true, text: res.variable_name.split(' vs ')[1] },
-                                    ticks: { beginAtZero: false }
-                                }
+                        chartConfig = {
+                            chartType: "bar",
+                            chartData: {
+                                labels: res.chart_data.labels,
+                                datasets: res.chart_data.datasets.map((ds, i) => ({
+                                    ...ds,
+                                    backgroundColor: i === 0 ? "#5c297c" : "#ffb736"
+                                }))
                             },
-                            plugins: {
-                                tooltip: {
-                                    callbacks: { label: (context) => `Student: (${context.raw.x}, ${context.raw.y})` }
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    x: { stacked: true },
+                                    y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Student Count' } }
                                 }
                             }
-                        }
-                    };
+                        };
+                    } else if (res.chart_type === 'chi_sq_gof' || res.title.includes('Goodness of Fit')) {
+                        // --- CHI-SQUARE GOODNESS OF FIT LOGIC ---
+                        const categories = Object.keys(res.raw_data);
+                        const counts = Object.values(res.raw_data);
 
-                } else {
-                    // --- DESCRIPTIVE STATISTICS LOGIC ---
-                    // If raw_data is an object { "stu_001": 1.5 }, convert it to an array [1.5]
-                    const rawDataRaw = res.raw_data;
-                    const raw = Array.isArray(rawDataRaw) ? rawDataRaw : Object.values(rawDataRaw);
+                        datasetArray = categories.map((cat, i) => ({
+                            label: cat,
+                            val: `${counts[i]} students`
+                        }));
 
-                    const min = parseFloat(res.statistics.Minimum);
-                    const max = parseFloat(res.statistics.Maximum);
-                    
-                    // Now forEach will work because 'raw' is guaranteed to be an array
-                    const binCount = 7;
-                    const range = max - min;
-                    const binSize = range > 0 ? range / binCount : 1;
+                        chartConfig = {
+                            chartType: "bar",
+                            chartData: {
+                                labels: categories,
+                                datasets: [{
+                                    label: "Observed Frequency",
+                                    data: counts,
+                                    backgroundColor: "#5c297c",
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: { beginAtZero: true, title: { display: true, text: 'Count' } }
+                                },
+                                plugins: { legend: { display: false } }
+                            }
+                        };
 
-                    const bins = Array.from({ length: binCount }, (_, i) => {
-                        const start = min + i * binSize;
-                        const end = i === binCount - 1 ? max : min + (i + 1) * binSize;
-                        return { start, end, label: `${start.toFixed(2)} - ${end.toFixed(2)}`, count: 0 };
-                    });
+                    } else {
+                        // --- DESCRIPTIVE STATISTICS LOGIC ---
+                        const rawDataRaw = res.raw_data;
+                        const raw = Array.isArray(rawDataRaw) ? rawDataRaw : Object.values(rawDataRaw);
 
-                    raw.forEach(val => {
-                        const numVal = parseFloat(val);
-                        if (numVal === max) bins[binCount - 1].count++;
-                        else {
-                            const index = Math.floor((numVal - min) / binSize);
-                            const safeIndex = Math.max(0, Math.min(binCount - 1, index));
-                            bins[safeIndex].count++;
-                        }
-                    });
+                        const min = parseFloat(res.statistics.Minimum);
+                        const max = parseFloat(res.statistics.Maximum);
+                        
+                        const binCount = 7;
+                        const range = max - min;
+                        const binSize = range > 0 ? range / binCount : 1;
 
-                    datasetArray = bins.map(b => ({ label: b.label, val: b.count.toString() }));
-                    chartConfig = {
-                        chartType: "bar",
-                        chartData: {
-                            labels: bins.map(b => b.label),
-                            datasets: [{
-                                label: "Frequency",
-                                data: bins.map(b => b.count),
-                                backgroundColor: "#5c297c",
-                            }]
-                        }
-                    };
-                }
+                        const bins = Array.from({ length: binCount }, (_, i) => {
+                            const start = min + i * binSize;
+                            const end = i === binCount - 1 ? max : min + (i + 1) * binSize;
+                            return { start, end, label: `${start.toFixed(2)} - ${end.toFixed(2)}`, count: 0 };
+                        });
 
-            // 3. Final Report Assembly
-            const now = new Date();
-            const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-                    
-            const isGoF = res.title.includes('Goodness of Fit');
-            const expectedInfo = isGoF && config.expected_ratios 
-                ? `\nExpected: ${Object.entries(config.expected_ratios).map(([k, v]) => `${k}: ${v}%`).join(', ')}`
-                : '';
+                        raw.forEach(val => {
+                            const numVal = parseFloat(val);
+                            if (numVal === max) bins[binCount - 1].count++;
+                            else {
+                                const index = Math.floor((numVal - min) / binSize);
+                                const safeIndex = Math.max(0, Math.min(binCount - 1, index));
+                                bins[safeIndex].count++;
+                            }
+                        });
 
-            setReportData({
-                title: "BRIDGE Statistical Report",
-                timestamp: timestamp,
-                tool: res.title,
-                fields: res.variable_name + expectedInfo, // Adds the target percentages to the title area
-                metricName: res.variable_name,
-                tableData: { dataset: datasetArray, stats: statsArray },
-                ...chartConfig
-            });
+                        datasetArray = bins.map(b => ({ label: b.label, val: b.count.toString() }));
+                        chartConfig = {
+                            chartType: "bar",
+                            chartData: {
+                                labels: bins.map(b => b.label),
+                                datasets: [{
+                                    label: "Frequency",
+                                    data: bins.map(b => b.count),
+                                    backgroundColor: "#5c297c",
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } }
+                            }
+                        };
+                    }
 
-            setIsStatModalOpen(false);
+                // 3. Final Report Assembly
+                const now = new Date();
+                const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+                        
+                const isGoF = res.title && res.title.includes('Goodness of Fit');
+                const expectedInfo = isGoF && config.expected_ratios 
+                    ? `\nExpected: ${Object.entries(config.expected_ratios).map(([k, v]) => `${k}: ${v}%`).join(', ')}`
+                    : '';
+
+                setReportData({
+                    title: "BRIDGE Statistical Report",
+                    timestamp: timestamp,
+                    tool: res.title,
+                    fields: res.variable_name + expectedInfo,
+                    metricName: res.variable_name,
+                    tableData: { dataset: datasetArray, stats: statsArray },
+                    ...chartConfig
+                });
+
+                setIsStatModalOpen(false);
+            }
+        } catch (error) {
+            console.error("Report Error:", error);
+            alert(error.response?.data?.error || "An error occurred during calculation.");
+        } finally {
+            setIsGenerating(false);
         }
-    } catch (error) {
-        console.error("Report Error:", error);
-        alert(error.response?.data?.error || "An error occurred during calculation.");
-    } finally {
-        setIsGenerating(false);
-    }
-};
+    };
 
     return (
         <AuthenticatedLayout>

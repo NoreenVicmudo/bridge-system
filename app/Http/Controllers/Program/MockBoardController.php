@@ -35,7 +35,6 @@ class MockBoardController extends Controller
         $subjects = MockSubject::where('program_id', $program)->where('is_active', 1)->get();
         $subjectHeaders = $subjects->pluck('mock_subject_name')->toArray();
 
-        // 🛠️ FIXED: Added `programs` join to protect `college_id` filter
         $query = StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
             ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
@@ -65,7 +64,12 @@ class MockBoardController extends Controller
         $query->orderBy($sortColumn, $sortDirection);
         $batches = $query->paginate(10)->withQueryString();
 
-        $scores = StudentMockBoardScore::whereIn('batch_id', $batches->pluck('batch_id'))->where('is_active', 1)->get()->groupBy('batch_id');
+        // 🧠 FETCH SCORES BASED ON EXAM PERIOD
+        $period = $request->get('exam_period', 'Default');
+
+        $scores = StudentMockBoardScore::whereIn('batch_id', $batches->pluck('batch_id'))
+            ->where('exam_period', $period) // <-- 🧠 EXAM PERIOD FILTER
+            ->where('is_active', 1)->get()->groupBy('batch_id');
 
         $batches->getCollection()->transform(function ($batch) use ($scores, $subjects) {
             $batchScores = $scores->get($batch->batch_id) ?? collect();
@@ -77,7 +81,7 @@ class MockBoardController extends Controller
             return ['batch_id' => $batch->batch_id, 'student_number' => $batch->student_number, 'name' => "{$batch->student_lname}, {$batch->student_fname}", 'scores' => $scoreMap];
         });
 
-        $activeFilter = ['college' => $college, 'program' => $program, 'calendar_year' => $year, 'batch_number' => $batchNumber];
+        $activeFilter = ['college' => $college, 'program' => $program, 'calendar_year' => $year, 'batch_number' => $batchNumber, 'exam_period' => $period];
 
         return Inertia::render('Program/MockBoardScores', [
             'students' => ['data' => $batches, 'subjects' => $subjectHeaders],
@@ -89,6 +93,8 @@ class MockBoardController extends Controller
 
     public function edit(Request $request)
     {
+        $examPeriod = $request->query('exam_period', 'Default'); // <-- 🧠 GRAB PERIOD FROM URL
+
         if ($request->has('batch_id')) {
             $batchQuery = BoardBatch::where('batch_id', $request->query('batch_id'));
         } else {
@@ -99,7 +105,7 @@ class MockBoardController extends Controller
         }
 
         $batch = $batchQuery->join('student_info', 'board_batch.student_number', '=', 'student_info.student_number')
-            ->select('board_batch.batch_id', 'board_batch.program_id', 'student_info.student_number', 'student_info.student_lname', 'student_info.student_fname')
+            ->select('board_batch.batch_id', 'board_batch.program_id', 'student_info.student_number', 'student_info.student_lname as lname', 'student_info.student_fname as fname')
             ->firstOrFail();
 
         // 🔒 THE BOUNCER
@@ -107,12 +113,16 @@ class MockBoardController extends Controller
         $this->authorizeStudentAccess($request->user(), $student, $batch->program_id);
 
         $subjects = MockSubject::where('program_id', $batch->program_id)->where('is_active', 1)->get()->map(fn($s) => ['value' => $s->mock_subject_id, 'label' => $s->mock_subject_name]);
-        $scores = StudentMockBoardScore::where('batch_id', $batch->batch_id)->where('is_active', 1)->pluck('score', 'mock_subject_id');
+        
+        $scores = StudentMockBoardScore::where('batch_id', $batch->batch_id)
+            ->where('exam_period', $examPeriod) // <-- 🧠 FILTER SCORES BY PERIOD
+            ->where('is_active', 1)->pluck('score', 'mock_subject_id');
 
         return Inertia::render('Program/MockScoresEntry', [
             'student'        => $batch,
             'subjectOptions' => $subjects,
             'currentScores'  => $scores,
+            'examPeriod'     => $examPeriod, // <-- 🧠 PASS TO FRONTEND
         ]);
     }
 
@@ -121,21 +131,27 @@ class MockBoardController extends Controller
         $validated = $request->validate([
             'mock_subject_id' => 'required|integer|exists:mock_subjects,mock_subject_id',
             'score'           => 'required|numeric|min:0|max:100',
+            'exam_period'     => 'required|string|max:50', // <-- 🧠 VALIDATE PERIOD
         ]);
 
         $batch = BoardBatch::findOrFail($batchId);
         $student = StudentInfo::where('student_number', $batch->student_number)->first();
+        $subject = MockSubject::findOrFail($validated['mock_subject_id']);
 
         // 🔒 THE BOUNCER
-        $this->authorizeStudentAccess($request->user(), $student, $batch->program_id);
+        $this->authorizeStudentAccess($request->user(), $student, $subject->program_id);
 
         StudentMockBoardScore::updateOrCreate(
-            ['batch_id' => $batchId, 'mock_subject_id' => $validated['mock_subject_id']],
+            [
+                'batch_id' => $batchId, 
+                'mock_subject_id' => $validated['mock_subject_id'],
+                'exam_period' => $validated['exam_period'] // <-- 🧠 ADD TO UNIQUE KEY
+            ],
             ['score' => $validated['score'], 'date_created' => now(), 'is_active' => 1]
         );
 
         // 📝 AUDIT LOG
-        AuditService::logStudentProgram($student->student_number, "Updated Mock Board Score (Subject ID: {$validated['mock_subject_id']}) to {$validated['score']}");
+        AuditService::logStudentAcademic($student->student_number, "Updated {$validated['exam_period']} Mock Board Score for {$subject->mock_subject_name} to {$validated['score']}%");
 
         return redirect()->back()->with('success', 'Mock board score updated.');
     }
@@ -146,6 +162,7 @@ class MockBoardController extends Controller
         $program = $request->input('program') ?? $request->input('batch_program');
         $year = $request->input('calendar_year') ?? $request->input('batch_year');
         $batchNumber = $request->input('batch_number') ?? $request->input('board_batch');
+        $period = $request->input('exam_period', 'Default'); // <-- 🧠 GRAB PERIOD
 
         $subjects = MockSubject::where('program_id', $program)->where('is_active', 1)->get();
         
@@ -162,7 +179,9 @@ class MockBoardController extends Controller
             ->distinct()
             ->get();
 
-        $scores = StudentMockBoardScore::whereIn('batch_id', $batches->pluck('batch_id'))->where('is_active', 1)->get()->groupBy('batch_id');
+        $scores = StudentMockBoardScore::whereIn('batch_id', $batches->pluck('batch_id'))
+            ->where('exam_period', $period) // <-- 🧠 EXPORT SPECIFIC PERIOD
+            ->where('is_active', 1)->get()->groupBy('batch_id');
         
         $headers = ['Student Number', 'Student Name'];
         foreach ($subjects as $sub) $headers[] = $sub->mock_subject_name . " (%)";
@@ -182,7 +201,7 @@ class MockBoardController extends Controller
             fclose($file);
         };
 
-        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=MockBoard_Export.csv"]);
+        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=MockBoard_{$period}_Export.csv"]);
     }
 
     public function import(Request $request)
@@ -193,6 +212,7 @@ class MockBoardController extends Controller
         $program = $request->input('filter.program') ?? $request->input('filter.batch_program');
         $year = $request->input('filter.calendar_year') ?? $request->input('filter.batch_year');
         $batchNumber = $request->input('filter.batch_number') ?? $request->input('filter.board_batch');
+        $examPeriod = $request->input('filter.exam_period') ?? 'Default'; // <-- 🧠 GRAB PERIOD
 
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         $headers = fgetcsv($handle);
@@ -229,12 +249,16 @@ class MockBoardController extends Controller
                 $scoreValue = $row[$col['index']] ?? null;
                 if ($scoreValue !== null && $scoreValue !== '') {
                     StudentMockBoardScore::updateOrCreate(
-                        ['batch_id' => $batch->batch_id, 'mock_subject_id' => $col['mock_subject_id']],
+                        [
+                            'batch_id' => $batch->batch_id, 
+                            'mock_subject_id' => $col['mock_subject_id'],
+                            'exam_period' => $examPeriod // <-- 🧠 ADD TO UNIQUE KEY
+                        ],
                         ['score' => (float)$scoreValue, 'date_created' => $now, 'is_active' => 1]
                     );
 
                     // 📝 AUDIT LOG
-                    AuditService::logStudentProgram($studentNumber, "Imported CSV Mock Board Score for Subject ID: {$col['mock_subject_id']}");
+                    AuditService::logStudentAcademic($studentNumber, "Imported CSV {$examPeriod} Mock Board Score for Subject ID: {$col['mock_subject_id']}");
                     $recordsProcessed++;
                 }
             }

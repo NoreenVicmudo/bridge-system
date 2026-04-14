@@ -39,9 +39,7 @@ class StudentInfoController extends Controller
         $user = Auth::user();
         $metric = $request->input('metric');
 
-        // 1. Handle Socioeconomic Status (Restricted to Super Admins/System Level)
         if ($metric === 'SocioeconomicStatus') {
-            // Restriction: If the user is tied to a specific college or program, they can't change global ranges
             if ($user->college_id || $user->program_id) {
                 abort(403, 'Unauthorized: Only system administrators can update socioeconomic ranges.');
             }
@@ -70,11 +68,12 @@ class StudentInfoController extends Controller
             return redirect()->back()->with('success', 'Socioeconomic ranges updated successfully.');
         }
 
-        // 2. Standard Validation for other metrics
         $validated = $request->validate([
             'sub_metric' => 'required|string',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
+            // 🧠 FIXED: Validating the college_id so Super Admins can safely pass it
+            'college_id' => 'nullable|integer|exists:colleges,college_id'
         ]);
 
         $isNew = $validated['sub_metric'] === 'add';
@@ -82,7 +81,6 @@ class StudentInfoController extends Controller
 
         switch ($metric) {
             case 'College':
-                // Restriction: Only Super Admins (no college_id assigned) can manage colleges
                 if ($user->college_id || $user->program_id) {
                     abort(403, 'Unauthorized: You do not have permission to manage colleges.');
                 }
@@ -94,13 +92,15 @@ class StudentInfoController extends Controller
                 break;
 
             case 'Program':
-                // Restriction: Check if user has authority over this specific program
                 if (!$isNew) {
                     $this->authorizeProgramAccess($validated['sub_metric'], $user);
                 }
                 
-                // If a College Admin creates a program, it's auto-assigned to their college
-                $collegeId = $user->college_id ?? $request->input('college_id');
+                $collegeId = $user->college_id ?? $validated['college_id'];
+
+                if (!$collegeId) {
+                    return redirect()->back()->withErrors(['college_id' => 'A college must be selected.']);
+                }
 
                 Program::updateOrCreate(
                     ['program_id' => $isNew ? null : $validated['sub_metric']],
@@ -130,23 +130,17 @@ class StudentInfoController extends Controller
         return redirect()->back()->with('success', 'Student information configuration saved successfully.');
     }
 
-    /**
-     * Helper to verify if the user can modify a specific program.
-     */
     private function authorizeProgramAccess($programId, $user)
     {
-        // Super Admin check
         if (!$user->college_id && !$user->program_id) return;
 
         $program = Program::find($programId);
         if (!$program) return;
 
-        // Program Head check
         if ($user->program_id && $user->program_id != $programId) {
             abort(403, 'Unauthorized: You can only edit your assigned program.');
         }
 
-        // College Admin check
         if ($user->college_id && $program->college_id != $user->college_id) {
             abort(403, 'Unauthorized: This program belongs to another college.');
         }

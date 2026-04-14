@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Head, Link, router } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
 import AcademicFilterModal from "@/Components/Modals/Academic/AcademicFilterModal";
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
@@ -8,6 +8,10 @@ import FilterInfoCard from "@/Components/FilterInfoCard";
 import RecognitionAddStudentModal from "@/Components/Modals/Academic/RecognitionAddStudentModal";
 
 export default function AcademicRecognitionPage({ students, filter, search = "", sort = "", direction = "asc" }) {
+    const { auth } = usePage().props;
+    const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
+    const canManageData = !isAcademicAffairs;
+
     const records = students?.data || [];
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
@@ -41,7 +45,11 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
                             </button>
                         </>
                     }
-                    footerActions={<button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">Add Student</button>}
+                    footerActions={
+                        canManageData ? (
+                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">Add Student</button>
+                        ) : null
+                    }
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
@@ -54,7 +62,11 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
                         {records.length > 0 ? records.map((student, i) => (
                             <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 <td className="py-3 px-6">
-                                    <Link href={route('academic.recognition.entry', { student_id: student.id })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] transition-all text-center">{student.student_number}</Link>
+                                    {canManageData ? (
+                                        <Link href={route('academic.recognition.entry', { student_id: student.id })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] transition-all text-center">{student.student_number}</Link>
+                                    ) : (
+                                        <span className="inline-block px-4 py-1.5 rounded-[6px] bg-gray-400 text-white font-bold text-center shadow-sm">{student.student_number}</span>
+                                    )}
                                 </td>
                                 <td className="py-3 px-6 text-gray-800 uppercase font-bold">{student.name}</td>
                                 <td className="py-3 px-6 text-center"><span className="text-gray-700 font-bold text-base">{student.recognition_count > 0 ? student.recognition_count : "-"}</span></td>
@@ -67,7 +79,7 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
 
                 <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={filter} onApply={(v) => router.get(route('academic.recognition'), v)} />
                 <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Academic Recognition" filterData={filter} />
-                <RecognitionAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={filter} />
+                {canManageData && <RecognitionAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={filter} />}
             </div>
         </AuthenticatedLayout>
     );
