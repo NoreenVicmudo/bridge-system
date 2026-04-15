@@ -161,7 +161,7 @@ export default function StudentInfoFilter({ dbColleges = [], dbPrograms = [] }) 
             Object.entries(values).filter(([_, v]) => v !== "")
         );
 
-        router.get('/students/filtered-info', filteredParams, {
+        router.get(route('student.info'), filteredParams, {
             preserveState: true, 
             preserveScroll: true,
         });

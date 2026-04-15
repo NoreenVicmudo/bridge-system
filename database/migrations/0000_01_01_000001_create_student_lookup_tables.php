@@ -12,12 +12,16 @@ return new class extends Migration
         Schema::create('living_arrangements', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100);
+            $table->timestamp('date_created')->useCurrent();
+            $table->boolean('is_active')->default(true);
         });
 
         // 2. Languages Table
         Schema::create('languages', function (Blueprint $table) {
             $table->id();
             $table->string('name', 100);
+            $table->timestamp('date_created')->useCurrent();
+            $table->boolean('is_active')->default(true);
         });
         
         // Note: In your 'create_student_info_table' migration, you can now add these foreign keys:

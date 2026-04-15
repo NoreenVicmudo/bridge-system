@@ -112,7 +112,7 @@ class AuditService
     }
 
     /**
-     * 8. STUDENT ACADEMIC AUDIT (Grades, GWA, Mock Scores)
+     * 8. STUDENT ACADEMIC AUDIT (Academic Profile)
      * Table: student_academic_audit
      */
     public static function logStudentAcademic($studentNumber, $remarks)
@@ -127,7 +127,7 @@ class AuditService
     }
 
     /**
-     * 9. STUDENT PROGRAM AUDIT (Changing Courses/Colleges)
+     * 9. STUDENT PROGRAM AUDIT (Program Metrics)
      * Table: student_program_audit
      */
     public static function logStudentProgram($studentNumber, $remarks)

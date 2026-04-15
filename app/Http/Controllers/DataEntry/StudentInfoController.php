@@ -69,7 +69,7 @@ class StudentInfoController extends Controller
         }
 
         $validated = $request->validate([
-            'sub_metric' => 'required|string',
+            'sub_metric' => 'required',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
             // 🧠 FIXED: Validating the college_id so Super Admins can safely pass it
@@ -115,14 +115,14 @@ class StudentInfoController extends Controller
             case 'CurrentLivingArrangement':
                 LivingArrangement::updateOrCreate(
                     ['id' => $isNew ? null : $validated['sub_metric']],
-                    ['name' => $validated['detail_name']]
+                    ['name' => $validated['detail_name'], 'is_active' => $isActive] // 🧠 Added is_active
                 );
                 break;
 
             case 'LanguageSpoken':
                 Language::updateOrCreate(
                     ['id' => $isNew ? null : $validated['sub_metric']],
-                    ['name' => $validated['detail_name']]
+                    ['name' => $validated['detail_name'], 'is_active' => $isActive] // 🧠 Added is_active
                 );
                 break;
         }

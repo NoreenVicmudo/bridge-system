@@ -63,7 +63,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
 
     const handleSearch = (value) => {
         const params = { ...activeFilters, search: value };
-        router.get('/student.info', params, { preserveState: true, preserveScroll: true });
+        router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
     };
 
     const handleSort = (sortKey) => {
@@ -74,7 +74,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
         const dbColumn = sortKeyMap[sortKey] || 'student_info.student_id';
         const newDirection = activeSortColumn === dbColumn && activeSortDirection === 'asc' ? 'desc' : 'asc';
         const params = { ...activeFilters, sort: dbColumn, direction: newDirection };
-        router.get('/student.info', params, { preserveState: true, preserveScroll: true });
+        router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
     };
 
     const [isRemoveMode, setIsRemoveMode] = useState(false);
@@ -92,7 +92,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
 
     const handleApplyFilter = (newFilters, mode) => {
         const params = { ...newFilters, search: currentSearch };
-        router.get('/student.info', params, { preserveState: true, preserveScroll: true });
+        router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
     };
 
     const toggleSelection = (id) => {

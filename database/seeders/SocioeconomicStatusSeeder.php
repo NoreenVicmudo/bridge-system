@@ -25,7 +25,7 @@ class SocioeconomicStatusSeeder extends Seeder
                 'maximum' => 29120,
             ],
             [
-                'status' => 'Lower Middle Class',
+                'status' => 'Lower Middle',
                 'minimum' => 29120,
                 'maximum' => 58240,
             ],
@@ -35,12 +35,12 @@ class SocioeconomicStatusSeeder extends Seeder
                 'maximum' => 116480,
             ],
             [
-                'status' => 'Upper Middle Class',
+                'status' => 'Upper Middle',
                 'minimum' => 116480,
                 'maximum' => 232960,
             ],
             [
-                'status' => 'Upper Income',
+                'status' => 'High Income',
                 'minimum' => 232960,
                 'maximum' => 465920,
             ],

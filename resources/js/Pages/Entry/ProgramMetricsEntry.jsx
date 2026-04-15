@@ -42,26 +42,31 @@ export default function ProgramMetricsEntry({ initialData }) {
     }, [selectedProgram, data.metric, initialData]);
 
     // Auto-Fill Logic when selecting existing items
+    // Auto-Fill Logic when selecting existing items
     useEffect(() => {
+        let newDetailName = "";
+        let newIsHidden = false;
+
         if (data.sub_metric && data.sub_metric !== "add") {
             const selectedOption = subMetrics.find(opt => String(opt.value) === String(data.sub_metric));
-            if (selectedOption) setData("detail_name", selectedOption.label);
+            if (selectedOption) newDetailName = selectedOption.label;
 
-            // 🧠 Find the original DB item to get its is_active status
+            // Find the original DB item to get its is_active status
             const items = initialData[data.metric] || [];
             const originalItem = items.find(item => String(item.mock_subject_id) === String(data.sub_metric));
             
             if (originalItem && originalItem.is_active !== undefined) {
-                setData("is_hidden", !originalItem.is_active);
-            } else {
-                setData("is_hidden", false);
+                newIsHidden = !originalItem.is_active;
             }
-
-        } else {
-            setData("detail_name", "");
-            setData("is_hidden", false); // Default to visible for new entries
         }
-    }, [data.sub_metric, subMetrics, initialData, data.metric]);
+
+        setData(prev => ({
+            ...prev,
+            detail_name: newDetailName,
+            is_hidden: newIsHidden
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.sub_metric, data.metric]);
         
     const handleSubmit = () => {
         post(route("program-metrics-entry.store"), {

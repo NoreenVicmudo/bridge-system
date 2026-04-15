@@ -54,7 +54,7 @@ class AcademicProfileController extends Controller
         $user = Auth::user();
         $validated = $request->validate([
             'metric' => 'required|string',
-            'sub_metric' => 'required|string',
+            'sub_metric' => 'required',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
             // 🧠 FIXED: Must be nullable so Program Heads don't trigger a 422 crash

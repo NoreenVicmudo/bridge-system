@@ -49,12 +49,30 @@ export default function StudentForm({
     const selectLabelOverride =
         "!w-full !text-left !font-bold !text-[#5c297c] !mb-0 !whitespace-nowrap";
 
-    const handleBack = () => {
-        // If we came from a specific page, we can use history.back()
-        // Otherwise fallback to masterlist
-        if (window.history.length > 1) {
-            router.get(window.location.referrer || route('student.masterlist'));
+    // 🧠 SMART BACK BUTTON: Routes back to the exact context they came from
+    const handleBack = (e) => {
+        e.preventDefault();
+
+        if (mode === 'section' && enrollmentContext.academic_year) {
+            router.get(route('student.info'), {
+                mode: 'section',
+                academic_year: enrollmentContext.academic_year,
+                semester: enrollmentContext.semester,
+                college: enrollmentContext.college,
+                program: enrollmentContext.program,
+                year_level: enrollmentContext.year_level,
+                section: enrollmentContext.section,
+            });
+        } else if (mode === 'batch' && enrollmentContext.college_id) {
+            router.get(route('student.info'), {
+                mode: 'batch',
+                batch_college: enrollmentContext.college_id, 
+                batch_program: enrollmentContext.program_id,
+                batch_year: enrollmentContext.year,
+                board_batch: enrollmentContext.batch_number,
+            });
         } else {
+            // Default fallback if they came from the masterlist or direct link
             router.get(route('student.masterlist'));
         }
     };
@@ -62,26 +80,11 @@ export default function StudentForm({
     const isFormValid = () => {
         if (isEdit) return true;
         const requiredFields = [
-            "student_number",
-            "last_name",
-            "first_name",
-            "middle_name",
-            "college",
-            "program",
-            "birthdate",
-            "sex",
-            "socioeconomic_status",
-            "living_arrangement",
-            "house_no",
-            "street",
-            "barangay",
-            "city",
-            "province",
-            "postal_code",
-            "work_status",
-            "scholarship",
-            "language",
-            "last_school_type",
+            "student_number", "last_name", "first_name", "middle_name",
+            "college", "program", "birthdate", "sex", "socioeconomic_status",
+            "living_arrangement", "house_no", "street", "barangay", "city",
+            "province", "postal_code", "work_status", "scholarship",
+            "language", "last_school_type",
         ];
         return requiredFields.every(
             (field) => data[field] && data[field].toString().trim() !== "",
@@ -410,7 +413,7 @@ export default function StudentForm({
                                 options={[
                                     { value: "Full-time", label: "Full-time" },
                                     { value: "Part-time", label: "Part-time" },
-                                    { value: "Not-Working", label: "Not Working" },
+                                    { value: "Not Working", label: "Not Working" },
                                 ]}
                                 placeholder="Select Work Status"
                                 className={selectGroupOverride}

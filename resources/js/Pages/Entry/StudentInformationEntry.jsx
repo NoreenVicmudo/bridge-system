@@ -9,35 +9,26 @@ export default function StudentInformationEntry({ initialData }) {
     const { auth = {} } = usePage().props;
     const user = auth?.user || {};
 
-    // Determine specific access based on the user's database footprint
     const isSuperAdmin = !user.college_id && !user.program_id;
     const isDean = !!user.college_id && !user.program_id;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [rangeError, setRangeError] = useState(""); // 🧠 ADDED: State for validation errors
 
-    // 1. Filter the main selection dropdown based on access
     const activeMetricOptions = useMemo(() => {
         const options = [];
-        
-        // Only Super Admins can see/edit Socioeconomic and College
         if (isSuperAdmin) {
             options.push({ value: "SocioeconomicStatus", label: "Socioeconomic Status" });
             options.push({ value: "College", label: "College" });
         }
-
-        // Super Admins and Deans can see Programs
         if (isSuperAdmin || isDean) {
             options.push({ value: "Program", label: "Program" });
         }
-
-        // Everyone can access the standard lookups
         options.push({ value: "CurrentLivingArrangement", label: "Living Arrangement" });
         options.push({ value: "LanguageSpoken", label: "Language Spoken" });
-
         return options;
     }, [isSuperAdmin, isDean]);
 
-    // 2. Map database props to dropdown options, enforcing Dean restrictions
     const subMetrics = useMemo(() => ({
         College: [
             { value: "add", label: "+ Add New College" },
@@ -46,7 +37,7 @@ export default function StudentInformationEntry({ initialData }) {
         Program: [
             { value: "add", label: "+ Add New Program" },
             ...(initialData?.Programs || [])
-                .filter(p => isSuperAdmin || p.college_id == user.college_id) // Dean restriction
+                .filter(p => isSuperAdmin || p.college_id == user.college_id)
                 .map(p => ({ value: p.program_id, label: p.name }))
         ],
         CurrentLivingArrangement: [
@@ -63,7 +54,7 @@ export default function StudentInformationEntry({ initialData }) {
         metric: "",
         sub_metric: "",
         detail_name: "",
-        college_id: "", // Used specifically for Super Admins adding Programs
+        college_id: "",
         is_hidden: false,
         ranges: {
             rich_min: "", high_min: "", high_max: "",
@@ -73,14 +64,44 @@ export default function StudentInformationEntry({ initialData }) {
         },
     });
 
-    // 3. Validation Rules
+    // 🧠 ADDED: Live Overlap Validation
+    useEffect(() => {
+        if (data.metric === "SocioeconomicStatus") {
+            const r = data.ranges;
+            
+            // The exact mathematical order from lowest to highest
+            const sequence = [
+                r.poor_max, r.low_min, r.low_max, r.lower_mid_min, r.lower_mid_max,
+                r.mid_min, r.mid_max, r.upper_min, r.upper_max, r.high_min, r.high_max, r.rich_min
+            ];
+
+            // 1. Check if any fields are empty
+            if (sequence.some(v => v === "" || v === null || v === undefined)) {
+                setRangeError("Please fill out all income boundary fields.");
+                return;
+            }
+
+            // 2. Check for Overlaps (Ensure strictly increasing/non-decreasing)
+            const numSequence = sequence.map(Number);
+            for (let i = 0; i < numSequence.length - 1; i++) {
+                if (numSequence[i] >= numSequence[i + 1]) {
+                    setRangeError("Overlap Error: Income ranges must go in ascending order without overlapping.");
+                    return;
+                }
+            }
+
+            setRangeError(""); // Valid!
+        } else {
+            setRangeError("");
+        }
+    }, [data.ranges, data.metric]);
+
     const isFormValid = () => {
         if (!data.metric) return false;
-        if (data.metric === "SocioeconomicStatus") {
-            return Object.values(data.ranges).some((val) => val !== "");
-        }
         
-        // If Super Admin is adding a new Program, force them to select a parent College
+        // 🧠 FIXED: Only allow save if the range error is clear
+        if (data.metric === "SocioeconomicStatus") return rangeError === "";
+        
         if (data.metric === "Program" && data.sub_metric === "add" && isSuperAdmin) {
             if (!data.college_id) return false;
         }
@@ -88,56 +109,80 @@ export default function StudentInformationEntry({ initialData }) {
         return data.sub_metric !== "" && data.detail_name.trim() !== "";
     };
 
-    // 4. Auto-Fill Logic when selecting existing items
-    // 4. Auto-Fill Logic when selecting existing items
     useEffect(() => {
+        let newDetailName = "";
+        let newIsHidden = false;
+        let newCollegeId = data.college_id;
+
         if (data.sub_metric && data.sub_metric !== "add") {
             const selectedOption = subMetrics[data.metric]?.find(opt => String(opt.value) === String(data.sub_metric));
             
             if (selectedOption) {
-                setData("detail_name", selectedOption.label);
+                newDetailName = selectedOption.label;
                 
-                // 🧠 Find the original DB item to get its properties
                 let originalItem = null;
                 if (data.metric === "College") originalItem = initialData?.Colleges?.find(c => String(c.college_id) === String(data.sub_metric));
                 else if (data.metric === "Program") originalItem = initialData?.Programs?.find(p => String(p.program_id) === String(data.sub_metric));
                 else if (data.metric === "CurrentLivingArrangement") originalItem = initialData?.LivingArrangements?.find(l => String(l.id) === String(data.sub_metric));
                 else if (data.metric === "LanguageSpoken") originalItem = initialData?.Languages?.find(l => String(l.id) === String(data.sub_metric));
 
-                // If editing a Program as SuperAdmin, auto-select its current College
                 if (data.metric === "Program" && isSuperAdmin && originalItem) {
-                    setData("college_id", originalItem.college_id || "");
+                    newCollegeId = originalItem.college_id || "";
                 }
 
-                // 🧠 Map the is_active state to the checkbox
                 if (originalItem && originalItem.is_active !== undefined) {
-                    setData("is_hidden", !originalItem.is_active);
-                } else {
-                    setData("is_hidden", false);
+                    newIsHidden = !originalItem.is_active;
                 }
             }
         } else {
-            setData("detail_name", "");
-            setData("college_id", "");
-            setData("is_hidden", false); // Default to visible for new entries
+            newCollegeId = "";
         }
-    }, [data.sub_metric, data.metric, subMetrics, initialData, isSuperAdmin]);
 
-    // 5. Pre-fill Socioeconomic ranges if data exists
+        setData(prev => ({
+            ...prev,
+            detail_name: newDetailName,
+            college_id: newCollegeId,
+            is_hidden: newIsHidden
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.sub_metric, data.metric]);
+
+    // Pre-fill Socioeconomic ranges if data exists
     useEffect(() => {
         if (data.metric === "SocioeconomicStatus" && initialData?.SocioeconomicStatus?.length > 0) {
-            const ranges = { ...data.ranges };
-            initialData.SocioeconomicStatus.forEach(status => {
-                if (status.status === 'Rich') ranges.rich_min = status.minimum || "";
-                if (status.status === 'High Income') { ranges.high_min = status.minimum || ""; ranges.high_max = status.maximum || ""; }
-                if (status.status === 'Upper Middle') { ranges.upper_min = status.minimum || ""; ranges.upper_max = status.maximum || ""; }
-                if (status.status === 'Middle Class') { ranges.mid_min = status.minimum || ""; ranges.mid_max = status.maximum || ""; }
-                if (status.status === 'Lower Middle') { ranges.lower_mid_min = status.minimum || ""; ranges.lower_mid_max = status.maximum || ""; }
-                if (status.status === 'Low Income') { ranges.low_min = status.minimum || ""; ranges.low_max = status.maximum || ""; }
-                if (status.status === 'Poor') ranges.poor_max = status.maximum || "";
+            setData(prev => {
+                const newRanges = { ...prev.ranges };
+                
+                initialData.SocioeconomicStatus.forEach(item => {
+                    const status = item.status?.trim(); 
+                    
+                    // 🧠 FIXED: Exactly matches your backend array map!
+                    if (status === 'Rich') {
+                        newRanges.rich_min = item.minimum ?? "";
+                    } else if (status === 'High Income') {
+                        newRanges.high_min = item.minimum ?? "";
+                        newRanges.high_max = item.maximum ?? "";
+                    } else if (status === 'Upper Middle') {
+                        newRanges.upper_min = item.minimum ?? "";
+                        newRanges.upper_max = item.maximum ?? "";
+                    } else if (status === 'Middle Class') {
+                        newRanges.mid_min = item.minimum ?? "";
+                        newRanges.mid_max = item.maximum ?? "";
+                    } else if (status === 'Lower Middle') {
+                        newRanges.lower_mid_min = item.minimum ?? "";
+                        newRanges.lower_mid_max = item.maximum ?? "";
+                    } else if (status === 'Low Income') {
+                        newRanges.low_min = item.minimum ?? "";
+                        newRanges.low_max = item.maximum ?? "";
+                    } else if (status === 'Poor') {
+                        newRanges.poor_max = item.maximum ?? "";
+                    }
+                });
+
+                return { ...prev, ranges: newRanges };
             });
-            setData("ranges", ranges);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.metric, initialData]);
 
     const handleSubmit = () => {
@@ -150,7 +195,6 @@ export default function StudentInformationEntry({ initialData }) {
         <DataEntryLayout title="Student Info Entry">
             <div className="max-w-2xl mx-auto">
                 <form className="bg-white p-6 rounded-xl border border-purple-100 shadow-sm space-y-6">
-                    {/* 1. Metric Selection */}
                     <CustomSelectGroup
                         label="Select Field:"
                         value={data.metric}
@@ -164,7 +208,6 @@ export default function StudentInformationEntry({ initialData }) {
                         vertical={true}
                     />
 
-                    {/* 2A. Standard Entry (College, Program, Living, Language) */}
                     {data.metric && data.metric !== "SocioeconomicStatus" && (
                         <div className="space-y-5 animate-fade-in-up border-t border-gray-100 pt-5">
                             <CustomSelectGroup
@@ -176,7 +219,6 @@ export default function StudentInformationEntry({ initialData }) {
                                 vertical={true}
                             />
 
-                            {/* Extra requirement for Super Admins adding/editing Programs */}
                             {data.metric === "Program" && isSuperAdmin && (
                                 <CustomSelectGroup
                                     label="Parent College:"
@@ -214,12 +256,20 @@ export default function StudentInformationEntry({ initialData }) {
                         </div>
                     )}
 
-                    {/* 2B. Socioeconomic Status Ranges */}
                     {data.metric === "SocioeconomicStatus" && (
                         <div className="animate-fade-in-up border-t border-gray-100 pt-5 text-[#5c297c]">
                             <h3 className="text-sm font-bold mb-4 uppercase tracking-widest opacity-70">
                                 Update Income Ranges
                             </h3>
+                            
+                            {/* 🧠 ADDED: Error Message Display */}
+                            {rangeError && (
+                                <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-bold">
+                                    <i className="bi bi-exclamation-triangle-fill mr-2"></i>
+                                    {rangeError}
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 gap-3 bg-slate-50 p-4 rounded-xl border border-gray-200">
                                 <div className="flex items-center justify-between gap-4 bg-white p-2 rounded-lg shadow-sm">
                                     <label className="font-bold text-sm w-32">Rich:</label>
@@ -235,7 +285,6 @@ export default function StudentInformationEntry({ initialData }) {
                                     </div>
                                 </div>
 
-                                {/* Helper loop for min/max ranges */}
                                 {[
                                     { id: "high", label: "High Income" },
                                     { id: "upper", label: "Upper Middle" },
@@ -282,7 +331,6 @@ export default function StudentInformationEntry({ initialData }) {
                         </div>
                     )}
 
-                    {/* Submit Button */}
                     <div className="flex justify-center pt-4">
                         <button
                             type="button"

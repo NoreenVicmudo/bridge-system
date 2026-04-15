@@ -13,7 +13,7 @@ export default function CreateUser({ colleges, programs }) {
         password: "",
         college_id: "",
         program_id: "",
-        level: "",
+        position: "",
     });
 
     const handleSubmit = () => {

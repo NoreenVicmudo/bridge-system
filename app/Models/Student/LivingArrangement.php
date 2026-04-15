@@ -10,5 +10,9 @@ class LivingArrangement extends Model
     protected $primaryKey = 'id';
     public $timestamps = false;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'is_active'];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 }

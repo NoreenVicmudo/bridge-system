@@ -7,12 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    /**
-     * Display the User List with search, sort, and pagination.
-     */
     public function index(Request $request)
     {
         $search = $request->query('search', '');
@@ -41,48 +39,29 @@ class UserController extends Controller
             });
         }
 
-        // Map frontend sort keys to database columns
         $sortMap = [
-            'username' => 'u.username',
-            'name' => 'u.name',
-            'email' => 'u.email',
-            'college' => 'c.name',
-            'position' => 'u.position',
-            'program' => 'p.name',
+            'username' => 'u.username', 'name' => 'u.name', 'email' => 'u.email',
+            'college' => 'c.name', 'position' => 'u.position', 'program' => 'p.name',
             'date_registered' => 'u.created_at',
         ];
 
         $actualSort = $sortMap[$sort] ?? 'u.created_at';
         $direction = in_array(strtolower($direction), ['asc', 'desc']) ? $direction : 'desc';
 
-        $users = $query->orderBy($actualSort, $direction)
-            ->paginate(15)
-            ->withQueryString();
+        $users = $query->orderBy($actualSort, $direction)->paginate(15)->withQueryString();
 
-        return Inertia::render('User/UserList', [
-            'users' => $users,
-            'queryParams' => (object) $request->query()
-        ]);
+        return Inertia::render('User/UserList', ['users' => $users, 'queryParams' => (object) $request->query()]);
     }
 
-    /**
-     * Show the form for creating a new user.
-     */
     public function create()
     {
-        // Fetch dropdown options matching { value, label } format
         $colleges = DB::table('colleges')->select('college_id as value', 'name as label')->get();
-        $programs = DB::table('programs')->select('program_id as value', 'name as label')->get();
+        // 🧠 FIXED: Added college_id to the query so React can filter the dropdown!
+        $programs = DB::table('programs')->select('program_id as value', 'name as label', 'college_id')->get();
 
-        return Inertia::render('User/CreateUser', [
-            'colleges' => $colleges,
-            'programs' => $programs
-        ]);
+        return Inertia::render('User/CreateUser', ['colleges' => $colleges, 'programs' => $programs]);
     }
 
-    /**
-     * Store a newly created user in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -91,136 +70,90 @@ class UserController extends Controller
             'username'   => 'required|string|max:50|unique:users,username',
             'email'      => 'required|string|email|max:255|unique:users,email',
             'password'   => 'required|string|min:8', 
-            'college_id' => 'required_unless:level,0|nullable|integer',
+            'position'   => 'required|string|max:50',
+            'college_id' => 'nullable|integer',
             'program_id' => 'nullable|integer',
-            'level'      => 'required|string|max:50',
         ]);
 
-        $levelMap = [
-            '0' => 'Super Admin',
-            '1' => 'Admin',
-            '2' => 'Dean',
-            '3' => 'Program Head', 
-        ];
+        // 🧠 SECURITY: Strictly enforce what IDs get saved based on the role
+        $needsCollege = in_array($validated['position'], ['Dean', 'Administrative Assistant', 'Program Head']);
+        $needsProgram = $validated['position'] === 'Program Head';
 
-        $fullName = trim($validated['fname'] . ' ' . $validated['lname']);
+        if ($needsCollege && empty($validated['college_id'])) return back()->withErrors(['college_id' => 'College is required for this position.']);
+        if ($needsProgram && empty($validated['program_id'])) return back()->withErrors(['program_id' => 'Program is required for this position.']);
 
         User::create([
-            'name'       => $fullName,
+            'name'       => trim($validated['fname'] . ' ' . $validated['lname']),
             'username'   => $validated['username'],
             'email'      => $validated['email'],
-            'password'   => Hash::make($validated['password']), // Encrypt the password!
-            'college_id' => $validated['level'] === '0' ? null : $validated['college_id'],
-            'program_id' => $validated['level'] === '3' ? $validated['program_id'] : null,
-            'position'   => $levelMap[$validated['level']] ?? 'Admin',
-            'status'     => 'APPROVED', // Assuming direct adds from an admin are auto-approved
+            'password'   => Hash::make($validated['password']),
+            'position'   => $validated['position'],
+            'college_id' => $needsCollege ? $validated['college_id'] : null,
+            'program_id' => $needsProgram ? $validated['program_id'] : null,
+            'status'     => 'APPROVED', 
         ]);
 
         return redirect()->route('users.index')->with('success', 'User created successfully.');
     }
 
-    /**
-     * Show the form for editing the specified user.
-     */
     public function edit(User $user)
     {
-        // 1. Split the single 'name' column into first and last name
         $nameParts = explode(' ', $user->name, 2);
-        
-        // 2. Fetch the actual names for the read-only overview
         $college = DB::table('colleges')->where('college_id', $user->college_id)->first();
         $program = DB::table('programs')->where('program_id', $user->program_id)->first();
 
-        // 3. Map Database string to React Form integer values
-        $positionMap = [
-            'Super Admin'  => '0',
-            'Admin'        => '1',
-            'Dean'         => '2',
-            'Program Head' => '3',
-            'Assistant'    => '3', // Mapping legacy 'Assistant' to 'Program Head'
-        ];
-
-        // 4. Construct the exact object UpdateUserForm.jsx expects
         $userData = [
-            // Form Data
             'user_id' => $user->id,
             'user_username' => $user->username,
             'user_firstname' => $nameParts[0],
             'user_lastname' => $nameParts[1] ?? '',
             'user_college' => $user->college_id ?? '',
             'user_program' => $user->program_id ?? '',
-            'user_level' => $positionMap[$user->position] ?? '',
-            
-            // Read-Only Overview Data
+            'user_position' => $user->position, // 🧠 FIXED: Using explicit string
             'user_email' => $user->email,
             'college_name' => $college ? $college->name : 'SYSTEM',
             'position_name' => $user->position,
             'program_name' => $program ? $program->name : null,
         ];
 
-        // 5. Fetch dropdown options matching { value, label } format
         $colleges = DB::table('colleges')->select('college_id as value', 'name as label')->get();
-        $programs = DB::table('programs')->select('program_id as value', 'name as label')->get();
+        $programs = DB::table('programs')->select('program_id as value', 'name as label', 'college_id')->get();
 
-        return Inertia::render('User/EditUser', [
-            'user' => $userData,
-            'colleges' => $colleges,
-            'programs' => $programs
-        ]);
+        return Inertia::render('User/EditUser', ['user' => $userData, 'colleges' => $colleges, 'programs' => $programs]);
     }
 
-    /**
-     * Update the specified user in storage.
-     */
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
             'fname'      => 'required|string|max:255',
             'lname'      => 'required|string|max:255',
-            'college_id' => 'required_unless:level,0|nullable|integer', // Required unless Super Admin
+            'position'   => 'required|string|max:50',
+            'college_id' => 'nullable|integer',
             'program_id' => 'nullable|integer',
-            'level'      => 'required|string|max:50',
         ]);
 
-        // Map the React Form integer back to a Database string
-        $levelMap = [
-            '0' => 'Super Admin',
-            '1' => 'Admin',
-            '2' => 'Dean',
-            '3' => 'Program Head', 
-        ];
+        // 🧠 SECURITY: Strictly enforce what IDs get saved based on the role
+        $needsCollege = in_array($validated['position'], ['Dean', 'Administrative Assistant', 'Program Head']);
+        $needsProgram = $validated['position'] === 'Program Head';
 
-        // Recombine first and last name
-        $fullName = trim($validated['fname'] . ' ' . $validated['lname']);
+        if ($needsCollege && empty($validated['college_id'])) return back()->withErrors(['college_id' => 'College is required for this position.']);
+        if ($needsProgram && empty($validated['program_id'])) return back()->withErrors(['program_id' => 'Program is required for this position.']);
 
         $user->update([
-            'name'       => $fullName,
-            'college_id' => $validated['level'] === '0' ? null : $validated['college_id'], // Super Admins have no college
-            'program_id' => $validated['level'] === '3' ? $validated['program_id'] : null, // Only Program Heads have programs
-            'position'   => $levelMap[$validated['level']] ?? 'Admin',
+            'name'       => trim($validated['fname'] . ' ' . $validated['lname']),
+            'position'   => $validated['position'],
+            'college_id' => $needsCollege ? $validated['college_id'] : null,
+            'program_id' => $needsProgram ? $validated['program_id'] : null,
         ]);
 
         return redirect()->route('users.index')->with('success', 'User updated successfully.');
     }
 
-    /**
-     * Remove the specified users from storage (Bulk Delete).
-     */
     public function bulkDestroy(Request $request)
     {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'integer|exists:users,id'
-        ]);
-
-        // Prevent users from deleting themselves
+        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer|exists:users,id']);
         $idsToDelete = array_diff($request->ids, [auth()->id()]);
-
-        if (count($idsToDelete) > 0) {
-            User::whereIn('id', $idsToDelete)->delete();
-            // AuditService::logUserManagement('Multiple Users', 'Bulk deleted ' . count($idsToDelete) . ' users');
-        }
-
+        if (count($idsToDelete) > 0) User::whereIn('id', $idsToDelete)->delete();
         return redirect()->route('users.index')->with('success', 'Users removed successfully.');
     }
 }

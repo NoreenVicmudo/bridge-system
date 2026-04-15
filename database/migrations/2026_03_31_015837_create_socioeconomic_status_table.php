@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('socioeconomic_status', function (Blueprint $table) {
-            $table->string('status', 15)->primary();
+            $table->string('status', 20)->primary();
             $table->integer('minimum')->nullable();
             $table->integer('maximum')->nullable();
             $table->timestamp('date_created')->useCurrent();

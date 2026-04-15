@@ -12,11 +12,10 @@ return new class extends Migration
             $table->id('score_id');
             $table->unsignedBigInteger('batch_id')->nullable();
             $table->unsignedBigInteger('mock_subject_id')->nullable();
-            $table->integer('student_score')->nullable();
-            $table->integer('total_score')->nullable();
+            $table->decimal('score', 5, 2)->nullable();
             $table->timestamp('date_created')->useCurrent();
             $table->boolean('is_active')->default(true);
-            $table->unique(['batch_id', 'mock_subject_id'], 'batch_id');
+            $table->unique(['batch_id', 'mock_subject_id'], 'batch_mock_unique');
         });
     }
 

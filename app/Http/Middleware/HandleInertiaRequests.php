@@ -39,6 +39,7 @@ class HandleInertiaRequests extends Middleware
                     'position' => $request->user()->position,
                     'college_id' => $request->user()->college_id,
                     'program_id' => $request->user()->program_id,
+                    'avatar' => $request->user()->avatar,
                 ] : null,
             ],
         ]);

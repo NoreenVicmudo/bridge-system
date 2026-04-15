@@ -13,7 +13,6 @@ return new class extends Migration
             $table->string('student_number', 15)->nullable();
             $table->unsignedBigInteger('simulation_id')->nullable();
             $table->integer('student_score')->nullable();
-            $table->integer('total_score')->nullable();
             $table->timestamp('date_created')->useCurrent();
             $table->boolean('is_active')->default(true);
             $table->unique(['student_number', 'simulation_id'], 'student_number');

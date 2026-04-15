@@ -389,7 +389,7 @@ class StudentController extends Controller
                 'updated_at' => now()
             ]);
             
-            AuditService::logStudentProgram($student->student_number, "Student shifted to Program ID: $newProgramId");
+            AuditService::logStudentUpdate($student->student_number, "Student shifted to Program ID: $newProgramId");
         }
 
         AuditService::logStudentUpdate($student->student_number, 'Profile updated');

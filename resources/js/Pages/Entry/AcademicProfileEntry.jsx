@@ -46,27 +46,32 @@ export default function AcademicProfileEntry({ initialData }) {
 
     // Auto-Fill Logic when selecting existing items
     useEffect(() => {
+        let newDetailName = "";
+        let newIsHidden = false;
+
         if (data.sub_metric && data.sub_metric !== "add") {
             const selected = subMetrics.find(opt => String(opt.value) === String(data.sub_metric));
-            if (selected) setData("detail_name", selected.label);
+            if (selected) newDetailName = selected.label;
 
-            // 🧠 Find the original DB item to get its is_active status
+            // Find the original DB item to get its is_active status
             const items = initialData[data.metric] || [];
             const originalItem = items.find(item => 
                 String(item.subject_id || item.general_subject_id || item.category_id || item.simulation_id) === String(data.sub_metric)
             );
             
             if (originalItem && originalItem.is_active !== undefined) {
-                setData("is_hidden", !originalItem.is_active);
-            } else {
-                setData("is_hidden", false);
+                newIsHidden = !originalItem.is_active;
             }
-
-        } else {
-            setData("detail_name", "");
-            setData("is_hidden", false); // Default to visible for new entries
         }
-    }, [data.sub_metric, subMetrics, initialData, data.metric]);
+
+        // Safely update state without depending on the state itself
+        setData(prev => ({
+            ...prev,
+            detail_name: newDetailName,
+            is_hidden: newIsHidden
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.sub_metric, data.metric]);
 
     const handleSubmit = () => {
         post(route("academic-profile-entry.store"), {

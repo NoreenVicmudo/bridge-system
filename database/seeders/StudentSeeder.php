@@ -39,6 +39,7 @@ class StudentSeeder extends Seeder
         // Arrays to hold bulk insert data
         $infoBatch = [];
         $sectionBatch = [];
+        $programsBatch = [];
 
         foreach ($allProgramsToSeed as $program) {
             // PER YEAR (Years 1 to 4)
@@ -78,31 +79,29 @@ class StudentSeeder extends Seeder
                                 $income = $faker->numberBetween($range['min'], $range['max']);
                             }
 
-                            // Build the Profile
+                            // Build the Profile (NO college_id or program_id)
                             $infoBatch[] = [
                                 'student_number' => $studentNumber,
                                 'student_fname' => $faker->firstName,
                                 'student_mname' => $faker->lastName,
                                 'student_lname' => $faker->lastName,
-                                'college_id' => $program->college_id,
-                                'program_id' => $program->program_id,
                                 'student_birthdate' => $faker->dateTimeBetween($birthYearStart, $birthYearEnd)->format('Y-m-d'),
                                 'student_sex' => $faker->randomElement(['Male', 'Female']),
-                                'student_socioeconomic' => $income, // Numeric income
+                                'student_socioeconomic' => $income,
                                 'student_address_number' => $faker->buildingNumber,
                                 'student_address_street' => $faker->streetName,
                                 'student_address_barangay' => 'Brgy. ' . $faker->numberBetween(1, 100),
                                 'student_address_city' => $faker->city,
                                 'student_living' => $faker->numberBetween(1, 4),
-                                'student_work' => $faker->randomElement(['Full-time Student', 'Working Student', 'None']),
-                                'student_scholarship' => $faker->randomElement(['None', 'Academic Scholar', 'Athletic Scholar']),
+                                'student_work' => $faker->randomElement(['Full-time', 'Part-time', 'Not Working']),
+                                'student_scholarship' => $faker->randomElement(['None', 'Internal', 'External']),
                                 'student_language' => $faker->numberBetween(1, 4),
-                                'student_last_school' => 'MCU SHS',
+                                'student_last_school' => $faker->randomElement(['Private', 'Public']),
                                 'date_created' => $now,
                                 'is_active' => 1,
                             ];
 
-                            // Build the Enrollment Record
+                            // Build the Enrollment Record (includes program_id)
                             $sectionBatch[] = [
                                 'student_number' => $studentNumber,
                                 'section' => $sectionName,
@@ -114,14 +113,25 @@ class StudentSeeder extends Seeder
                                 'is_active' => 1,
                             ];
 
+                            // Build the student_programs pivot entry (Active status)
+                            $programsBatch[] = [
+                                'student_number' => $studentNumber,
+                                'program_id' => $program->program_id,
+                                'status' => 'Active',
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ];
+
                             $studentCounter++;
 
                             // BULK INSERT: Once we hit 500 students, insert them to save memory
                             if (count($infoBatch) >= 500) {
                                 DB::table('student_info')->insert($infoBatch);
                                 DB::table('student_section')->insert($sectionBatch);
+                                DB::table('student_programs')->insert($programsBatch);
                                 $infoBatch = [];
                                 $sectionBatch = [];
+                                $programsBatch = [];
                             }
                         }
                     }
@@ -133,6 +143,7 @@ class StudentSeeder extends Seeder
         if (count($infoBatch) > 0) {
             DB::table('student_info')->insert($infoBatch);
             DB::table('student_section')->insert($sectionBatch);
+            DB::table('student_programs')->insert($programsBatch);
         }
     }
 }

@@ -20,10 +20,11 @@ return new class extends Migration
             
             // SSO Support: Password is now nullable, and we store their Microsoft ID
             $table->string('microsoft_id')->nullable()->unique();
+            $table->string('avatar')->nullable();
             $table->string('password')->nullable();
             
             // System Security & Roles
-            $table->string('position', 50)->default('Assistant'); // e.g., 'Assistant' or 'Dean'
+            $table->string('position', 50)->default('Admin'); // e.g., 'Assistant' or 'Dean'
             $table->enum('status', ['PENDING', 'APPROVED', 'REJECTED'])->default('PENDING');
             
             // Academic Isolation (From your SQL structure)

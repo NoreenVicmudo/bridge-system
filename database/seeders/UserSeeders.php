@@ -18,20 +18,30 @@ class UserSeeders extends Seeder
             'username' => 'Super Admin',
             'email' => 'superadmin@mcu.edu.ph',
             'password' => bcrypt('password123'),
-            'position' => 'Admin',
+            'position' => 'Super Admin',
             'status' => 'APPROVED'
-        ]);
-        /*User::create([
-            'name' => 'Opto Dean',
-            'username' => 'Opto Dean',
-            'email' => 'optodean@mcu.edu.ph',
-            'password' => bcrypt('password123'),
-            'position' => 'Dean',
-            'status' => 'APPROVED',
-            'college_id' => 5
         ]);
 
         User::create([
+            'name' => 'Acad Affair',
+            'username' => 'Acad Affair',
+            'email' => 'acadaffair@mcu.edu.ph',
+            'password' => bcrypt('password123'),
+            'position' => 'Admin',
+            'status' => 'APPROVED'
+        ]);
+
+        User::create([
+            'name' => 'CAS Dean',
+            'username' => 'CAS Dean',
+            'email' => 'casdean@mcu.edu.ph',
+            'password' => bcrypt('password123'),
+            'position' => 'Dean',
+            'status' => 'APPROVED',
+            'college_id' => 6
+        ]);
+
+        /* User::create([
             'name' => 'Nursing Dean',
             'username' => 'nursing_dean',
             'email' => 'nursingdean@mcu.edu.ph',

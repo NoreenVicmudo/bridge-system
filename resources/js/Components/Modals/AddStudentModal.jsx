@@ -96,7 +96,7 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
             }
 
             closeModal();
-            router.get('/student-entry',queryObject);
+            router.get(route('students.create'), queryObject);
         }
 
         

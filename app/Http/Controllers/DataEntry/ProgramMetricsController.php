@@ -37,7 +37,7 @@ class ProgramMetricsController extends Controller
         $user = auth()->user();
         $validated = $request->validate([
             'metric' => 'required|string',
-            'sub_metric' => 'required|string',
+            'sub_metric' => 'required',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
             // 🧠 FIXED: Made nullable

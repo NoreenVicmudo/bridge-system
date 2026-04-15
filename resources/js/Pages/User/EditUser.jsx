@@ -4,13 +4,12 @@ import { useForm, Head } from "@inertiajs/react";
 import UpdateUserForm from "@/Components/Forms/UpdateUserForm";
 
 export default function EditUser({ user, colleges, programs }) {
-    // Initialize form with the user's current values
     const { data, setData, put, processing, errors } = useForm({
         fname: user?.user_firstname || "",
         lname: user?.user_lastname || "",
-        college_id: user?.user_college || "",
-        level: user?.user_level !== undefined ? String(user.user_level) : "",
-        program_id: user?.user_program || "",
+        position: user?.user_position || "",
+        college_id: user?.user_college ? String(user.user_college) : "",
+        program_id: user?.user_program ? String(user.user_program) : "",
     });
 
     const handleSubmit = () => {
@@ -30,8 +29,8 @@ export default function EditUser({ user, colleges, programs }) {
                     processing={processing}
                     submit={handleSubmit}
                     user={user}
-                    collegeOptions={colleges} // Expected format: [{ value: '1', label: 'College of Arts' }]
-                    programOptions={programs} // Expected format: [{ value: '1', label: 'BS Psych' }]
+                    collegeOptions={colleges} 
+                    programOptions={programs} 
                 />
             </div>
         </AuthenticatedLayout>

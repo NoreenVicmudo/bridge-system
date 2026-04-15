@@ -11,6 +11,17 @@ class College extends Model
     // Disable default timestamps since you use 'date_created'
     public $timestamps = false; 
 
+    // 🧠 ADDED: Mass Assignment Protection
+    protected $fillable = [
+        'name',
+        'is_active',
+        'date_created'
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
     public function programs()
     {
         return $this->hasMany(Program::class, 'college_id', 'college_id');

@@ -3,27 +3,20 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Database\Seeders\AcademicStructureSeeder;
-use Database\Seeders\StudentSeeder;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
-        // 1. Seed the Colleges and Programs
-        $this->call([
-            AcademicStructureSeeder::class,
-        ]);
+        // 1. Colleges & Programs
+        $this->call(AcademicStructureSeeder::class);
 
-        // 2. Seed Lookup Tables
+        // 2. Lookup tables
         DB::table('living_arrangements')->insert([
             ['id' => 1, 'name' => 'Living with Parents'],
             ['id' => 2, 'name' => 'Living with Relatives'],
@@ -38,30 +31,25 @@ class DatabaseSeeder extends Seeder
             ['id' => 4, 'name' => 'Other Regional Dialect'],
         ]);
 
-        // 3. Automatically generate your Test Users linked to the College of Medical Technology (ID: 1)
-        User::create([
-            'name' => 'Dr. Dean Admin',
-            'username' => 'dean_admin',
-            'email' => 'dean@mcu.edu.ph',
-            'password' => bcrypt('password123'),
-            'position' => 'Dean',
-            'status' => 'APPROVED',
-            'college_id' => 6
-        ]);
+        $this->call(SocioeconomicStatusSeeder::class);
 
-        User::create([
-            'name' => 'Staff Assistant',
-            'username' => 'staff_01',
-            'email' => 'staff@mcu.edu.ph',
-            'password' => bcrypt('password123'),
-            'position' => 'Assistant',
-            'status' => 'APPROVED',
-            'college_id' => 6,
-            'program_id' => 7
-        ]);
+        // 3. Subject & exam definitions
+        $this->call(BoardSubjectSeeder::class);
+        $this->call(GeneralSubjectsSeeder::class);
+        $this->call(MockSubjectSeeder::class);
+        $this->call(RatingCategorySeeder::class);
+        $this->call(SimulationExamSeeder::class);
 
-        $this->call([
-            StudentSeeder::class,
-        ]);
+        // 4. Users
+        $this->call(UserSeeders::class);
+
+        // 5. Students (basic info + sections)
+        $this->call(StudentSeeder::class);
+
+        // 6. Student academic data (grades, ratings, scores)
+        $this->call(StudentBoardSubjectGradesSeeder::class);
+        $this->call(StudentPerformanceRatingSeeder::class);
+        $this->call(StudentSimulationExamSeeder::class);
+        $this->call(StudentMockBoardScoresSeeder::class);
     }
 }

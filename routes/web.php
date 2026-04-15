@@ -16,6 +16,8 @@ use Inertia\Inertia;
 // ==========================================
 // ⚠️ DEV LOGIN & REDIRECTS
 // ==========================================
+
+
 Route::get('/dev-login/{id}', function ($id) {
     Auth::loginUsingId($id);
     return redirect()->route('main');
@@ -36,6 +38,7 @@ Route::middleware('auth', 'verified')->group(function () {
         Route::get('/masterlist', [StudentController::class, 'masterlist'])->name('student.masterlist');
         Route::get('/filtered-info', [StudentController::class, 'filteredInfo'])->name('student.info');
         Route::get('/export/csv', [StudentController::class, 'export'])->name('students.export');
+        Route::get('/create', [StudentController::class, 'create'])->name('students.create');
         Route::get('/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
         
         Route::post('/', [StudentController::class, 'store'])->name('students.store');
