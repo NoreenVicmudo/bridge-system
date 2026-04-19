@@ -252,7 +252,10 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                 {canManageData && (
                     <>
                         <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode={filterMode} currentFilters={activeFilters} />
-                        <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={studentList.filter(s => selectedIds.has(s.id))} />
+                        <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={studentList.filter(s => selectedIds.has(s.id))} onSuccess={() => {
+                            setIsRemoveMode(false);
+                            setSelectedIds(new Set());
+                        }}/>
                     </>
                 )}
                 <FilterStudentModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={handleApplyFilter} dbColleges={dbColleges} dbPrograms={dbPrograms} user={user} />

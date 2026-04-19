@@ -49,21 +49,20 @@ class ImportStudentsAction
                     }
                 }
 
-                // 4. CHECK IF PROFILE EXISTS
-                $exists = DB::table('student_info')->where('student_number', $studentNumber)->exists();
+                // 4. RESTORE OR CREATE PROFILE
+                $existingStudent = \App\Models\Student\StudentInfo::where('student_number', $studentNumber)->first();
 
-                if (!$exists) {
-                    // Create Profile (Will not overwrite existing students!)
-                    DB::table('student_info')->insert([
-                        'student_number'           => $studentNumber,
+                \App\Models\Student\StudentInfo::updateOrCreate(
+                    ['student_number' => $studentNumber],
+                    [
                         'student_lname'            => trim($row[1] ?? null),
                         'student_fname'            => trim($row[2] ?? null),
                         'student_mname'            => trim($row[3] ?? null),
                         'student_suffix'           => trim($row[4] ?? null),
-                        'student_birthdate'        => $birthdate, // Using our safe date!
+                        'student_birthdate'        => $birthdate,
                         'student_sex'              => trim($row[6] ?? null),
                         'student_socioeconomic'    => trim($row[7] ?? null),
-                        'student_living'           => $livingId,  // Using our translated ID!
+                        'student_living'           => $livingId,  
                         'student_address_number'   => trim($row[9] ?? null),
                         'student_address_street'   => trim($row[10] ?? null),
                         'student_address_barangay' => trim($row[11] ?? null),
@@ -72,43 +71,40 @@ class ImportStudentsAction
                         'student_address_postal'   => trim($row[14] ?? null),
                         'student_work'             => trim($row[15] ?? null),
                         'student_scholarship'      => trim($row[16] ?? null),
-                        'student_language'         => $languageId, // Using our translated ID!
+                        'student_language'         => $languageId, 
                         'student_last_school'      => trim($row[18] ?? null),
-                                                
-                        'date_created'             => $now,
-                        'is_active'                => 1,
-                    ]);
-                    DB::table('student_programs')->insert([
-                        'student_number' => $studentNumber,
-                        'program_id'     => $context['program'],
-                        'status'         => 'Active',
-                        'created_at'     => $now,
-                        'updated_at'     => $now
-                    ]);
+                        'date_created'             => $existingStudent ? $existingStudent->date_created : $now,
+                        'is_active'                => 1, // 🧠 Forces restoration!
+                    ]
+                );
 
+                // Ensure pivot is active
+                DB::table('student_programs')->updateOrInsert(
+                    ['student_number' => $studentNumber, 'program_id' => $context['program']],
+                    ['status' => 'Active', 'updated_at' => $now]
+                );
+
+                if (!$existingStudent) {
                     \App\Services\AuditService::logStudentAdd($studentNumber, "Imported via CSV for {$context['academic_year']} {$context['semester']}");
-
                     $successCount++;
                 }
 
-                // 5. ENROLL IN SECTION (Prevents duplicates)
-                $isEnrolled = DB::table('student_section')
-                    ->where('student_number', $studentNumber)
-                    ->where('academic_year', $context['academic_year'])
-                    ->where('semester', $context['semester'])
-                    ->exists();
-
-                if (!$isEnrolled) {
-                    DB::table('student_section')->insert([
+                // 5. RESTORE OR ENROLL IN SECTION
+                $sectionEnrolled = DB::table('student_section')->updateOrInsert(
+                    [
                         'student_number' => $studentNumber,
+                        'academic_year'  => $context['academic_year'],
+                        'semester'       => $context['semester'],
+                    ],
+                    [
                         'section'        => $context['section'],
                         'year_level'     => $context['year_level'],
                         'program_id'     => $context['program'],
-                        'semester'       => $context['semester'],
-                        'academic_year'  => $context['academic_year'],
-                        'date_created'   => $now,
-                        'is_active'      => 1,
-                    ]);
+                        'is_active'      => 1, // 🧠 Forces restoration of enrollment!
+                    ]
+                );
+
+                if ($sectionEnrolled) {
                     $enrollCount++;
                 }
             }

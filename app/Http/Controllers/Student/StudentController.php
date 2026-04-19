@@ -421,6 +421,7 @@ class StudentController extends Controller
             'student_scholarship' => $validated['scholarship'],
             'student_language' => $validated['language'],
             'student_last_school' => $validated['last_school_type'],
+            'is_active' => 1,
         ]);
 
         // 2. Handle Shifting (Pivot Table Logic)

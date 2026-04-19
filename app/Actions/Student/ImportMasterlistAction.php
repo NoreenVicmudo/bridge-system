@@ -40,12 +40,24 @@ class ImportMasterlistAction
                 if (!$studentNumber) continue; // Skip empty rows
 
                 // Check if profile already exists
-                $exists = StudentInfo::where('student_number', $studentNumber)->exists();
+                $student = StudentInfo::where('student_number', $studentNumber)->first();
 
-                if ($exists) {
-                    $errorCount++;
-                    $errors[] = "Row skipped: {$studentNumber} already exists in the system.";
-                    continue;
+                if ($student) {
+                    if (!$student->is_active) {
+                        // 🧠 RESTORE DELETED STUDENT
+                        $student->update(['is_active' => 1]);
+                        
+                        $student->programs()->syncWithoutDetaching([
+                            $programId => ['status' => 'Active', 'updated_at' => $now]
+                        ]);
+                        
+                        AuditService::logStudentAdd($studentNumber, "Restored profile to Masterlist via CSV Import");
+                        $successCount++;
+                    } else {
+                        $errorCount++;
+                        $errors[] = "Row skipped: {$studentNumber} already exists and is active.";
+                    }
+                    continue; // Move to the next row in the CSV
                 }
 
                 // Safely translate dropdown strings to IDs

@@ -53,59 +53,49 @@ class EnrollStudentAction
             $message = '';
 
             if ($data['mode'] === 'section') {
-                $exists = StudentSection::where('student_number', $studentNumber)
-                    ->where('academic_year', $data['academic_year'])
-                    ->where('semester', $data['semester'])
-                    ->exists();
-
-                if (!$exists) {
-                    StudentSection::create([
+                // 🧠 FIXED: Use updateOrCreate to restore previous enrollments
+                StudentSection::updateOrCreate(
+                    [
                         'student_number' => $studentNumber,
+                        'academic_year'  => $data['academic_year'],
+                        'semester'       => $data['semester'],
+                    ],
+                    [
                         'section'        => $data['section'],
                         'year_level'     => $data['year_level'],
                         'program_id'     => $data['program'],
-                        'semester'       => $data['semester'],
-                        'academic_year'  => $data['academic_year'],
                         'date_created'   => $now,
-                        'is_active'      => true,
-                    ]);
-                    $message = 'Student enrolled in section successfully.';
-                    
-                    // 🧠 NEW: Smart Logging
-                    if (!$existingStudent) {
-                        AuditService::logStudentAdd($studentNumber, "Profile created and enrolled in Section {$data['section']} ({$data['semester']})");
-                    } else {
-                        AuditService::logStudentUpdate($studentNumber, "Enrolled in new Section {$data['section']} ({$data['semester']})");
-                    }
-                    return $message;
+                        'is_active'      => 1, // 🧠 Restore
+                    ]
+                );
+                
+                if (!$existingStudent) {
+                    AuditService::logStudentAdd($studentNumber, "Profile created and enrolled in Section {$data['section']} ({$data['semester']})");
+                } else {
+                    AuditService::logStudentUpdate($studentNumber, "Enrolled in / Restored to Section {$data['section']} ({$data['semester']})");
                 }
-                return 'Student is already enrolled in this section.';
+                return 'Student enrolled in section successfully.';
             } else {
-                $exists = BoardBatch::where('student_number', $studentNumber)
-                    ->where('year', $data['batch_year'])
-                    ->where('program_id', $data['batch_program'])
-                    ->where('batch_number', $data['batch_number'])
-                    ->exists();
-
-                if (!$exists) {
-                    BoardBatch::create([
+                // 🧠 FIXED: Use updateOrCreate for batches
+                BoardBatch::updateOrCreate(
+                    [
                         'student_number' => $studentNumber,
                         'year'           => $data['batch_year'],
                         'program_id'     => $data['batch_program'],
                         'batch_number'   => $data['batch_number'],
+                    ],
+                    [
                         'date_created'   => $now,
-                        'is_active'      => true,
-                    ]);
-                    
-                    // 🧠 NEW: Smart Logging
-                    if (!$existingStudent) {
-                        AuditService::logStudentAdd($studentNumber, "Profile created and enrolled in Board Batch {$data['batch_number']} ({$data['batch_year']})");
-                    } else {
-                        AuditService::logStudentUpdate($studentNumber, "Enrolled in Board Batch {$data['batch_number']} ({$data['batch_year']})");
-                    }
-                    return 'Student enrolled in batch successfully.';
+                        'is_active'      => 1, // 🧠 Restore
+                    ]
+                );
+                
+                if (!$existingStudent) {
+                    AuditService::logStudentAdd($studentNumber, "Profile created and enrolled in Board Batch {$data['batch_number']} ({$data['batch_year']})");
+                } else {
+                    AuditService::logStudentUpdate($studentNumber, "Enrolled in / Restored to Board Batch {$data['batch_number']} ({$data['batch_year']})");
                 }
-                return 'Student is already enrolled in this batch.';
+                return 'Student enrolled in batch successfully.';
             }
         });
     }

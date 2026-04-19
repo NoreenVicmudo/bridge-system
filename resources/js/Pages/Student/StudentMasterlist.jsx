@@ -254,7 +254,10 @@ export default function StudentMasterlist({ students }) {
                 {canManageData && (
                     <>
                         <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode="masterlist" />
-                        <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={studentList.filter(s => selectedIds.has(s.id))} />
+                        <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={studentList.filter(s => selectedIds.has(s.id))} onSuccess={() => {
+                            setIsRemoveMode(false);
+                            setSelectedIds(new Set());
+                        }}/>
                     </>
                 )}
             </div>

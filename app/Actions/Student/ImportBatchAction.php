@@ -32,6 +32,9 @@ class ImportBatchAction
                     continue;
                 }
 
+                // 🧠 RESTORE DELETED STUDENT
+                $student->update(['is_active' => 1]);
+
                 // NEW: Sync the program to the pivot table just in case they are a shifter
                 $student->programs()->syncWithoutDetaching([
                     $context['program_id'] => ['status' => 'Active', 'updated_at' => $now]
@@ -49,14 +52,18 @@ class ImportBatchAction
                     continue;
                 }
 
-                BoardBatch::create([
-                    'student_number' => $studentNumber,
-                    'year'           => $context['year'],
-                    'program_id'     => $context['program_id'],
-                    'batch_number'   => $context['batch_number'],
-                    'date_created'   => $now,
-                    'is_active'      => true,
-                ]);
+                BoardBatch::updateOrCreate(
+                    [
+                        'student_number' => $studentNumber,
+                        'year'           => $context['year'],
+                        'program_id'     => $context['program_id'],
+                        'batch_number'   => $context['batch_number'],
+                    ],
+                    [
+                        'date_created'   => $now,
+                        'is_active'      => 1, // 🧠 Force batch enrollment to active
+                    ]
+                );
 
                 \App\Services\AuditService::logStudentUpdate($studentNumber, "Imported via CSV into Batch {$context['batch_number']}");
                 $successCount++;
