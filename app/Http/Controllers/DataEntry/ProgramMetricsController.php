@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\ProgramMetric\MockSubject;
 use App\Models\College;
 use App\Models\Program;
+use App\Services\AuditService;
 use Inertia\Inertia;
 
 class ProgramMetricsController extends Controller
@@ -66,6 +67,9 @@ class ProgramMetricsController extends Controller
                 ['mock_subject_id' => $isNew ? null : $validated['sub_metric']],
                 ['mock_subject_name' => $validated['detail_name'], 'is_active' => $isActive, 'program_id' => $targetProgramId]
             );
+
+            $action = $isNew ? 'Added' : 'Updated';
+            AuditService::logAdditionalEntry($validated['metric'], "{$action} '{$validated['detail_name']}' (Program ID: {$targetProgramId})");
         }
 
         return redirect()->back()->with('success', 'Program metrics configuration saved successfully.');

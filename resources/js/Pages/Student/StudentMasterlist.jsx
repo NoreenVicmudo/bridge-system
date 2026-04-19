@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
@@ -71,8 +71,36 @@ export default function StudentMasterlist({ students }) {
 
     const currentFrontendSort = reverseSortKeyMap[activeSortColumn] || '';
 
+    // 🧠 FIXED: Added local state and debounce ref for the search bar
+    const [searchQuery, setSearchQuery] = useState(currentSearch);
+    const [isRemoveMode, setIsRemoveMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
+    const initialRender = useRef(true);
+
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        
+        const delayDebounceFn = setTimeout(() => {
+            router.get(route('student.masterlist'), { 
+                search: searchQuery,
+                sort: activeSortColumn,
+                direction: activeSortDirection
+            }, { preserveState: true, preserveScroll: true, replace: true });
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+        
+    }, [searchQuery]);
+
     const handleSearch = (value) => {
-        router.get(route('student.masterlist'), { search: value }, { preserveState: true, preserveScroll: true });
+        // Handle both raw strings and input events
+        const text = typeof value === 'string' ? value : value.target.value;
+        setSearchQuery(text);
     };
 
     const handleSort = (sortKey) => {
@@ -80,15 +108,30 @@ export default function StudentMasterlist({ students }) {
             mock.handleSort(sortKey);
             return;
         }
-        const dbColumn = sortKeyMap[sortKey] || 'student_id';
-        const newDirection = activeSortColumn === dbColumn && activeSortDirection === 'asc' ? 'desc' : 'asc';
-        router.get(route('student.masterlist'), { sort: dbColumn, direction: newDirection }, { preserveState: true, preserveScroll: true });
-    };
 
-    const [isRemoveMode, setIsRemoveMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState(new Set());
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
+        const dbColumn = sortKeyMap[sortKey] || 'student_info.student_id';
+        
+        let newColumn = dbColumn;
+        let newDirection = 'asc'; // Default first click is always Ascending
+
+        // 🧠 FIXED: 3-State Sort Logic (Ascending -> Descending -> None)
+        if (activeSortColumn === dbColumn) {
+            if (activeSortDirection === 'asc') {
+                newDirection = 'desc';
+            } else if (activeSortDirection === 'desc') {
+                newColumn = ''; // Reset to None
+                newDirection = ''; // Reset to None
+            }
+        }
+
+        const params = { search: searchQuery };
+        
+        // Only attach sort params if we aren't in the "None" state
+        if (newColumn) params.sort = newColumn;
+        if (newDirection) params.direction = newDirection;
+
+        router.get(route('student.masterlist'), params, { preserveState: true, preserveScroll: true });
+    };
 
     const toggleSelection = (id) => {
         const newSelected = new Set(selectedIds);
@@ -125,7 +168,7 @@ export default function StudentMasterlist({ students }) {
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Student Masterlist"
-                    search={currentSearch}
+                    search={searchQuery}
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}

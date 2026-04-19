@@ -11,6 +11,7 @@ use App\Models\Academic\RatingCategory;
 use App\Models\Academic\SimulationExam;
 use App\Models\College;
 use App\Models\Program;
+use App\Services\AuditService;
 use Inertia\Inertia;
 
 class AcademicProfileController extends Controller
@@ -89,6 +90,9 @@ class AcademicProfileController extends Controller
                 SimulationExam::updateOrCreate(['simulation_id' => $isNew ? null : $validated['sub_metric']], ['simulation_name' => $validated['detail_name'], 'is_active' => $isActive, 'program_id' => $targetProgramId]);
                 break;
         }
+
+        $action = $isNew ? 'Added' : 'Updated';
+        AuditService::logAdditionalEntry($validated['metric'], "{$action} '{$validated['detail_name']}' (Program ID: {$targetProgramId})");
 
         return redirect()->back()->with('success', 'Academic profile configuration saved successfully.');
     }

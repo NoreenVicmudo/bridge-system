@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use App\Services\StatisticsService;
+use App\Services\AuditService;
 
 class ReportController extends Controller
 {
@@ -94,6 +95,10 @@ class ReportController extends Controller
             if ($batchStudents->isEmpty()) {
                 return response()->json(['error' => 'No students found in this primary range.'], 404);
             }
+
+            $treatment = $config['tool'] === 'inferential' ? $config['inferentialType'] : 'descriptive';
+            $batchContext = "College {$filters['college']}, Program {$filters['program']}, Batch {$filters['year_start']}-{$filters['year_end']}";
+            AuditService::logReportGeneration($batchContext, $treatment, "Generated {$treatment} report");
 
             // Route to the correct statistical treatment
             if ($config['tool'] === 'descriptive') {

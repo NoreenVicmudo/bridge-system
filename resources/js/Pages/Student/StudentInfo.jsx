@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { router, Head, Link, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
@@ -61,22 +61,8 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
 
     const currentFrontendSort = reverseSortKeyMap[activeSortColumn] || '';
 
-    const handleSearch = (value) => {
-        const params = { ...activeFilters, search: value };
-        router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
-    };
-
-    const handleSort = (sortKey) => {
-        if (!isBackendReady) {
-            mock.handleSort(sortKey);
-            return;
-        }
-        const dbColumn = sortKeyMap[sortKey] || 'student_info.student_id';
-        const newDirection = activeSortColumn === dbColumn && activeSortDirection === 'asc' ? 'desc' : 'asc';
-        const params = { ...activeFilters, sort: dbColumn, direction: newDirection };
-        router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
-    };
-
+    // 🧠 FIXED: Added local state and debounce ref for the search bar
+    const [searchQuery, setSearchQuery] = useState(currentSearch);
     const [isRemoveMode, setIsRemoveMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -84,11 +70,68 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [activeFilters, setActiveFilters] = useState(filters || {});
     const [filterMode, setFilterMode] = useState(filters?.mode || "section");
+    const initialRender = useRef(true);
+
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(() => {
+            const params = { 
+                ...activeFilters, 
+                search: searchQuery,
+                sort: activeSortColumn,
+                direction: activeSortDirection
+            };
+            router.get(route('student.info'), params, { preserveState: true, preserveScroll: true, replace: true });
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+        // 🧠 FIXED: ONLY watch searchQuery! Do not watch filters or sort here to prevent loops!
+    }, [searchQuery]);
+
+    const handleSearch = (value) => {
+        const text = typeof value === 'string' ? value : value.target.value;
+        setSearchQuery(text);
+    };
+
+    const handleSort = (sortKey) => {
+        if (!isBackendReady) {
+            mock.handleSort(sortKey);
+            return;
+        }
+        
+        const dbColumn = sortKeyMap[sortKey] || 'student_info.student_id';
+        
+        let newColumn = dbColumn;
+        let newDirection = 'asc';
+
+        // 🧠 FIXED: 3-State Sort Logic (Ascending -> Descending -> None)
+        if (activeSortColumn === dbColumn) {
+            if (activeSortDirection === 'asc') {
+                newDirection = 'desc';
+            } else if (activeSortDirection === 'desc') {
+                newColumn = ''; // Reset to None
+                newDirection = ''; // Reset to None
+            }
+        }
+
+        // Include activeFilters for this specific page
+        const params = { ...activeFilters, search: searchQuery };
+        
+        if (newColumn) params.sort = newColumn;
+        if (newDirection) params.direction = newDirection;
+
+        router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
+    };
 
     useEffect(() => {
         setActiveFilters(filters);
         if (filters?.mode) setFilterMode(filters.mode);
-    }, [filters]);
+        
+    }, [JSON.stringify(filters)]);
 
     const handleApplyFilter = (newFilters, mode) => {
         const params = { ...newFilters, search: currentSearch };
@@ -116,7 +159,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Student Information"
-                    search={currentSearch}
+                    search={searchQuery}
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}

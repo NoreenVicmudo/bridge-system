@@ -132,25 +132,22 @@ class RecognitionController extends Controller
     public function export(Request $request)
     {
         $filter = $request->validate([
-            'academic_year' => 'required|string',
-            'program'       => 'required|integer',
-            'year_level'    => 'required|integer',
-            'semester'      => 'required|string',
-            'section'       => 'required|string',
+            'academic_year' => 'required|string', 'college' => 'required|integer', 'program' => 'required|integer',
+            'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $sortDirection = $request->get('direction', 'asc');
+        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
+
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
-            $q->where('academic_year', $filter['academic_year'])
-            ->where('program_id', $filter['program'])
-            ->where('year_level', $filter['year_level'])
-            ->where('semester', $filter['semester'])
-            ->where('section', $filter['section'])
-            ->where('is_active', 1);
-        })->get();
+            $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
+            ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
+            ->where('section', $filter['section'])->where('is_active', 1);
+        })->orderBy($sortColumn, $sortDirection)->get();
 
         $records = StudentAcademicRecognition::whereIn('student_number', $students->pluck('student_number'))
-            ->where('program_id', $filter['program']) // SHIFTER-PROOF FILTER
-            ->where('is_active', 1)->get()->keyBy('student_number');
+            ->where('program_id', $filter['program'])->where('is_active', 1)->get()->keyBy('student_number');
 
         $headers = ['Student Number', 'Student Name', 'Dean\'s List Count'];
 
@@ -168,9 +165,11 @@ class RecognitionController extends Controller
             fclose($file);
         };
 
+        $timestamp = now()->format('Y-m-d_H-i');
+        $fileName = "AcademicRecognition_{$filter['section']}_{$timestamp}.csv";
+
         return response()->stream($callback, 200, [
-            "Content-type" => "text/csv", 
-            "Content-Disposition" => "attachment; filename=AcademicRecognition_Export.csv"
+            "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\""
         ]);
     }
 

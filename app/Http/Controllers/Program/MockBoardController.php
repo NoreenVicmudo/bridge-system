@@ -162,7 +162,17 @@ class MockBoardController extends Controller
         $program = $request->input('program') ?? $request->input('batch_program');
         $year = $request->input('calendar_year') ?? $request->input('batch_year');
         $batchNumber = $request->input('batch_number') ?? $request->input('board_batch');
-        $period = $request->input('exam_period', 'Default'); // <-- 🧠 GRAB PERIOD
+        $period = $request->input('exam_period', 'Default');
+
+        // 🧠 FIXED: Intercept sort parameters
+        $sort = $request->get('sort', 'name');
+        $direction = $request->get('direction', 'asc');
+        
+        $sortMap = [
+            'student_number' => 'student_info.student_number',
+            'name' => 'student_info.student_lname'
+        ];
+        $sortColumn = $sortMap[$sort] ?? 'student_info.student_lname';
 
         $subjects = MockSubject::where('program_id', $program)->where('is_active', 1)->get();
         
@@ -177,10 +187,11 @@ class MockBoardController extends Controller
             ->where('board_batch.batch_number', $batchNumber)
             ->select('board_batch.batch_id', 'student_info.student_number', 'student_info.student_lname', 'student_info.student_fname')
             ->distinct()
+            ->orderBy($sortColumn, $direction) // 🧠 FIXED: Apply dynamic sorting
             ->get();
 
         $scores = StudentMockBoardScore::whereIn('batch_id', $batches->pluck('batch_id'))
-            ->where('exam_period', $period) // <-- 🧠 EXPORT SPECIFIC PERIOD
+            ->where('exam_period', $period)
             ->where('is_active', 1)->get()->groupBy('batch_id');
         
         $headers = ['Student Number', 'Student Name'];
@@ -201,7 +212,17 @@ class MockBoardController extends Controller
             fclose($file);
         };
 
-        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=MockBoard_{$period}_Export.csv"]);
+        // 🧠 FIXED: Add timestamp to filename
+        $timestamp = now()->format('Y-m-d_H-i');
+        $fileName = "MockBoard_{$period}_Export_{$timestamp}.csv";
+
+        return response()->stream($callback, 200, [
+            "Content-type" => "text/csv", 
+            "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
+            "Pragma" => "no-cache", 
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", 
+            "Expires" => "0"
+        ]);
     }
 
     public function import(Request $request)

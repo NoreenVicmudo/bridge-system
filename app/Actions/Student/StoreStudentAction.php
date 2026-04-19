@@ -3,6 +3,7 @@
 namespace App\Actions\Student;
 
 use App\Models\Student\StudentInfo;
+use App\Services\AuditService; // 🧠 ADD THIS
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +21,6 @@ class StoreStudentAction
                 'student_mname'  => $data['middle_name'] ?? null,
                 'student_lname'  => $data['last_name'] ?? 'Unknown',
                 'student_suffix' => $data['suffix'] ?? null,
-                // Removed college_id and program_id from here!
                 'student_birthdate' => $data['birthdate'] ?? null,
                 'student_sex'        => $data['sex'] ?? null,
                 'student_socioeconomic' => $data['socioeconomic_status'] ?? null,
@@ -39,7 +39,6 @@ class StoreStudentAction
                 'is_active'          => true,
             ]);
 
-            // Add the program to the pivot table
             if (!empty($data['program'])) {
                 $student->programs()->attach($data['program'], [
                     'status' => 'Active',
@@ -47,6 +46,9 @@ class StoreStudentAction
                     'updated_at' => $now
                 ]);
             }
+
+            // 🧠 NEW: Log the creation!
+            AuditService::logStudentAdd($studentNumber, 'Student profile added to Masterlist');
 
             return 'Student profile created successfully.';
         });

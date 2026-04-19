@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -93,6 +93,8 @@ class UserController extends Controller
             'status'     => 'APPROVED', 
         ]);
 
+        AuditService::logUserManagement($validated['username'], "Created new user account with role: {$validated['position']}");
+
         return redirect()->route('users.index')->with('success', 'User created successfully.');
     }
 
@@ -146,14 +148,51 @@ class UserController extends Controller
             'program_id' => $needsProgram ? $validated['program_id'] : null,
         ]);
 
+        AuditService::logUserManagement($user->username, "Updated user account info/role to: {$validated['position']}");
+
         return redirect()->route('users.index')->with('success', 'User updated successfully.');
     }
 
     public function bulkDestroy(Request $request)
     {
-        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer|exists:users,id']);
+        $request->validate([
+            'ids' => 'required|array', 
+            'ids.*' => 'integer|exists:users,id',
+            'reason_mode' => 'required|in:single,multiple', // From React
+        ]);
+
         $idsToDelete = array_diff($request->ids, [auth()->id()]);
-        if (count($idsToDelete) > 0) User::whereIn('id', $idsToDelete)->delete();
+        
+        if (count($idsToDelete) > 0) {
+            $usersToDelete = User::whereIn('id', $idsToDelete)->get();
+            
+            foreach($usersToDelete as $u) {
+                // Determine the reason sent by RemoveUserModal
+                $reason = $request->reason_mode === 'single' 
+                    ? $request->reason 
+                    : ($request->per_reasons[$u->id] ?? 'No reason provided');
+                
+                // 🧠 NEW: Log the deletion WITH the specific reason!
+                AuditService::logUserManagement($u->username, "Removed user account. Reason: {$reason}");
+            }
+
+            // Execute the bulk delete
+            User::whereIn('id', $idsToDelete)->delete();
+        }
+
         return redirect()->route('users.index')->with('success', 'Users removed successfully.');
+    }
+
+    public function acceptTos(Request $request)
+    {
+        $user = $request->user();
+        
+        $user->update([
+            'tos_accepted_at' => now()
+        ]);
+
+        \App\Services\AuditService::logUserAuth('Accepted Terms of Service');
+
+        return redirect()->back();
     }
 }

@@ -144,11 +144,15 @@ class AttendanceController extends Controller
 
     public function export(Request $request)
     {
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $sortDirection = $request->get('direction', 'asc');
+        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
+
         $students = StudentInfo::whereHas('sections', function ($q) use ($request) {
             $q->where('academic_year', $request->academic_year)->where('program_id', $request->program)
               ->where('year_level', $request->year_level)->where('semester', $request->semester)
               ->where('section', $request->section)->where('is_active', 1);
-        })->get();
+        })->orderBy($sortColumn, $sortDirection)->get();
 
         $records = StudentAttendanceReview::whereIn('student_number', $students->pluck('student_number'))
             ->where('program_id', $request->program)
@@ -166,17 +170,18 @@ class AttendanceController extends Controller
                 fputcsv($file, [
                     $student->student_number,
                     "{$student->student_lname}, {$student->student_fname}",
-                    $att,
-                    $tot,
-                    ($tot > 0) ? round(($att / $tot) * 100, 2) . '%' : '0%'
+                    $att, $tot, ($tot > 0) ? round(($att / $tot) * 100, 2) . '%' : '0%'
                 ]);
             }
             fclose($file);
         };
 
+        $timestamp = now()->format('Y-m-d_H-i');
+        $fileName = "ReviewAttendance_{$request->section}_{$timestamp}.csv";
+
         return response()->stream($callback, 200, [
             "Content-type" => "text/csv", 
-            "Content-Disposition" => "attachment; filename=ReviewAttendance_Export.csv"
+            "Content-Disposition" => "attachment; filename=\"{$fileName}\""
         ]);
     }
 

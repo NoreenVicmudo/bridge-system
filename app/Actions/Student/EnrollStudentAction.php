@@ -5,6 +5,7 @@ namespace App\Actions\Student;
 use App\Models\Student\StudentInfo;
 use App\Models\Student\StudentSection;
 use App\Models\ProgramMetric\BoardBatch;
+use App\Services\AuditService; // 🧠 ADD THIS
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,11 +16,10 @@ class EnrollStudentAction
         return DB::transaction(function () use ($data) {
             $now = Carbon::now();
             $studentNumber = $data['student_number'];
-            
-            // Determine the program from context
             $programId = $data['mode'] === 'section' ? $data['program'] : $data['batch_program'];
 
-            // 1. Create/Update Profile (NO program_id or college_id here!)
+            $existingStudent = StudentInfo::where('student_number', $studentNumber)->first();
+
             $student = StudentInfo::updateOrCreate(
                 ['student_number' => $studentNumber],
                 [
@@ -41,23 +41,18 @@ class EnrollStudentAction
                     'student_scholarship'=> $data['scholarship'] ?? null,
                     'student_language'   => $data['language'] ?? null,
                     'student_last_school'=> $data['last_school_type'] ?? null,
-                    'date_created'       => $student ? $student->date_created : $now,
+                    'date_created'       => $existingStudent ? $existingStudent->date_created : $now,
                     'is_active'          => true,
                 ]
             );
 
-            // 2. Pivot Table Sync
-            // We use syncWithoutDetaching to ensure we don't delete old historical programs
             $student->programs()->syncWithoutDetaching([
-                $programId => [
-                    'status' => 'Active',
-                    'updated_at' => $now
-                ]
+                $programId => ['status' => 'Active', 'updated_at' => $now]
             ]);
 
-            // 2. Enroll in section or batch
+            $message = '';
+
             if ($data['mode'] === 'section') {
-                // Check if already enrolled in this section for this semester/year
                 $exists = StudentSection::where('student_number', $studentNumber)
                     ->where('academic_year', $data['academic_year'])
                     ->where('semester', $data['semester'])
@@ -74,11 +69,18 @@ class EnrollStudentAction
                         'date_created'   => $now,
                         'is_active'      => true,
                     ]);
-                    return 'Student enrolled in section successfully.';
+                    $message = 'Student enrolled in section successfully.';
+                    
+                    // 🧠 NEW: Smart Logging
+                    if (!$existingStudent) {
+                        AuditService::logStudentAdd($studentNumber, "Profile created and enrolled in Section {$data['section']} ({$data['semester']})");
+                    } else {
+                        AuditService::logStudentUpdate($studentNumber, "Enrolled in new Section {$data['section']} ({$data['semester']})");
+                    }
+                    return $message;
                 }
                 return 'Student is already enrolled in this section.';
             } else {
-                // Batch mode
                 $exists = BoardBatch::where('student_number', $studentNumber)
                     ->where('year', $data['batch_year'])
                     ->where('program_id', $data['batch_program'])
@@ -94,6 +96,13 @@ class EnrollStudentAction
                         'date_created'   => $now,
                         'is_active'      => true,
                     ]);
+                    
+                    // 🧠 NEW: Smart Logging
+                    if (!$existingStudent) {
+                        AuditService::logStudentAdd($studentNumber, "Profile created and enrolled in Board Batch {$data['batch_number']} ({$data['batch_year']})");
+                    } else {
+                        AuditService::logStudentUpdate($studentNumber, "Enrolled in Board Batch {$data['batch_number']} ({$data['batch_year']})");
+                    }
                     return 'Student enrolled in batch successfully.';
                 }
                 return 'Student is already enrolled in this batch.';

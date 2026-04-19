@@ -161,49 +161,34 @@ class BoardGradeController extends Controller
     public function export(Request $request)
     {
         $filter = $request->validate([
-            'academic_year' => 'required|string',
-            'college'       => 'required|integer',
-            'program'       => 'required|integer',
-            'year_level'    => 'required|integer',
-            'semester'      => 'required|string',
-            'section'       => 'required|string',
+            'academic_year' => 'required|string', 'college' => 'required|integer', 'program' => 'required|integer',
+            'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
-        $boardSubjects = BoardSubject::where('program_id', $filter['program'])
-            ->where('is_active', 1)
-            ->get();
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $sortDirection = $request->get('direction', 'asc');
+        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
+
+        $boardSubjects = BoardSubject::where('program_id', $filter['program'])->where('is_active', 1)->get();
 
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
-            $q->where('academic_year', $filter['academic_year'])
-              ->where('program_id', $filter['program'])
-              ->where('year_level', $filter['year_level'])
-              ->where('semester', $filter['semester'])
-              ->where('section', $filter['section'])
-              ->where('is_active', 1);
-        })->get();
+            $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
+              ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
+              ->where('section', $filter['section'])->where('is_active', 1);
+        })->orderBy($sortColumn, $sortDirection)->get();
 
         $grades = StudentBoardGrade::whereIn('student_number', $students->pluck('student_number'))
-            ->where('is_active', 1)
-            ->get()
-            ->groupBy('student_number');
+            ->where('is_active', 1)->get()->groupBy('student_number');
 
         $headers = ['Student Number', 'Student Name'];
-        foreach ($boardSubjects as $sub) {
-            $headers[] = $sub->subject_name;
-        }
+        foreach ($boardSubjects as $sub) $headers[] = $sub->subject_name;
 
         $callback = function() use ($students, $grades, $boardSubjects, $headers) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $headers);
-
             foreach ($students as $student) {
                 $studentGrades = $grades->get($student->student_number) ?? collect();
-                
-                $row = [
-                    $student->student_number,
-                    "{$student->student_lname}, {$student->student_fname}"
-                ];
-
+                $row = [$student->student_number, "{$student->student_lname}, {$student->student_fname}"];
                 foreach ($boardSubjects as $sub) {
                     $record = $studentGrades->where('subject_id', $sub->subject_id)->first();
                     $row[] = $record ? $record->subject_grade : '';
@@ -213,14 +198,12 @@ class BoardGradeController extends Controller
             fclose($file);
         };
 
-        $fileName = "BoardGrades_Export_{$filter['section']}_{$filter['academic_year']}.csv";
+        $timestamp = now()->format('Y-m-d_H-i');
+        $fileName = "BoardGrades_{$filter['section']}_{$timestamp}.csv";
 
         return response()->stream($callback, 200, [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$fileName",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
+            "Pragma" => "no-cache", "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", "Expires" => "0"
         ]);
     }
 

@@ -151,25 +151,27 @@ class SimulationExamController extends Controller
     public function export(Request $request)
     {
         $filter = $request->validate([
-            'academic_year' => 'required|string',
-            'program'       => 'required|integer',
-            'year_level'    => 'required|integer',
-            'semester'      => 'required|string',
-            'section'       => 'required|string',
+            'academic_year' => 'required|string', 'college' => 'required|integer', 'program' => 'required|integer',
+            'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
+
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $sortDirection = $request->get('direction', 'asc');
+        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
 
         $simulations = SimulationExam::where('program_id', $filter['program'])->where('is_active', 1)->get();
         
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
-            $q->where('academic_year', $filter['academic_year'])
-            ->where('program_id', $filter['program'])
-            ->where('year_level', $filter['year_level'])
-            ->where('semester', $filter['semester'])
-            ->where('section', $filter['section'])
-            ->where('is_active', 1);
-        })->get();
+            $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
+            ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
+            ->where('section', $filter['section'])->where('is_active', 1);
+        })->orderBy($sortColumn, $sortDirection)->get();
 
-        $scores = StudentSimulationExam::whereIn('student_number', $students->pluck('student_number'))->where('is_active', 1)->get()->groupBy('student_number');
+        // 🧠 Also grabbing the current exam_period for accurate export
+        $period = $request->get('exam_period', 'Default');
+        $scores = StudentSimulationExam::whereIn('student_number', $students->pluck('student_number'))
+            ->where('exam_period', $period)->where('is_active', 1)->get()->groupBy('student_number');
+            
         $headers = ['Student Number', 'Student Name'];
         foreach ($simulations as $sim) $headers[] = $sim->simulation_name;
 
@@ -188,7 +190,13 @@ class SimulationExamController extends Controller
             fclose($file);
         };
 
-        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=SimExams_Export.csv", "Pragma" => "no-cache", "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", "Expires" => "0"]);
+        $timestamp = now()->format('Y-m-d_H-i');
+        $fileName = "SimExams_{$period}_{$filter['section']}_{$timestamp}.csv";
+
+        return response()->stream($callback, 200, [
+            "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\"", 
+            "Pragma" => "no-cache", "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", "Expires" => "0"
+        ]);
     }
 
     public function import(Request $request)
