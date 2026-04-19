@@ -48,6 +48,7 @@ Route::middleware('auth', 'verified')->group(function () {
         
         Route::post('/', [StudentController::class, 'store'])->name('students.store');
         Route::post('/masterlist-store', [StudentController::class, 'storeMasterlist'])->name('students.masterlist.store');
+        Route::post('/masterlist-import', [StudentController::class, 'importMasterlist'])->name('students.masterlist.import');
         Route::post('/import', [StudentController::class, 'import'])->name('students.import');
         Route::post('/import-batch', [StudentController::class, 'importBatch'])->name('students.import.batch');
         Route::post('/direct-enroll', [StudentController::class, 'directEnroll'])->name('students.direct-enroll');
