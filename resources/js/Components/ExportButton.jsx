@@ -1,8 +1,16 @@
 import React from "react";
+import { toast } from "react-toastify"; // <-- Import toast
 
 export default function ExportButton({ endpoint }) {
     const handleExport = () => {
-        // Automatically grabs current search/sort/filter URL parameters
+        // 1. Reassure the user instantly so they don't click twice
+        toast.info("Preparing export... Your download will begin shortly.", {
+            position: "bottom-right", // Keeps it out of the way of the browser's own download popup
+            autoClose: 3000,
+            hideProgressBar: true,
+        });
+
+        // 2. Trigger the actual download
         const queryParams = typeof window !== "undefined" ? window.location.search : "";
         window.location.href = `${endpoint}${queryParams}`;
     };

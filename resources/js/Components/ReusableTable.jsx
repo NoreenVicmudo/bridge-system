@@ -1,45 +1,127 @@
-import React from "react";
-import { Link } from "@inertiajs/react";
+import React, { useState, useEffect, useRef } from "react";
+import { Link, router } from "@inertiajs/react";
 import ExportButton from "@/Components/ExportButton";
 
 export const SortableHeader = ({
     label,
     sortKey,
+    className = "",
+    // Fallbacks for older pages
     currentSort,
     currentDirection,
     onSort,
-    className = "",
 }) => {
-    const isActive = currentSort === sortKey;
+    const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const activeSort = currentSort !== undefined ? currentSort : urlParams.get('sort');
+    const activeDir = currentDirection !== undefined ? currentDirection : urlParams.get('direction');
+
+    const isActive = activeSort === sortKey;
+
+    const handleSortClick = () => {
+        if (onSort) return onSort(sortKey);
+
+        let nextDir = 'asc';
+        let nextSort = sortKey;
+
+        if (activeSort === sortKey) {
+            if (activeDir === 'asc') {
+                nextDir = 'desc';
+            } else {
+                nextSort = null;
+            }
+        }
+
+        if (nextSort) {
+            urlParams.set('sort', nextSort);
+            urlParams.set('direction', nextDir);
+        } else {
+            urlParams.delete('sort');
+            urlParams.delete('direction');
+        }
+        urlParams.delete('page');
+
+        router.get(window.location.pathname, Object.fromEntries(urlParams.entries()), {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        });
+    };
+
     return (
         <th
-            onClick={() => onSort(sortKey)}
+            onClick={handleSortClick}
             className={`py-3 px-6 font-bold cursor-pointer hover:bg-[#4a1f63] transition-all duration-300 ease-in-out select-none group ${className}`}
         >
             <div className="flex items-center gap-2">
                 {label}
                 <div className="flex flex-col text-[10px] leading-none text-white/50 group-hover:text-white transition-colors duration-300 ease-in-out">
-                    <i className={`bi bi-caret-up-fill ${isActive && currentDirection === "asc" ? "text-[#ffb736]" : ""}`}></i>
-                    <i className={`bi bi-caret-down-fill ${isActive && currentDirection === "desc" ? "text-[#ffb736]" : ""}`}></i>
+                    <i className={`bi bi-caret-up-fill ${isActive && activeDir === "asc" ? "text-[#ffb736]" : ""}`}></i>
+                    <i className={`bi bi-caret-down-fill ${isActive && activeDir === "desc" ? "text-[#ffb736]" : ""}`}></i>
                 </div>
             </div>
         </th>
     );
 };
 
+
 export function TableContainer({
     title,
-    search,
-    onSearch,
+    paginationData,
     headerActions,
     footerActions,
     children,
-    paginationData,
-    onPageChange,
     filterDisplay,
     showEditNote = true,
     exportEndpoint,
+    search,
+    onSearch,
 }) {
+    const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const urlSearch = urlParams.get('search') || '';
+
+    const [localSearch, setLocalSearch] = useState(search !== undefined ? search : urlSearch);
+    
+    // 🧠 THE FIX: We use a 'ref' to keep track of the typing timer
+    const searchTimeout = useRef(null);
+
+    useEffect(() => {
+        if (search === undefined) setLocalSearch(urlSearch);
+    }, [urlSearch, search]);
+
+    const handleSearchChange = (e) => {
+        const val = e.target.value;
+        setLocalSearch(val); // Update the input box instantly so it feels fast
+
+        if (onSearch) {
+            onSearch(val);
+            return;
+        }
+
+        // 🧠 THE FIX: Clear the old timer if they are still typing
+        if (searchTimeout.current) {
+            clearTimeout(searchTimeout.current);
+        }
+
+        // 🧠 THE FIX: Set a new 300ms timer. It only fires when they STOP typing.
+        searchTimeout.current = setTimeout(() => {
+            // Read fresh URL params at the exact moment the timer fires
+            const currentParams = new URLSearchParams(window.location.search);
+            
+            if (val) {
+                currentParams.set('search', val);
+            } else {
+                currentParams.delete('search');
+            }
+            currentParams.delete('page');
+
+            router.get(window.location.pathname, Object.fromEntries(currentParams.entries()), {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true
+            });
+        }, 300); // 300 milliseconds
+    };
+
     return (
         <>
             <style>{`
@@ -48,7 +130,6 @@ export function TableContainer({
                 .scrollbar-purple::-webkit-scrollbar-thumb { background: #5c297c; border-radius: 4px; transition: background 0.3s ease; }
                 .scrollbar-purple::-webkit-scrollbar-thumb:hover { background: #ffb736; }
                 .scrollbar-purple { scrollbar-width: thin; scrollbar-color: #5c297c #f1f1f1; }
-                input[type="checkbox"]:checked { background-color: #5c297c; border-color: #5c297c; accent-color: #5c297c; }
             `}</style>
 
             <div className="bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] flex flex-col w-full font-['Montserrat'] animate-fade-in relative">
@@ -68,8 +149,8 @@ export function TableContainer({
                             <input
                                 type="text"
                                 placeholder="Search..."
-                                value={search}
-                                onChange={(e) => onSearch(e.target.value)}
+                                value={localSearch}
+                                onChange={handleSearchChange}
                                 className="w-full md:w-[300px] h-[40px] px-4 border border-[#5c297c] rounded-[5px] text-sm focus:outline-none focus:ring-2 focus:ring-[#ffb736] transition-all duration-300 ease-in-out"
                             />
                         </div>
@@ -92,20 +173,23 @@ export function TableContainer({
                         {paginationData && (
                             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
                                 <div className="text-sm text-gray-600 font-medium">
-                                    Showing {paginationData.from} to {paginationData.to} of {paginationData.total} entries
+                                    Showing {paginationData.from || 0} to {paginationData.to || 0} of {paginationData.total || 0} entries
                                 </div>
                                 <div className="flex gap-1">
                                     {paginationData.links.map((link, i) => {
-                                        const isSimulated = typeof onPageChange === "function";
                                         const className = `px-3 py-1.5 rounded text-sm font-medium transition-all duration-300 ease-in-out ${
                                             link.active ? "bg-[#ffb736] text-white shadow-sm" : "bg-[#5c297c] text-white hover:bg-[#4a1f63]"
                                         } ${!link.url ? "opacity-50 cursor-not-allowed bg-gray-400" : ""}`;
 
-                                        if (isSimulated) {
-                                            return <button key={i} disabled={!link.url} onClick={() => link.url && onPageChange(link.page)} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />;
-                                        }
                                         return link.url ? (
-                                            <Link key={i} href={link.url} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />
+                                            <Link 
+                                                key={i} 
+                                                href={link.url} 
+                                                preserveState 
+                                                preserveScroll 
+                                                className={className} 
+                                                dangerouslySetInnerHTML={{ __html: link.label }} 
+                                            />
                                         ) : (
                                             <span key={i} className={className} dangerouslySetInnerHTML={{ __html: link.label }} />
                                         );
@@ -117,7 +201,7 @@ export function TableContainer({
                         {showEditNote && (
                             <div className="flex-1 mb-4">
                                 <p className="text-[#ed1c24] text-xs md:text-sm font-medium italic">
-                                    Note: Click on the ID to edit the information.
+                                    Note: Click on the ID/Username to edit the information.
                                 </p>
                             </div>
                         )}

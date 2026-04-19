@@ -108,6 +108,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
             setSelectedIds(new Set());
         }
     };
+    
 
     return (
         <AuthenticatedLayout>

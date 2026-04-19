@@ -30,7 +30,10 @@ export default function UserList({ users, queryParams = {} }) {
     }, [search, sortColumn, sortDirection]);
 
     const handleSearch = (e) => {
-        const val = e.target.value;
+        // If 'e' is an event object, get e.target.value. 
+        // If 'e' is already a string (from the ReusableTable), use it directly.
+        const val = e?.target ? e.target.value : e;
+        
         setSearch(val);
         fetchUsers({ search: val });
     };
@@ -59,12 +62,24 @@ export default function UserList({ users, queryParams = {} }) {
         else setSelectedIds(new Set());
     };
 
-    const handleBulkDelete = () => {
-        router.post(route('users.bulk-destroy'), { ids: Array.from(selectedIds) }, {
+    // Accept the reasonData and a callback to stop the modal's loading spinner
+    const handleBulkDelete = (reasonData, stopLoading) => {
+        
+        // Combine the selected IDs with the reasons from the modal
+        const payload = {
+            ids: Array.from(selectedIds),
+            ...reasonData
+        };
+
+        router.post(route('users.bulk-destroy'), payload, {
             onSuccess: () => {
                 setIsRemoveModalOpen(false);
                 setIsRemoveMode(false);
                 setSelectedIds(new Set());
+            },
+            onFinish: () => {
+                // Stop the spinning loading wheel in the modal when backend finishes
+                if (stopLoading) stopLoading(); 
             }
         });
     };

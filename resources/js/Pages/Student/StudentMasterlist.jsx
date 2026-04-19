@@ -43,6 +43,13 @@ export default function StudentMasterlist({ students }) {
         age: 'student_birthdate',
         sex: 'student_sex',
         socioeconomic: 'student_socioeconomic',
+        // NEW ADDITIONS
+        address: 'student_address_city', 
+        living: 'student_living',
+        work_status: 'student_work',
+        scholarship: 'student_scholarship',
+        language: 'student_language',
+        last_school: 'student_last_school',
     };
 
     const reverseSortKeyMap = {
@@ -53,6 +60,13 @@ export default function StudentMasterlist({ students }) {
         student_birthdate: 'age',
         student_sex: 'sex',
         student_socioeconomic: 'socioeconomic',
+        // NEW ADDITIONS
+        student_address_city: 'address',
+        student_living: 'living',
+        student_work: 'work_status',
+        student_scholarship: 'scholarship',
+        student_language: 'language',
+        student_last_school: 'last_school',
     };
 
     const currentFrontendSort = reverseSortKeyMap[activeSortColumn] || '';
@@ -88,6 +102,21 @@ export default function StudentMasterlist({ students }) {
         } else {
             setSelectedIds(new Set());
         }
+    };
+
+    // 🧠 THE FIX: Catch the payload and send it via Inertia
+    const handleBulkDelete = (reasonData, stopLoading) => {
+        router.post(route('students.bulk-destroy'), reasonData, {
+            onSuccess: () => {
+                setIsRemoveModalOpen(false);
+                setIsRemoveMode(false);
+                setSelectedIds(new Set());
+                // AuthenticatedLayout will automatically pop the Toast here!
+            },
+            onFinish: () => {
+                if (stopLoading) stopLoading(); 
+            }
+        });
     };
 
     return (
@@ -134,12 +163,12 @@ export default function StudentMasterlist({ students }) {
                             <SortableHeader label="Age" sortKey="age" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
                             <SortableHeader label="Sex" sortKey="sex" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
                             <SortableHeader label="Socioeconomic Status" sortKey="socioeconomic" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
-                            <th className="py-3 px-6 font-bold">Address</th>
-                            <th className="py-3 px-6 font-bold">Living</th>
-                            <th className="py-3 px-6 font-bold">Work Status</th>
-                            <th className="py-3 px-6 font-bold">Scholarship</th>
-                            <th className="py-3 px-6 font-bold">Language</th>
-                            <th className="py-3 px-6 font-bold">Last School</th>
+                            <SortableHeader label="Address" sortKey="address" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Living" sortKey="living_arrangement" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Work Status" sortKey="work_status" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Scholarship" sortKey="scholarship" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Language" sortKey="language" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Last School" sortKey="last_school" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">

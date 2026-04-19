@@ -30,7 +30,6 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         return array_merge(parent::share($request), [
-            ...parent::share($request),
             'auth' => [
                 'user' => $request->user() ? [
                     'id'       => $request->user()->id,
@@ -41,6 +40,13 @@ class HandleInertiaRequests extends Middleware
                     'program_id' => $request->user()->program_id,
                     'avatar' => $request->user()->avatar,
                 ] : null,
+            ],
+            // --- ADDED THIS FLASH BLOCK ---
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error'   => fn () => $request->session()->get('error'),
+                'warning' => fn () => $request->session()->get('warning'),
+                'info'    => fn () => $request->session()->get('info'),
             ],
         ]);
     }

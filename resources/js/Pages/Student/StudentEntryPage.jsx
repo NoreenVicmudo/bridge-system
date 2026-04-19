@@ -29,14 +29,18 @@ export default function StudentEntryPage({ student = null, prefilledId = null, o
 
     // 2. Initialize the form
     // If editing, use student data. If adding, use empty strings (or prefilledId).
+    // 2. Initialize the form
     const { data, setData, post, put, processing, errors } = useForm({
         student_number: isEdit ? student.student_number : (prefilledId || queryParams.get('prefilledId') || ""),
         last_name: isEdit ? student.last_name : "",
         first_name: isEdit ? student.first_name : "",
         middle_name: isEdit ? student.middle_name : "",
         suffix: isEdit ? student.suffix : "",
-        college: isEdit ? student.college : (user.college_id || queryParams.get('college') || ""),
-        program: isEdit ? student.program : (user.program_id || queryParams.get('program') || ""),
+        
+        // 🧠 FIX: Parse these as integers so the dropdown recognizes the value!
+        college: isEdit ? student.college : (user.college_id || (queryParams.get('college') ? parseInt(queryParams.get('college')) : "")),
+        program: isEdit ? student.program : (user.program_id || (queryParams.get('program') ? parseInt(queryParams.get('program')) : "")),
+        
         birthdate: isEdit ? student.birthdate : "",
         sex: isEdit ? student.sex : "",
         socioeconomic_status: isEdit ? student.socioeconomic_status : "",
@@ -56,9 +60,10 @@ export default function StudentEntryPage({ student = null, prefilledId = null, o
         semester: queryParams.get('semester') || "",
         year_level: queryParams.get('year_level') || "",
         section: queryParams.get('section') || "",
-        // batch fields
-        college_id: queryParams.get('college_id') || "",
-        program_id: queryParams.get('program_id') || "",
+        
+        // 🧠 FIX: Also parse these for batch mode
+        college_id: queryParams.get('college_id') ? parseInt(queryParams.get('college_id')) : "",
+        program_id: queryParams.get('program_id') ? parseInt(queryParams.get('program_id')) : "",
         batch_year: queryParams.get('year') || "",
         batch_number: queryParams.get('batch_number') || "",
     });

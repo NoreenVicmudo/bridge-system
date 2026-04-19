@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Link } from "@inertiajs/react";
+import { Link, Head, router } from "@inertiajs/react";
 import LoadingScreen from "@/Components/LoadingScreen";
+import TermsOfServiceModal from "@/Components/Modals/TermsOfServiceModal";
 
-export default function Main({ auth }) {
+export default function Main({ auth, isFirstLogin = false }) {
     const [isHomeLoading, setIsHomeLoading] = useState(true);
+
+    // --- TOS MODAL STATE ---
+    const [showTosModal, setShowTosModal] = useState(isFirstLogin); //change isFirstLogin to true when testing the modal
 
     const user = auth.user;
     
@@ -16,8 +20,17 @@ export default function Main({ auth }) {
         return () => clearTimeout(timer);
     }, []);
 
+    // --- TOS HANDLER ---
+    const handleTosAccept = () => {
+        router.post(route('user.accept-tos'), {}, {
+            preserveScroll: true,
+            onSuccess: () => setShowTosModal(false)
+        });
+    };
+
     return (
         <AuthenticatedLayout defaultCollapsed={true}>
+            <Head title="Dashboard" />
             <LoadingScreen visible={isHomeLoading} />
 
             {/* --- HERO SECTION --- */}
@@ -73,6 +86,13 @@ export default function Main({ auth }) {
                     </div>
                 </div>
             </section>
+
+            {/* --- THE TOS MODAL --- */}
+            <TermsOfServiceModal 
+                isOpen={showTosModal}
+                onAccept={handleTosAccept}
+            />
+
         </AuthenticatedLayout>
     );
 }

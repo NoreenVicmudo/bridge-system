@@ -127,7 +127,7 @@ export default function UpdateUserForm({
                                 )}
                             </div>
                             <p className="text-[#ed1c24] text-xs font-bold italic mt-4 bg-red-50 p-2 rounded border border-red-100">
-                                <i className="bi bi-exclamation-triangle-fill mr-1"></i> WARNING: Editing user data will affect their access and will force the user to re-login.
+                                <i className="bi bi-exclamation-triangle-fill mr-1"></i> WARNING: Editing user data will affect their access.
                             </p>
                         </div>
 
