@@ -50,39 +50,53 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
     };
 
     const handleProceed = async () => {
+        const isMasterlist = filterMode === 'masterlist';
+
         if (checkStatus === 'exists') {
-            setEnrolling(true);
-            try {
-                const payload = {
-                    student_number: studentNumberInput,
-                    mode: filterMode,
-                };
-                if (filterMode === 'section') {
-                    payload.academic_year = currentFilters.academic_year || '';
-                    payload.semester = currentFilters.semester || '';
-                    payload.college = currentFilters.college || '';
-                    payload.program = currentFilters.program || '';
-                    payload.year_level = currentFilters.year_level || '';
-                    payload.section = currentFilters.section || '';
-                } else {
-                    payload.batch_college = currentFilters.batch_college || '';
-                    payload.batch_program = currentFilters.batch_program || '';
-                    payload.batch_year = currentFilters.batch_year || '';
-                    payload.batch_number = currentFilters.board_batch || '';
+            if (isMasterlist) {
+                // 🧠 NEW: In Masterlist, if student exists, go straight to Edit page
+                closeModal();
+                // We need to fetch the internal DB ID first to use the edit route
+                try {
+                    const idResponse = await axios.get(`/api/get-student-id/${studentNumberInput}`);
+                    router.get(route('students.edit', idResponse.data.id));
+                } catch (e) {
+                    alert("Could not find internal ID for this student.");
                 }
-                const response = await axios.post(route('students.direct-enroll'), payload);
-                if (response.data.success) {
-                    alert(response.data.message);
-                    closeModal();
-                    window.location.reload();
-                } else {
-                    alert('Enrollment failed: ' + response.data.message);
+            } else {
+                setEnrolling(true);
+                try {
+                    const payload = {
+                        student_number: studentNumberInput,
+                        mode: filterMode,
+                    };
+                    if (filterMode === 'section') {
+                        payload.academic_year = currentFilters.academic_year || '';
+                        payload.semester = currentFilters.semester || '';
+                        payload.college = currentFilters.college || '';
+                        payload.program = currentFilters.program || '';
+                        payload.year_level = currentFilters.year_level || '';
+                        payload.section = currentFilters.section || '';
+                    } else {
+                        payload.batch_college = currentFilters.batch_college || '';
+                        payload.batch_program = currentFilters.batch_program || '';
+                        payload.batch_year = currentFilters.batch_year || '';
+                        payload.batch_number = currentFilters.board_batch || '';
+                    }
+                    const response = await axios.post(route('students.direct-enroll'), payload);
+                    if (response.data.success) {
+                        alert(response.data.message);
+                        closeModal();
+                        window.location.reload();
+                    } else {
+                        alert('Enrollment failed: ' + response.data.message);
+                    }
+                } catch (error) {
+                    console.error('Enrollment error:', error);
+                    alert('Enrollment failed. Please try again.');
+                } finally {
+                    setEnrolling(false);
                 }
-            } catch (error) {
-                console.error('Enrollment error:', error);
-                alert('Enrollment failed. Please try again.');
-            } finally {
-                setEnrolling(false);
             }
         } else {
             // New student: go to entry page
@@ -122,7 +136,9 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
         formData.append('file', importFile);
         
         let endpoint;
-        if (filterMode === 'section') {
+        if (filterMode === 'masterlist') {
+            endpoint = route('students.masterlist.import');
+        } else if (filterMode === 'section') {
             endpoint = route('students.import');
             formData.append('academic_year', currentFilters.academic_year || '');
             formData.append('semester', currentFilters.semester || '');
@@ -287,14 +303,19 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
                                     <div className="flex items-center gap-3 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100 shadow-sm">
                                         <i className="bi bi-info-circle-fill text-xl"></i>
-                                        <span className="text-sm font-medium">Student found! You can proceed to enroll them.</span>
+                                        <span className="text-sm font-medium">
+                                            {filterMode === 'masterlist' 
+                                                ? "Student profile found! You can proceed to edit their details." 
+                                                : "Student found! You can proceed to enroll them."
+                                            }
+                                        </span>
                                     </div>
                                     <button 
                                         onClick={handleProceed} 
                                         disabled={enrolling}
-                                        className="w-full py-3 bg-[#ffb736] text-white font-bold rounded-lg shadow-md hover:bg-[#e0a800] hover:scale-[1.02] transition-all disabled:opacity-60 disabled:hover:scale-100"
+                                        className="w-full py-3 bg-[#ffb736] text-white font-bold rounded-lg shadow-md hover:bg-[#e0a800] hover:scale-[1.02] transition-all disabled:opacity-60"
                                     >
-                                        {enrolling ? "Enrolling..." : "Proceed to Enroll"}
+                                        {enrolling ? "Enrolling..." : (filterMode === 'masterlist' ? "Proceed to Edit Profile" : "Proceed to Enroll")}
                                     </button>
                                 </div>
                             )}

@@ -6,6 +6,7 @@ use App\Actions\Student\DirectEnrollStudentAction;
 use App\Actions\Student\EnrollStudentAction;
 use App\Actions\Student\ImportBatchAction;
 use App\Actions\Student\ImportStudentsAction;
+use App\Actions\Student\ImportMasterlistAction;
 use App\Actions\Student\StoreStudentAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\StoreStudentRequest;
@@ -63,6 +64,21 @@ class StudentController extends Controller
 
         $message = $action->execute($request->file('file'), $request->except('file'));
         return response()->json(['success' => true, 'message' => $message]);
+    }
+
+    public function importMasterlist(Request $request, ImportMasterlistAction $action)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
+            'program_id' => 'required|integer|exists:programs,program_id',
+        ]);
+
+        try {
+            $message = $action->execute($request->file('file'), $request->program_id);
+            return response()->json(['success' => true, 'message' => $message]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Import failed: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -137,7 +153,12 @@ class StudentController extends Controller
         if ($user->program_id) $query->where('student_programs.program_id', $user->program_id);
 
         // 🧠 FIXED: 2. Apply the sort to the database query!
-        $query->orderBy($sortColumn, $direction);
+        if (!empty($sortColumn) && in_array($direction, ['asc', 'desc'])) {
+            $query->orderBy($sortColumn, $direction);
+        } else {
+            // Optional: Default fallback sort if no sort is active
+            $query->orderBy('student_info.student_id', 'asc');
+        }
 
         $students = $query->paginate(20)->withQueryString();
         $students->getCollection()->transform(fn($student) => $this->transformStudent($student));
@@ -188,7 +209,12 @@ class StudentController extends Controller
             if ($request->filled('board_batch')) $query->where('board_batch.batch_number', $request->board_batch);
 
             // 🧠 FIXED: 2. Apply sort before paginating
+            if (!empty($sortColumn) && in_array($direction, ['asc', 'desc'])) {
             $query->orderBy($sortColumn, $direction);
+            } else {
+                // Optional: Default fallback sort if no sort is active
+                $query->orderBy('student_info.student_id', 'asc');
+            }
             $students = $query->paginate(20)->withQueryString();
             
             $filterData = $request->only(['batch_college', 'batch_program', 'batch_year', 'board_batch']);
@@ -208,8 +234,12 @@ class StudentController extends Controller
             if ($request->filled('year_level')) $query->where('student_section.year_level', $request->year_level);
             if ($request->filled('section')) $query->where('student_section.section', $request->section);
 
-            // 🧠 FIXED: 3. Apply sort before paginating here as well
+            if (!empty($sortColumn) && in_array($direction, ['asc', 'desc'])) {
             $query->orderBy($sortColumn, $direction);
+            } else {
+                // Optional: Default fallback sort if no sort is active
+                $query->orderBy('student_info.student_id', 'asc');
+            }
             $students = $query->paginate(20)->withQueryString();
             
             $filterData = $request->only(['academic_year', 'semester', 'college', 'program', 'year_level', 'section']);
@@ -243,6 +273,9 @@ class StudentController extends Controller
      */
     public function create(Request $request)
     {
+        $request->validate([
+            'mode' => 'nullable|in:section,batch,masterlist',
+        ]);
         $mode = $request->get('mode', 'section');
         $prefilledId = $request->get('prefilledId');
 
@@ -388,6 +421,7 @@ class StudentController extends Controller
             'student_scholarship' => $validated['scholarship'],
             'student_language' => $validated['language'],
             'student_last_school' => $validated['last_school_type'],
+            'is_active' => 1,
         ]);
 
         // 2. Handle Shifting (Pivot Table Logic)
@@ -452,6 +486,14 @@ class StudentController extends Controller
             $this->authorizeStudentAccess($request->user(), $student);
 
             $student->update(['is_active' => 0]);
+
+            DB::table('student_section')
+            ->where('student_number', $student->student_number)
+            ->update(['is_active' => 0]);
+
+            DB::table('board_batch')
+                ->where('student_number', $student->student_number)
+                ->update(['is_active' => 0]);
 
             $reason = $request->reason_mode === 'single'
                 ? $request->reason
@@ -568,8 +610,12 @@ class StudentController extends Controller
             if ($user->program_id) $query->where('student_programs.program_id', $user->program_id);
         }
 
-        // 🧠 FIXED: Apply the active sort column before pulling the data
-        $query->orderBy($sortColumn, $direction);
+        if (!empty($sortColumn) && in_array($direction, ['asc', 'desc'])) {
+            $query->orderBy($sortColumn, $direction);
+        } else {
+            // Optional: Default fallback sort if no sort is active
+            $query->orderBy('student_info.student_id', 'asc');
+        }
 
         $students = $query->get();
 
