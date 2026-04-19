@@ -38,7 +38,7 @@ class StoreStudentRequest extends FormRequest
             'last_school_type' => ['nullable', 'string'],
 
             // Mode
-            'mode' => ['required', 'in:section,batch'],
+            'mode' => ['required', 'in:section,batch,masterlist'],
 
             // Section context
             'academic_year'  => ['nullable', 'string'],
