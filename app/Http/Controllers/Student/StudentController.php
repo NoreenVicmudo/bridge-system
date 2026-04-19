@@ -273,6 +273,9 @@ class StudentController extends Controller
      */
     public function create(Request $request)
     {
+        $request->validate([
+            'mode' => 'nullable|in:section,batch,masterlist',
+        ]);
         $mode = $request->get('mode', 'section');
         $prefilledId = $request->get('prefilledId');
 
