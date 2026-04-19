@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Auth;
@@ -82,6 +83,8 @@ Route::middleware('guest')->group(function () {
 
                 // 5. Log the user in
                 Auth::login($user);
+
+                AuditService::logUserAuth('Logged in via Microsoft SSO');
 
                 return redirect()->route('main');
                 

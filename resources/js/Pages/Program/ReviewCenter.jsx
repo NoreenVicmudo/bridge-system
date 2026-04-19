@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
@@ -27,24 +27,44 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
         batch_program_name: dbPrograms.find(p => p.program_id == filter?.program)?.name || filter?.program,
     };
 
-    const handleSearch = (val) => router.get(route('review.center'), { ...filter, search: val, sort, direction }, { preserveState: true });
+    // 🧠 1. Setup local state and debounce ref
+    const [searchQuery, setSearchQuery] = useState(search);
+    const initialRender = useRef(true);
+
+    // 🧠 2. The Debounce Effect
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        const delayDebounceFn = setTimeout(() => {
+            router.get(route('review.center'), { ...filter, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true, replace: true });
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    // 🧠 3. Handlers using searchQuery
+    const handleSearch = (val) => {
+        const text = typeof val === 'string' ? val : val?.target?.value || "";
+        setSearchQuery(text);
+    };
 
     const handleSort = (key) => {
         const dbKeyMap = { 'student_number': 'student_info.student_number', 'name': 'student_info.student_lname', 'review_center': 'student_review_center.review_center' };
         const dbKey = dbKeyMap[key] || 'student_info.student_lname';
         const dir = sort === dbKey && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('review.center'), { ...filter, search, sort: dbKey, direction: dir }, { preserveState: true });
+        router.get(route('review.center'), { ...filter, search: searchQuery, sort: dbKey, direction: dir }, { preserveState: true, preserveScroll: true });
     };
 
-    const handleApplyFilter = (newFilters) => router.get(route('review.center'), { ...newFilters, search, sort, direction }, { preserveState: true });
-
+    const handleApplyFilter = (newFilters) => router.get(route('review.center'), { ...newFilters, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true });
+    
     return (
         <AuthenticatedLayout>
             <Head title="Student Review Center" />
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Student Review Center"
-                    search={search} onSearch={handleSearch}
+                    search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
                     exportEndpoint={route('review.center.export', filter)}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />}

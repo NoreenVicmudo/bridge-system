@@ -461,7 +461,7 @@ class StudentController extends Controller
             $deletedCount++;
         }
 
-        return response()->json(['success' => true, 'deleted_count' => $deletedCount]);
+        return redirect()->back()->with('success', "Successfully removed {$deletedCount} student(s).");
     }
 
     /**

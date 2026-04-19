@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
@@ -19,19 +19,38 @@ export default function SimulationExamPage({ students, filter, search: backendSe
     const sortColumn = isBackendReady ? sort : mock.sortColumn;
     const sortDirection = isBackendReady ? direction : mock.sortDirection;
 
-    const handleSearch = isBackendReady ? (val) => {
-        router.get(route('simulation.exam'), { ...filter, search: val, sort, direction, exam_period: examPeriod }, { preserveState: true, preserveScroll: true });
-    } : mock.setSearch;
+    const [searchQuery, setSearchQuery] = useState(search);
+    const initialRender = useRef(true);
+
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        const delayDebounceFn = setTimeout(() => {
+            if (isBackendReady) {
+                router.get(route('simulation.exam'), { ...filter, search: searchQuery, sort, direction, exam_period: examPeriod }, { preserveState: true, preserveScroll: true, replace: true });
+            } else {
+                mock.setSearch(searchQuery);
+            }
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    const handleSearch = (val) => {
+        const text = typeof val === 'string' ? val : val?.target?.value || "";
+        setSearchQuery(text);
+    };
 
     const handlePageChange = isBackendReady ? (url) => {
-        if(url) router.get(url, { ...filter, search, sort, direction, exam_period: examPeriod }, { preserveScroll: true, preserveState: true });
+        if(url) router.get(url, { ...filter, search: searchQuery, sort, direction, exam_period: examPeriod }, { preserveScroll: true, preserveState: true });
     } : mock.setPage;
 
     const handleSort = isBackendReady ? (sortKey) => {
         const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
         const dbColumn = dbColumnMap[sortKey] || 'student_info.student_id';
         const newDir = sort === dbColumn && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('simulation.exam'), { ...filter, search, sort: dbColumn, direction: newDir, exam_period: examPeriod }, { preserveState: true, preserveScroll: true });
+        router.get(route('simulation.exam'), { ...filter, search: searchQuery, sort: dbColumn, direction: newDir, exam_period: examPeriod }, { preserveState: true, preserveScroll: true });
     } : mock.handleSort;
 
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -69,7 +88,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Simulation Exam Results"
-                    search={search} onSearch={handleSearch}
+                    search={searchQuery} onSearch={handleSearch}
                     paginationData={paginator} onPageChange={handlePageChange}
                     exportEndpoint={route('simulation-exam.export', { ...filter, exam_period: examPeriod })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}

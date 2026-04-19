@@ -159,11 +159,17 @@ class PerformanceRatingController extends Controller
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $sortDirection = $request->get('direction', 'asc');
+        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
+
         $categories = RatingCategory::where('program_id', $filter['program'])->where('is_active', 1)->get();
+        
         $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
-              ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])->where('section', $filter['section'])->where('is_active', 1);
-        })->get();
+              ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
+              ->where('section', $filter['section'])->where('is_active', 1);
+        })->orderBy($sortColumn, $sortDirection)->get();
 
         $ratings = StudentPerformanceRating::whereIn('student_number', $students->pluck('student_number'))->where('is_active', 1)->get()->groupBy('student_number');
         $headers = ['Student Number', 'Student Name'];
@@ -184,8 +190,11 @@ class PerformanceRatingController extends Controller
             fclose($file);
         };
 
+        $timestamp = now()->format('Y-m-d_H-i');
+        $fileName = "PerformanceRatings_{$filter['section']}_{$timestamp}.csv";
+
         return response()->stream($callback, 200, [
-            "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=PerformanceRatings_Export.csv",
+            "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
             "Pragma" => "no-cache", "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", "Expires" => "0"
         ]);
     }

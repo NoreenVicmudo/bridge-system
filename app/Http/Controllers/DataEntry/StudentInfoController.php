@@ -10,6 +10,7 @@ use App\Models\Student\Language;
 use App\Models\Student\LivingArrangement;
 use App\Models\College;
 use App\Models\Program;
+use App\Services\AuditService;
 use Inertia\Inertia;
 
 class StudentInfoController extends Controller
@@ -64,6 +65,8 @@ class StudentInfoController extends Controller
                     ]
                 );
             }
+
+            AuditService::logAdditionalEntry('SocioeconomicStatus', 'Updated system-wide socioeconomic bounds/ranges');
 
             return redirect()->back()->with('success', 'Socioeconomic ranges updated successfully.');
         }
@@ -126,6 +129,9 @@ class StudentInfoController extends Controller
                 );
                 break;
         }
+
+        $action = $isNew ? 'Added' : 'Updated';
+        AuditService::logAdditionalEntry($metric, "{$action} '{$validated['detail_name']}' configuration");
 
         return redirect()->back()->with('success', 'Student information configuration saved successfully.');
     }

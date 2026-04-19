@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { router } from "@inertiajs/react";
 import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function RemoveStudentModal({
@@ -43,37 +43,37 @@ export default function RemoveStudentModal({
         );
     };
 
-    const handleConfirm = async () => {
+    const handleConfirm = () => {
         if (!isReadyToRemove()) return;
-
         setDeleting(true);
-        try {
-            const payload = {
-                students: selectedStudents.map(s => s.id),
-                reason_mode: mode,
-                location: window.location.pathname.includes("masterlist") ? "MASTERLIST" : "STUDENT_INFO",
-            };
-            if (mode === "single") {
-                payload.reason = singleReason;
-            } else {
-                payload.per_reasons = individualReasons;
-            }
 
-            const response = await axios.post(route('students.bulk-destroy'), payload);
-            if (response.data.success) {
-                alert(`Successfully deleted ${response.data.deleted_count} student(s).`);
+        const payload = {
+            students: selectedStudents.map(s => s.id),
+            reason_mode: mode,
+            location: window.location.pathname.includes("masterlist") ? "MASTERLIST" : "STUDENT_INFO",
+        };
+        
+        if (mode === "single") {
+            payload.reason = singleReason;
+        } else {
+            payload.per_reasons = individualReasons;
+        }
+
+        // 2. Use Inertia so the Toast works!
+        router.post(route('students.bulk-destroy'), payload, {
+            onSuccess: () => {
                 if (onSuccess) onSuccess();
                 closeModal();
-                window.location.reload();
-            } else {
-                alert('Deletion failed: ' + response.data.message);
+                // You no longer need window.location.reload() here! Inertia handles it.
+            },
+            onError: (errors) => {
+                alert('Deletion failed. Please check the console.');
+                console.error(errors);
+            },
+            onFinish: () => {
+                setDeleting(false);
             }
-        } catch (error) {
-            console.error('Delete error:', error);
-            alert('An error occurred while deleting students.');
-        } finally {
-            setDeleting(false);
-        }
+        });
     };
 
     if (!isOpen) return null;

@@ -139,6 +139,17 @@ class ReviewCenterController extends Controller
         $year = $request->input('calendar_year') ?? $request->input('batch_year');
         $batchNumber = $request->input('batch_number') ?? $request->input('board_batch');
 
+        // 🧠 FIXED: Intercept sort parameters
+        $sort = $request->get('sort', 'name');
+        $direction = $request->get('direction', 'asc');
+        
+        $sortMap = [
+            'student_number' => 'student_info.student_number',
+            'name' => 'student_info.student_lname',
+            'review_center' => 'student_review_center.review_center'
+        ];
+        $sortColumn = $sortMap[$sort] ?? 'student_info.student_lname';
+
         $batches = StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
             ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
@@ -152,7 +163,7 @@ class ReviewCenterController extends Controller
             ->where('board_batch.year', $year)
             ->where('board_batch.batch_number', $batchNumber)
             ->select('student_info.student_number', 'student_info.student_lname', 'student_info.student_fname', 'student_review_center.review_center')
-            ->orderBy('student_info.student_lname', 'asc')
+            ->orderBy($sortColumn, $direction) // 🧠 FIXED: Replaced static orderBy with dynamic sort
             ->get();
 
         $headers = ['Student Number', 'Student Name', 'Review Center'];
@@ -164,7 +175,17 @@ class ReviewCenterController extends Controller
             fclose($file);
         };
 
-        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=ReviewCenter_Export_{$year}_Batch{$batchNumber}.csv"]);
+        // 🧠 FIXED: Add timestamp to filename
+        $timestamp = now()->format('Y-m-d_H-i');
+        $fileName = "ReviewCenter_Export_{$year}_Batch{$batchNumber}_{$timestamp}.csv";
+
+        return response()->stream($callback, 200, [
+            "Content-type" => "text/csv", 
+            "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
+            "Pragma" => "no-cache", 
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", 
+            "Expires" => "0"
+        ]);
     }
 
     public function import(Request $request)

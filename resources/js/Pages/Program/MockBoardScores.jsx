@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
@@ -31,19 +31,39 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
         batch_program_name: dbPrograms.find(p => p.program_id == filter?.program)?.name || filter?.program,
     };
 
-    const handleSearch = (val) => router.get(route('mock.board.scores'), { ...filter, search: val, sort, direction }, { preserveState: true });
+    // 🧠 1. Setup local state and debounce ref
+    const [searchQuery, setSearchQuery] = useState(search);
+    const initialRender = useRef(true);
+
+    // 🧠 2. The Debounce Effect
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        const delayDebounceFn = setTimeout(() => {
+            router.get(route('mock.board.scores'), { ...filter, search: searchQuery, sort, direction, exam_period: currentExamPeriod }, { preserveState: true, preserveScroll: true, replace: true });
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    // 🧠 3. Handlers using searchQuery
+    const handleSearch = (val) => {
+        const text = typeof val === 'string' ? val : val?.target?.value || "";
+        setSearchQuery(text);
+    };
     
     const handleSort = (key) => {
         const dbKey = key === 'student_number' ? 'student_info.student_number' : 'student_info.student_lname';
         const dir = sort === dbKey && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('mock.board.scores'), { ...filter, search, sort: dbKey, direction: dir }, { preserveState: true });
+        router.get(route('mock.board.scores'), { ...filter, search: searchQuery, sort: dbKey, direction: dir }, { preserveState: true, preserveScroll: true });
     };
 
-    const handleApplyFilter = (newFilters) => router.get(route('mock.board.scores'), { ...newFilters, search, sort, direction }, { preserveState: true });
+    const handleApplyFilter = (newFilters) => router.get(route('mock.board.scores'), { ...newFilters, search: searchQuery, sort, direction, exam_period: currentExamPeriod }, { preserveState: true, preserveScroll: true });
 
     const handlePeriodChange = (e) => {
         const newPeriod = e.target.value;
-        router.get(route('mock.board.scores'), { ...filter, search, sort, direction, exam_period: newPeriod }, { preserveState: true });
+        router.get(route('mock.board.scores'), { ...filter, search: searchQuery, sort, direction, exam_period: newPeriod }, { preserveState: true, preserveScroll: true });
     };
 
     const visibleSubjects = selectedSubject === "All" ? subjectHeaders : subjectHeaders.filter(s => s === selectedSubject);
@@ -54,7 +74,7 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title={`Mock Board Scores (${currentExamPeriod})`}
-                    search={search} onSearch={handleSearch}
+                    search={searchQuery} onSearch={handleSearch}
                     paginationData={students?.data} 
                     exportEndpoint={route('mock-scores.export', filter)}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />} 

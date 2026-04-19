@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
@@ -22,13 +22,41 @@ export default function PerformanceRatingPage({ students, filter, search: backen
     const sortColumn = isBackendReady ? sort : mock.sortColumn;
     const sortDirection = isBackendReady ? direction : mock.sortDirection;
 
-    const handleSearch = isBackendReady ? (val) => router.get(route('performance.rating'), { ...filter, search: val, sort, direction }, { preserveState: true, preserveScroll: true }) : mock.setSearch;
-    const handlePageChange = isBackendReady ? (url) => { if(url) router.get(url, { ...filter, search, sort, direction }, { preserveScroll: true, preserveState: true }); } : mock.setPage;
+    // 🧠 1. Setup local state and debounce ref
+    const [searchQuery, setSearchQuery] = useState(search);
+    const initialRender = useRef(true);
+
+    // 🧠 2. The Debounce Effect
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        const delayDebounceFn = setTimeout(() => {
+            if (isBackendReady) {
+                router.get(route('performance.rating'), { ...filter, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true, replace: true });
+            } else {
+                mock.setSearch(searchQuery);
+            }
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    // 🧠 3. Fast local state update
+    const handleSearch = (val) => {
+        const text = typeof val === 'string' ? val : val?.target?.value || "";
+        setSearchQuery(text);
+    };
+
+    const handlePageChange = isBackendReady ? (url) => { 
+        if(url) router.get(url, { ...filter, search: searchQuery, sort, direction }, { preserveScroll: true, preserveState: true }); 
+    } : mock.setPage;
+    
     const handleSort = isBackendReady ? (sortKey) => {
         const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
         const dbColumn = dbColumnMap[sortKey] || 'student_info.student_id';
         const newDir = sort === dbColumn && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('performance.rating'), { ...filter, search, sort: dbColumn, direction: newDir }, { preserveState: true, preserveScroll: true });
+        router.get(route('performance.rating'), { ...filter, search: searchQuery, sort: dbColumn, direction: newDir }, { preserveState: true, preserveScroll: true });
     } : mock.handleSort;
 
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -53,7 +81,7 @@ export default function PerformanceRatingPage({ students, filter, search: backen
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Performance Rating"
-                    search={search} onSearch={handleSearch}
+                    search={searchQuery} onSearch={handleSearch}
                     paginationData={paginator} onPageChange={handlePageChange}
                     exportEndpoint={route('performance-rating.export', filter)}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}

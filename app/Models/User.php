@@ -21,6 +21,7 @@ class User extends Authenticatable
         'college_id', 
         'program_id',
         'avatar',
+        'tos_accepted_at',
     ];
 
     protected $hidden = [

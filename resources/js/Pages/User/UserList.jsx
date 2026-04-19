@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, Link, router } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
@@ -17,6 +17,9 @@ export default function UserList({ users, queryParams = {} }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
 
+    // 1. Add the debounce ref
+    const initialRender = useRef(true);
+
     const fetchUsers = useCallback((overrides = {}) => {
         router.get(route('users.index'), {
             search: overrides.search ?? search,
@@ -29,13 +32,24 @@ export default function UserList({ users, queryParams = {} }) {
         });
     }, [search, sortColumn, sortDirection]);
 
+    // 2. Add the Debounce Effect
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+
+        const delayDebounceFn = setTimeout(() => {
+            fetchUsers({ search: search });
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [search]); // ONLY watch 'search'
+
+    // 3. Make handleSearch ONLY update the local React state instantly
     const handleSearch = (e) => {
-        // If 'e' is an event object, get e.target.value. 
-        // If 'e' is already a string (from the ReusableTable), use it directly.
         const val = e?.target ? e.target.value : e;
-        
         setSearch(val);
-        fetchUsers({ search: val });
     };
 
     const handleSort = (column) => {

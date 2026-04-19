@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, router, usePage } from "@inertiajs/react";
 import { TableContainer } from "@/Components/ReusableTable";
@@ -18,6 +18,9 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showAllGwas, setShowAllGwas] = useState(false);
+    const urlParams = new URLSearchParams(window.location.search);
+    const [searchQuery, setSearchQuery] = useState(urlParams.get('search') || "");
+    const initialRender = useRef(true);
     const exportUrl = route('gwa.export', filter);
 
     useEffect(() => {
@@ -31,14 +34,37 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
         }
     }, []);
 
-    const fetchGwaData = (f) => {
-        router.get(route('gwa.info'), f, { preserveState: false, onSuccess: (page) => setStudents(page.props.students) });
+    const fetchGwaData = (f, preserveState = false) => {
+        router.get(route('gwa.info'), f, { 
+            preserveState: preserveState, 
+            preserveScroll: true, 
+            onSuccess: (page) => setStudents(page.props.students) 
+        });
+    };
+
+    // 🧠 3. Debounce Effect
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        const delayDebounceFn = setTimeout(() => {
+            fetchGwaData({ ...filter, search: searchQuery }, true); // preserveState: true prevents typing interruption
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    // 🧠 4. Search Handler
+    const handleSearch = (val) => {
+        const text = typeof val === 'string' ? val : val?.target?.value || "";
+        setSearchQuery(text);
     };
 
     const handleApplyFilter = (newFilters) => {
         setFilter(newFilters);
         localStorage.setItem("academicFilterData", JSON.stringify(newFilters));
-        fetchGwaData(newFilters);
+        // Include search when filtering
+        fetchGwaData({ ...newFilters, search: searchQuery });
     };
 
     const handleEdit = (student) => router.get(route('gwa.entry'), { student_id: student.id });
@@ -57,7 +83,8 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="General Weighted Average"
-                    search="" onSearch={() => {}}
+                    search={searchQuery}          // 🧠 FIXED
+                    onSearch={handleSearch}       // 🧠 FIXED
                     paginationData={students} onPageChange={(url) => router.get(url)}
                     exportEndpoint={exportUrl}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
