@@ -57,6 +57,8 @@ class ImportBatchAction
                     'date_created'   => $now,
                     'is_active'      => true,
                 ]);
+
+                \App\Services\AuditService::logStudentUpdate($studentNumber, "Imported via CSV into Batch {$context['batch_number']}");
                 $successCount++;
             }
             DB::commit();

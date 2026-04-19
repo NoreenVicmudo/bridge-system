@@ -86,6 +86,8 @@ class ImportStudentsAction
                         'updated_at'     => $now
                     ]);
 
+                    \App\Services\AuditService::logStudentAdd($studentNumber, "Imported via CSV for {$context['academic_year']} {$context['semester']}");
+
                     $successCount++;
                 }
 

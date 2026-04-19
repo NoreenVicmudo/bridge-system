@@ -109,15 +109,22 @@ class StudentController extends Controller
     {
         $user = $request->user();
         
-        // Join student_programs and programs to fetch the current "Active" context
+        // 🧠 FIXED: 1. Grab sort parameters from the React URL
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $direction = $request->get('direction', 'asc');
+
+        // Prevent ambiguous SQL errors if React sends 'student_number' instead of 'student_info.student_number'
+        if (strpos($sortColumn, '.') === false && !empty($sortColumn)) {
+            $sortColumn = 'student_info.' . $sortColumn;
+        }
+
         $query = StudentInfo::query()
             ->join('student_programs', 'student_info.student_number', '=', 'student_programs.student_number')
             ->join('programs', 'student_programs.program_id', '=', 'programs.program_id')
             ->where('student_programs.status', 'Active') 
             ->where('student_info.is_active', 1)
-            ->select('student_info.*'); // Keep student_info as the base object
+            ->select('student_info.*');
 
-        // Apply Search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -126,9 +133,11 @@ class StudentController extends Controller
             });
         }
 
-        // Role restrictions now look at the joined tables
         if ($user->college_id) $query->where('programs.college_id', $user->college_id);
         if ($user->program_id) $query->where('student_programs.program_id', $user->program_id);
+
+        // 🧠 FIXED: 2. Apply the sort to the database query!
+        $query->orderBy($sortColumn, $direction);
 
         $students = $query->paginate(20)->withQueryString();
         $students->getCollection()->transform(fn($student) => $this->transformStudent($student));
@@ -147,9 +156,16 @@ class StudentController extends Controller
                     $request->filled('batch_year') && 
                     $request->filled('board_batch');
 
+        // 🧠 FIXED: 1. Grab sort parameters
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $direction = $request->get('direction', 'asc');
+
+        if (strpos($sortColumn, '.') === false && !empty($sortColumn)) {
+            $sortColumn = 'student_info.' . $sortColumn;
+        }
+
         $query = StudentInfo::query()->where('student_info.is_active', 1);
 
-        // ----- SEARCH -----
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -160,7 +176,6 @@ class StudentController extends Controller
             });
         }
 
-        // ----- HISTORICAL FILTERING -----
         if ($isBatchMode) {
             $query->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
                 ->where('board_batch.is_active', 1)
@@ -172,6 +187,8 @@ class StudentController extends Controller
             if ($request->filled('batch_year')) $query->where('board_batch.year', $request->batch_year);
             if ($request->filled('board_batch')) $query->where('board_batch.batch_number', $request->board_batch);
 
+            // 🧠 FIXED: 2. Apply sort before paginating
+            $query->orderBy($sortColumn, $direction);
             $students = $query->paginate(20)->withQueryString();
             
             $filterData = $request->only(['batch_college', 'batch_program', 'batch_year', 'board_batch']);
@@ -191,6 +208,8 @@ class StudentController extends Controller
             if ($request->filled('year_level')) $query->where('student_section.year_level', $request->year_level);
             if ($request->filled('section')) $query->where('student_section.section', $request->section);
 
+            // 🧠 FIXED: 3. Apply sort before paginating here as well
+            $query->orderBy($sortColumn, $direction);
             $students = $query->paginate(20)->withQueryString();
             
             $filterData = $request->only(['academic_year', 'semester', 'college', 'program', 'year_level', 'section']);
@@ -199,7 +218,6 @@ class StudentController extends Controller
             if ($request->filled('program')) $filterData['program_name'] = Program::find($request->program)?->name;
         }
 
-        // Add user's default college/program if not set
         if ($user->college_id && !isset($filterData['college'])) {
             $filterData['college'] = $user->college_id;
             $filterData['college_name'] = College::find($user->college_id)?->name;
@@ -499,6 +517,10 @@ class StudentController extends Controller
         $user = $request->user();
         $mode = $request->get('mode'); 
 
+        // 🧠 FIXED: Grab the sort parameters from React
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $direction = $request->get('direction', 'asc');
+
         $query = StudentInfo::query()->where('student_info.is_active', 1);
 
         // 1. Apply Search
@@ -546,6 +568,9 @@ class StudentController extends Controller
             if ($user->program_id) $query->where('student_programs.program_id', $user->program_id);
         }
 
+        // 🧠 FIXED: Apply the active sort column before pulling the data
+        $query->orderBy($sortColumn, $direction);
+
         $students = $query->get();
 
         // 4. Generate CSV
@@ -559,49 +584,41 @@ class StudentController extends Controller
             $file = fopen('php://output', 'w');
             fputcsv($file, $headers);
             
-            // Pre-fetch programs to prevent the database from doing hundreds of tiny queries (N+1 problem)
             $allPrograms = \App\Models\Program::with('college')->get()->keyBy('program_id');
             
             foreach ($students as $s) {
                 $age = $s->student_birthdate ? \Carbon\Carbon::parse($s->student_birthdate)->age : 'N/A';
                 $address = trim("{$s->student_address_number} {$s->student_address_street}, {$s->student_address_barangay}, {$s->student_address_city}");
                 
-                // 🧠 THE HISTORICAL CHECK
-                // If we are exporting a specific batch/section, use the context program.
-                // Otherwise, fall back to the virtual accessor (their current active program).
                 if (isset($s->contextual_program_id)) {
                     $program = $allPrograms->get($s->contextual_program_id);
                     $collegeName = $program?->college?->name ?? 'N/A';
                     $programName = $program?->name ?? 'N/A';
                 } else {
-                    $collegeName = $s->college?->name ?? 'N/A'; // Hits virtual accessor
-                    $programName = $s->program?->name ?? 'N/A'; // Hits virtual accessor
+                    $collegeName = $s->college?->name ?? 'N/A'; 
+                    $programName = $s->program?->name ?? 'N/A'; 
                 }
                 
                 fputcsv($file, [
                     $s->student_number,
                     "{$s->student_lname}, {$s->student_fname} " . ($s->student_mname ? substr($s->student_mname, 0, 1) . '.' : ''),
-                    $collegeName,
-                    $programName,
-                    $age,
-                    $s->student_sex ?? 'N/A',
+                    $collegeName, $programName, $age, $s->student_sex ?? 'N/A',
                     $s->socioeconomic_category ?? $s->student_socioeconomic ?? 'N/A',
-                    $address ?: 'N/A',
-                    $s->living?->name ?? 'N/A',
-                    $s->student_work ?? 'N/A',
-                    $s->student_scholarship ?? 'N/A',
-                    $s->language?->name ?? 'N/A',
+                    $address ?: 'N/A', $s->living?->name ?? 'N/A', $s->student_work ?? 'N/A',
+                    $s->student_scholarship ?? 'N/A', $s->language?->name ?? 'N/A',
                     $s->student_last_school ?? 'N/A',
                 ]);
             }
             fclose($file);
         };
 
-        $filename = $mode ? "Filtered_Students_Export.csv" : "Student_Masterlist_Export.csv";
+        // 🧠 FIXED: Generate dynamic timestamp for the filename
+        $timestamp = now()->format('Y-m-d_H-i');
+        $filename = $mode ? "Filtered_Students_{$timestamp}.csv" : "Student_Masterlist_{$timestamp}.csv";
 
         return response()->stream($callback, 200, [
             "Content-type" => "text/csv", 
-            "Content-Disposition" => "attachment; filename={$filename}",
+            "Content-Disposition" => "attachment; filename=\"{$filename}\"",
             "Pragma" => "no-cache",
             "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
             "Expires" => "0"

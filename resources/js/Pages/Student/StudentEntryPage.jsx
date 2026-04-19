@@ -66,8 +66,11 @@ export default function StudentEntryPage({ student = null, prefilledId = null, o
         program_id: queryParams.get('program_id') ? parseInt(queryParams.get('program_id')) : "",
         batch_year: queryParams.get('year') || "",
         batch_number: queryParams.get('batch_number') || "",
+
+        mode: mode,
     });
 
+    // 3. Handle Submit based on mode
     // 3. Handle Submit based on mode
     const handleSubmit = (e) => {
         if (e && typeof e.preventDefault === 'function') {
@@ -77,7 +80,12 @@ export default function StudentEntryPage({ student = null, prefilledId = null, o
         if (isEdit) {
             put(route("students.update", student.id));
         } else {
-            post(route("students.store"));
+            // 🧠 FIXED: Route it to the correct backend endpoint based on context!
+            if (mode === 'masterlist') {
+                post(route("students.masterlist.store"));
+            } else {
+                post(route("students.store"));
+            }
         }
     };
 
