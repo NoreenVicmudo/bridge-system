@@ -83,21 +83,40 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="General Weighted Average"
-                    search={searchQuery}          // 🧠 FIXED
-                    onSearch={handleSearch}       // 🧠 FIXED
-                    paginationData={students} onPageChange={(url) => router.get(url)}
+                    search={searchQuery}
+                    onSearch={handleSearch}
+                    paginationData={students} 
+                    onPageChange={(url) => router.get(url)}
                     exportEndpoint={exportUrl}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
                     headerActions={
                         <>
-                            <button onClick={() => setShowAllGwas(!showAllGwas)} className={`flex items-center justify-center gap-2 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all shadow-sm shrink-0 ${showAllGwas ? "bg-[#ffb736] text-white border-[#ffb736]" : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-purple-50"}`}>
-                                <i className={`bi ${showAllGwas ? 'bi-eye-fill' : 'bi-eye-slash-fill'}`}></i><span>{showAllGwas ? "Hide All GWAs" : "Show All GWAs"}</span>
+                            <button 
+                                onClick={() => setShowAllGwas(!showAllGwas)} 
+                                className={`flex items-center justify-center gap-2 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm shrink-0 
+                                    ${showAllGwas 
+                                        ? "bg-[#ffb736] text-white border-[#ffb736]" // Active state
+                                        : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" // Standard state matching filter
+                                    }`}
+                            >
+                                <i className={`bi ${showAllGwas ? 'bi-eye-fill' : 'bi-eye-slash-fill'}`}></i>
+                                <span>{showAllGwas ? "Hide All GWAs" : "Show All GWAs"}</span>
                             </button>
-                            <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all shadow-sm shrink-0">
-                                <i className="bi bi-funnel-fill leading-none"></i><span className="leading-none">Filter</span>
+
+                            <button 
+                                onClick={() => setIsFilterModalOpen(true)} 
+                                className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 ease-in-out shadow-sm shrink-0"
+                            >
+                                <i className="bi bi-funnel-fill leading-none"></i>
+                                <span className="leading-none">Filter</span>
                             </button>
-                            <button onClick={() => setIsMetricModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] transition-all shadow-sm shrink-0">
-                                <i className="bi bi-bar-chart-fill leading-none"></i><span className="leading-none">Change Metric</span>
+
+                            <button 
+                                onClick={() => setIsMetricModalOpen(true)} 
+                                className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm shrink-0"
+                            >
+                                <i className="bi bi-bar-chart-fill leading-none"></i>
+                                <span className="leading-none">Change Metric</span>
                             </button>
                         </>
                     }
@@ -107,35 +126,58 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                         ) : null
                     }
                 >
-                    <thead>
+                    <thead className="min-w-full">
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            <th className="py-3 px-6 font-bold text-left sticky left-0 bg-[#5c297c] z-20 w-[150px]">Student ID</th>
-                            <th className="py-3 px-6 font-bold text-left sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md">Student Name</th>
+                            <th className="py-3 px-6 font-bold text-left sticky left-0 bg-[#5c297c] z-20 w-[150px] min-w-[150px]">
+                                Student ID
+                            </th>
+                            <th className="py-3 px-6 font-bold text-left sticky left-[150px] bg-[#5c297c] z-20 w-[250px] min-w-[250px] shadow-md">
+                                Student Name
+                            </th>
                             {!showAllGwas ? (
-                                <th className="py-3 px-6 font-bold text-center min-w-[120px]">{semesterLabel}</th>
+                                <th className="py-3 px-6 font-bold text-center min-w-[120px]">
+                                    {semesterLabel}
+                                </th>
                             ) : (
-                                gwaColumns.map(col => <th key={col} className="py-3 px-2 font-bold text-center min-w-[80px] text-[10px]">{col}</th>)
+                                gwaColumns.map(col => (
+                                    <th key={col} className="py-3 px-2 font-bold text-center w-[90px] min-w-[90px] text-[10px] whitespace-nowrap border-l border-white/10">
+                                        {col}
+                                    </th>
+                                ))
                             )}
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
                         {students.data?.map((student, idx) => (
-                            <tr key={student.id} className="...">
-                                <td className="py-3 px-6 sticky left-0 bg-inherit z-10">
+                            <tr key={student.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-[#f9f9f9]"} hover:bg-purple-50 transition-all`}>
+                                <td className="py-3 px-6 sticky left-0 bg-inherit z-10 font-bold">
                                     {canManageData ? (
-                                        <button onClick={() => handleEdit(student)} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all text-center">{student.student_number}</button>
+                                        <button onClick={() => handleEdit(student)} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] transition-all text-xs text-center shadow-sm">
+                                            {student.student_number}
+                                        </button>
                                     ) : (
-                                        <span className="inline-block px-4 py-1.5 rounded-[6px] bg-gray-400 text-white font-bold text-center shadow-sm">{student.student_number}</span>
+                                        <span className="inline-block px-4 py-1.5 rounded-[6px] bg-gray-400 text-white font-bold text-xs text-center shadow-sm">
+                                            {student.student_number}
+                                        </span>
                                     )}
                                 </td>
-                                <td className="py-3 px-6 sticky left-[150px] bg-inherit z-10 shadow-md">{student.name}</td>
+                                <td className="py-3 px-6 sticky left-[150px] bg-inherit z-10 shadow-md whitespace-nowrap">
+                                    {student.name}
+                                </td>
+                                
                                 {!showAllGwas ? (
-                                    <td className="py-3 px-6 text-center font-bold">{student.gwa || <span className="text-gray-300">—</span>}</td>
+                                    <td className="py-3 px-6 text-center font-bold text-[#5c297c]">
+                                        {student.gwa || <span className="text-gray-300">—</span>}
+                                    </td>
                                 ) : (
                                     gwaColumns.map(col => {
                                         const [year, sem] = col.split('Y-').map(s => s.replace('S', ''));
                                         const record = student.all_gwas.find(r => r.year_level == year && r.semester == sem);
-                                        return <td key={col} className="py-3 px-2 text-center text-[11px] border-l border-gray-50">{record ? record.gwa : <span className="text-gray-200">-</span>}</td>;
+                                        return (
+                                            <td key={col} className="py-3 px-2 text-center text-[11px] border-l border-gray-100 font-semibold">
+                                                {record ? record.gwa : <span className="text-gray-200">-</span>}
+                                            </td>
+                                        );
                                     })
                                 )}
                             </tr>

@@ -28,6 +28,10 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedSubject, setSelectedSubject] = useState("All");
+    
+    // Dropdown State
+    const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
 
     const [activeFilters, setActiveFilters] = useState(filter || {
         academic_year: "2025-2026", semester: "1st Semester", college: "COLLEGE OF MEDICAL TECHNOLOGY", program: "BS MEDICAL TECHNOLOGY", year_level: "4TH YEAR", section: "4-1",
@@ -35,6 +39,17 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
     const [filterMode, setFilterMode] = useState(filter?.mode || "section");
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
+
+    // Close Dropdown on Outside Click
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsSubjectDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // 🧠 2. Debounce Effect
     useEffect(() => {
@@ -64,7 +79,7 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
 
     const handleSort = isBackendReady ? (sortKey) => {
         const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
-        const dbColumn = dbColumnMap[sortKey] || 'student_info.student_id';
+        const dbColumn = dbColumnMap[sortKey] || sortKey; 
         const newDir = sort === dbColumn && direction === 'asc' ? 'desc' : 'asc';
         router.get(route('board.subject.grades'), { ...filter, search: searchQuery, sort: dbColumn, direction: newDir }, { preserveState: true, preserveScroll: true });
     } : mock.handleSort;
@@ -90,12 +105,53 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode={filterMode} />}
                     headerActions={
                         <>
+                            {/* HYBRID SELECTGROUP DROPDOWN */}
                             {subjectHeaders.length > 0 && (
-                                <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="px-4 h-[40px] border border-[#5c297c] text-[#5c297c] bg-white rounded-[5px] text-sm font-bold focus:ring-[#5c297c] outline-none shadow-sm cursor-pointer shrink-0">
-                                    <option value="All">All Subjects</option>
-                                    {subjectHeaders.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-                                </select>
+                                <div className="relative shrink-0 flex-1 md:flex-none" ref={dropdownRef}>
+                                    <button 
+                                        onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
+                                        className={`flex items-center justify-between gap-3 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm w-full md:w-[200px] ${
+                                            isSubjectDropdownOpen 
+                                                ? "bg-white text-[#5c297c] border-[#ffb736] ring-1 ring-[#ffb736]" // Match SelectGroup Focus
+                                                : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" // Match Filter Idle
+                                        }`}
+                                    >
+                                        <span className="truncate flex-1 text-left">
+                                            {selectedSubject === "All" ? "All Subjects" : selectedSubject}
+                                        </span>
+                                        <svg
+                                            className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isSubjectDropdownOpen ? "rotate-180" : ""}`}
+                                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                        >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    {/* MENU - Styled exactly like SelectGroup.jsx */}
+                                    <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isSubjectDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
+                                        <div className="overflow-hidden min-h-0">
+                                            <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
+                                                <li 
+                                                    onClick={() => { setSelectedSubject("All"); setIsSubjectDropdownOpen(false); }}
+                                                    className={`px-3 py-2 text-sm cursor-pointer transition-colors ${selectedSubject === "All" ? "bg-[#5c297c] text-white" : "text-slate-700 hover:bg-[#ffb736]/20"}`}
+                                                >
+                                                    All Subjects
+                                                </li>
+                                                {subjectHeaders.map(sub => (
+                                                    <li
+                                                        key={sub}
+                                                        onClick={() => { setSelectedSubject(sub); setIsSubjectDropdownOpen(false); }}
+                                                        className={`px-3 py-2 text-sm cursor-pointer transition-colors ${selectedSubject === sub ? "bg-[#5c297c] text-white" : "text-slate-700 hover:bg-[#ffb736]/20"}`}
+                                                    >
+                                                        {sub}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
+
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 ease-in-out shadow-sm shrink-0">
                                 <i className="bi bi-funnel-fill leading-none"></i><span className="leading-none">Filter</span>
                             </button>
@@ -114,7 +170,19 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
-                            {visibleSubjects.map((subject, i) => <th key={i} className="py-3 px-6 font-bold text-center whitespace-nowrap min-w-[150px]">{subject}</th>)}
+                            
+                            {/* 🧠 FIX: Center the subject if it's the only one by applying w-full */}
+                            {visibleSubjects.map((subject, i) => (
+                                <SortableHeader 
+                                    key={i} 
+                                    label={subject} 
+                                    sortKey={subject} 
+                                    currentSort={sortColumn} 
+                                    currentDirection={sortDirection} 
+                                    onSort={handleSort} 
+                                    className={`text-center whitespace-nowrap ${visibleSubjects.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
+                                />
+                            ))}
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
@@ -132,7 +200,8 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
                                     const grade = student.grades[subject];
                                     return (
                                         <td key={idx} className="py-3 px-6 text-center">
-                                            {grade ? <span className={`font-bold ${parseFloat(grade) <= 3.0 ? "text-[#5c297c]" : "text-red-500"}`}>{grade}</span> : <span className="text-gray-300">-</span>}
+                                            {/* 🧠 FIX: Always black text */}
+                                            {grade ? <span className="font-bold text-black">{grade}</span> : <span className="text-gray-300">-</span>}
                                         </td>
                                     );
                                 })}
