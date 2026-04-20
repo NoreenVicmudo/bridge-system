@@ -41,7 +41,8 @@ export default function RetakesAddStudentModal({ isOpen, onClose, currentFilter,
     const handleProceedToEdit = async () => {
         try {
             const res = await axios.get(route('api.get-student-id', { student_number: studentNumber }));
-            router.get(route('back-subjects.entry'), { student_id: res.data.id });
+            // 🧠 FIXED: Changed from 'back-subjects.entry' to 'retakes.entry'
+            router.get(route('retakes.entry'), { student_id: res.data.id });
             closeModal();
         } catch {
             alert("Student not found");
