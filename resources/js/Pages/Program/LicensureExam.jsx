@@ -7,7 +7,7 @@ import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
 import LicensureAddModal from "@/Components/Modals/Program/LicensureAddModal"; 
 
-export default function LicensureExamPage({ students, filter, search = "", sort = "", direction = "asc", dbColleges = [], dbPrograms = [] }) {
+export default function LicensureExamPage({ students, filter, search = "", sort = "", direction = "", dbColleges = [], dbPrograms = [] }) {
     // --- RBAC ---
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
@@ -30,6 +30,19 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
+    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = sort || urlParams.get('sort') || "";
+    const actualDirection = direction || urlParams.get('direction') || "asc";
+
+    // 🧠 Reverse Map for the Active Arrow Indicator
+    const reverseDbKeyMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'student_licensure_exam.exam_result': 'status'
+    };
+    const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
+
     // 🧠 2. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
@@ -37,7 +50,9 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            router.get(route('licensure.exam'), { ...filter, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true, replace: true });
+            const params = { ...filter, search: searchQuery };
+            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+            router.get(route('licensure.exam'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
@@ -48,14 +63,37 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
         setSearchQuery(text);
     };
 
+    // 🧠 4. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
         const dbKeyMap = { 'student_number': 'student_info.student_number', 'name': 'student_info.student_lname', 'status': 'student_licensure_exam.exam_result' };
-        const dbKey = dbKeyMap[key] || 'student_info.student_lname';
-        const dir = sort === dbKey && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('licensure.exam'), { ...filter, search: searchQuery, sort: dbKey, direction: dir }, { preserveState: true, preserveScroll: true });
+        const dbKey = dbKeyMap[key] || key;
+        
+        let nextDir = 'asc';
+        let nextSort = dbKey;
+
+        // Check against actualSort (the URL value) to cycle the states properly
+        if (actualSort === dbKey) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc';
+            } else {
+                nextDir = null;
+                nextSort = null;
+            }
+        }
+
+        const params = { ...filter, search: searchQuery };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        }
+        router.get(route('licensure.exam'), params, { preserveState: true, preserveScroll: true });
     };
 
-    const handleApplyFilter = (newFilters) => router.get(route('licensure.exam'), { ...newFilters, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true });
+    const handleApplyFilter = (newFilters) => {
+        const params = { ...newFilters, search: searchQuery };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('licensure.exam'), params, { preserveState: true, preserveScroll: true });
+    };
 
     return (
         <AuthenticatedLayout>
@@ -81,10 +119,11 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sort} currentDirection={direction} onSort={handleSort} />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sort} currentDirection={direction} onSort={handleSort} />
-                            <SortableHeader label="Status" sortKey="status" currentSort={sort} currentDirection={direction} onSort={handleSort} className="text-center" />
-                            <th className="py-3 px-6 font-bold text-center">Exam Date</th>
+                            {/* 🧠 FIX: Passed activeFrontendSort and actualDirection to update arrows */}
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Status" sortKey="status" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />
+                            <th className="py-3 px-6 font-bold text-center bg-[#5c297c]">Exam Date</th>
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">

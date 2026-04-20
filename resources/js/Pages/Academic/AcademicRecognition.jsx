@@ -7,7 +7,7 @@ import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
 import RecognitionAddStudentModal from "@/Components/Modals/Academic/RecognitionAddStudentModal";
 
-export default function AcademicRecognitionPage({ students, filter, search = "", sort = "", direction = "asc" }) {
+export default function AcademicRecognitionPage({ students, filter, search = "", sort = "", direction = "" }) {
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
     const canManageData = !isAcademicAffairs;
@@ -20,6 +20,19 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
+    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = sort || urlParams.get('sort') || "";
+    const actualDirection = direction || urlParams.get('direction') || "asc";
+
+    // 🧠 Reverse Map for the Active Arrow Indicator
+    const reverseDbKeyMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'award_count': 'recognition_count' // Map backend 'award_count' back to frontend 'recognition_count'
+    };
+    const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
+
     // 🧠 2. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
@@ -27,7 +40,9 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            router.get(route('academic.recognition'), { ...filter, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true, replace: true });
+            const params = { ...filter, search: searchQuery };
+            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+            router.get(route('academic.recognition'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]); // ONLY watch searchQuery
@@ -38,10 +53,41 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
         setSearchQuery(text);
     };
     
+    // 🧠 4. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
-        const dbKey = key === 'student_number' ? 'student_info.student_number' : (key === 'name' ? 'student_info.student_lname' : 'award_count');
-        const dir = sort === dbKey && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('academic.recognition'), { ...filter, search: searchQuery, sort: dbKey, direction: dir }, { preserveState: true, preserveScroll: true });
+        // Map frontend sortKey to DB column
+        const dbKeyMap = {
+            'student_number': 'student_info.student_number',
+            'name': 'student_info.student_lname',
+            'recognition_count': 'award_count'
+        };
+        const dbKey = dbKeyMap[key] || key;
+
+        let nextDir = 'asc';
+        let nextSort = dbKey;
+
+        // Check against actualSort (the URL value) to cycle the states properly
+        if (actualSort === dbKey) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc';
+            } else {
+                nextDir = null;
+                nextSort = null;
+            }
+        }
+
+        const params = { ...filter, search: searchQuery };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        }
+        router.get(route('academic.recognition'), params, { preserveState: true, preserveScroll: true });
+    };
+
+    const handleApplyFilter = (newFilters) => {
+        const params = { ...newFilters, search: searchQuery };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('academic.recognition'), params, { preserveState: true, preserveScroll: true });
     };
 
     return (
@@ -52,12 +98,12 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
                     title="Academic Recognition"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
-                    exportEndpoint={route('academic.recognition.export', filter)}
+                    exportEndpoint={route('academic.recognition.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
                     headerActions={
                         <>
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all shadow-sm shrink-0">
-                                <i className="bi bi-funnel-fill"></i> Filter Program
+                                <i className="bi bi-funnel-fill"></i> Filter
                             </button>
                             <button onClick={() => setIsMetricModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] transition-all shadow-sm shrink-0">
                                 <i className="bi bi-bar-chart-fill"></i> Change Metric
@@ -66,15 +112,16 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
                     }
                     footerActions={
                         canManageData ? (
-                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">Add Student</button>
+                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">Manage Records</button>
                         ) : null
                     }
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sort} currentDirection={direction} onSort={handleSort} />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sort} currentDirection={direction} onSort={handleSort} />
-                            <SortableHeader label="Dean's List" sortKey="recognition_count" currentSort={sort} currentDirection={direction} onSort={handleSort} className="text-center" />
+                            {/* 🧠 FIX: Passed actualDirection and activeFrontendSort to cycle arrows, added bg color */}
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Dean's List" sortKey="recognition_count" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
@@ -96,7 +143,7 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
                     </tbody>
                 </TableContainer>
 
-                <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={filter} onApply={(v) => router.get(route('academic.recognition'), v)} />
+                <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={filter} onApply={handleApplyFilter} />
                 <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Academic Recognition" filterData={filter} />
                 {canManageData && <RecognitionAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={filter} />}
             </div>

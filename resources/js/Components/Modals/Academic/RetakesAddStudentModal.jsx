@@ -104,7 +104,7 @@ export default function RetakesAddStudentModal({ isOpen, onClose, currentFilter,
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-pencil-square text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
                                 </div>
-                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Edit Student</span>
+                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Find Student</span>
                             </button>
                         </div>
                     )}

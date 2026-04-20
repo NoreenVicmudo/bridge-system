@@ -110,35 +110,56 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
                     )}
 
                     {view === "import" && (
-                        <div className="flex flex-col gap-5 animate-fade-in-up">
-                            <div className="bg-purple-50 p-5 rounded-lg border border-purple-100 text-center">
-                                <i className="bi bi-cloud-arrow-up text-4xl text-[#5c297c] mb-2 block"></i>
-                                <h3 className="font-bold text-[#5c297c] mb-1">Upload Mock Scores Data</h3>
-                                <p className="text-xs text-gray-600 mb-4">
+                        <form onSubmit={handleImportSubmit} className="flex flex-col gap-4 animate-fade-in-up">
+                            <div className="text-center mb-1">
+                                <h3 className="font-bold text-[#5c297c] text-lg">Upload Mock Scores Data</h3>
+                                <p className="text-xs text-gray-600 mt-1">
                                     Expected columns: <strong>student_number</strong> + Exact subject names like <strong>"{subjectHeaders[0] || 'Subject 1'} (%)"</strong>.
                                 </p>
-                                <form onSubmit={handleImportSubmit} className="flex flex-col gap-3">
-                                    <input 
-                                        type="file" 
-                                        accept=".csv"
-                                        onChange={(e) => setImportFile(e.target.files[0])}
-                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-[#5c297c] hover:file:bg-purple-200 cursor-pointer"
-                                        required
-                                    />
-                                    {importError && <div className="text-red-500 text-xs mt-1 font-medium">{importError}</div>}
-                                    <button 
-                                        type="submit"
-                                        disabled={importProcessing || !importFile}
-                                        className="mt-2 w-full py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] transition-all disabled:opacity-50 shadow-md"
-                                    >
-                                        {importProcessing ? "Uploading & Processing..." : "Import Records"}
-                                    </button>
-                                </form>
                             </div>
-                            <button onClick={() => setView("options")} className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-2">
+
+                            {/* Drag & Drop Label Design */}
+                            <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
+                                <input 
+                                    type="file" 
+                                    accept=".csv"
+                                    onChange={(e) => setImportFile(e.target.files[0])}
+                                    className="hidden" 
+                                    required 
+                                />
+                                <i className="bi bi-cloud-arrow-up text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
+                                
+                                {importFile ? (
+                                    <p className="text-[#5c297c] font-bold truncate px-4">{importFile.name}</p>
+                                ) : (
+                                    <p className="text-gray-600 font-medium">Drag & Drop your CSV file here</p>
+                                )}
+                                
+                                <p className="text-sm text-gray-400 mt-1 mb-4">Supports .csv</p>
+                                
+                                <span className="px-5 py-2 bg-white border border-[#5c297c] text-[#5c297c] font-bold rounded-lg text-sm group-hover:bg-[#5c297c] group-hover:text-white transition-all inline-block">
+                                    {importFile ? "Change File" : "Browse Files"}
+                                </span>
+                            </label>
+
+                            {importError && <div className="text-red-500 text-xs font-medium text-center">{importError}</div>}
+
+                            <button 
+                                type="submit"
+                                disabled={importProcessing || !importFile}
+                                className="w-full py-3 bg-[#5c297c] text-white font-bold rounded-lg shadow-md hover:bg-[#4a1f63] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100"
+                            >
+                                {importProcessing ? "Uploading & Processing..." : "Import Records"}
+                            </button>
+
+                            <button 
+                                type="button" 
+                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); }} 
+                                className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
+                            >
                                 ← Back to Options
                             </button>
-                        </div>
+                        </form>
                     )}
 
                     {view === "manual" && (

@@ -126,7 +126,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                     }
                     footerActions={
                         <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">
-                            Add Student
+                            Manage Records
                         </button>
                     }
                 >

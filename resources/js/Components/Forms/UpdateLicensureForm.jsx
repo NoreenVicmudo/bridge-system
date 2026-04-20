@@ -10,7 +10,7 @@ export default function UpdateLicensureForm({
     processing = false,
     submit,
     studentName,
-    studentNumber, // Added this prop
+    studentNumber, 
     currentResult = "",
     currentDate = "",
 }) {
@@ -88,7 +88,8 @@ export default function UpdateLicensureForm({
                                 type="date"
                                 value={data.exam_date_taken}
                                 onChange={(e) => setData("exam_date_taken", e.target.value)}
-                                className={inputClass}
+                                onClick={(e) => e.target.showPicker && e.target.showPicker()} // 🧠 ADDED: Click anywhere to open calendar
+                                className={`${inputClass} cursor-pointer`} // 🧠 ADDED: Cursor pointer
                                 required
                             />
                         </div>
