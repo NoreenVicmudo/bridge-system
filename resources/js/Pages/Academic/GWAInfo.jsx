@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, router, usePage } from "@inertiajs/react";
-import { TableContainer } from "@/Components/ReusableTable";
+import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
 import AcademicFilterModal from "@/Components/Modals/Academic/AcademicFilterModal";
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import GWAAddStudentModal from "@/Components/Modals/Academic/GWAAddStudentModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
 
-export default function GwaPage({ students: initialStudents, filter: initialFilter, maxYears }) {
+export default function GwaPage({ students: initialStudents, filter: initialFilter, maxYears, search = "", sort = "student_info.student_id", direction = "desc" }) {
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
     const canManageData = !isAcademicAffairs;
@@ -19,7 +19,7 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showAllGwas, setShowAllGwas] = useState(false);
     const urlParams = new URLSearchParams(window.location.search);
-    const [searchQuery, setSearchQuery] = useState(urlParams.get('search') || "");
+    const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
     const exportUrl = route('gwa.export', filter);
 
@@ -60,6 +60,21 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
         setSearchQuery(text);
     };
 
+    const handleSort = (sortKey) => {
+        const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
+        const dbColumn = dbColumnMap[sortKey] || sortKey; 
+        const newDir = sort === dbColumn && direction === 'asc' ? 'desc' : 'asc';
+        
+        router.get(route('gwa.info'), 
+            { ...filter, search: searchQuery, sort: dbColumn, direction: newDir }, 
+            { 
+                preserveState: true, 
+                preserveScroll: true, 
+                onSuccess: (page) => setStudents(page.props.students) 
+            }
+        );
+    };
+
     const handleApplyFilter = (newFilters) => {
         setFilter(newFilters);
         localStorage.setItem("academicFilterData", JSON.stringify(newFilters));
@@ -86,7 +101,9 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                     search={searchQuery}
                     onSearch={handleSearch}
                     paginationData={students} 
-                    onPageChange={(url) => router.get(url)}
+                    onPageChange={(url) => {
+                        if(url) router.get(url, { ...filter, search: searchQuery, sort, direction }, { preserveScroll: true, preserveState: true, onSuccess: (page) => setStudents(page.props.students) });
+                    }}
                     exportEndpoint={exportUrl}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
                     headerActions={
@@ -128,19 +145,29 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                 >
                     <thead className="min-w-full">
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            <th className="py-3 px-6 font-bold text-left sticky left-0 bg-[#5c297c] z-20 w-[150px] min-w-[150px]">
-                                Student ID
-                            </th>
-                            <th className="py-3 px-6 font-bold text-left sticky left-[150px] bg-[#5c297c] z-20 w-[250px] min-w-[250px] shadow-md">
-                                Student Name
-                            </th>
+                            <SortableHeader 
+                                label="Student ID" 
+                                sortKey="student_number" 
+                                currentSort={sort} 
+                                currentDirection={direction} 
+                                onSort={handleSort} 
+                                className="sticky left-0 bg-[#5c297c] z-20 w-[150px] min-w-[150px]" 
+                            />
+                            <SortableHeader 
+                                label="Student Name" 
+                                sortKey="name" 
+                                currentSort={sort} 
+                                currentDirection={direction} 
+                                onSort={handleSort} 
+                                className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] min-w-[250px] shadow-md" 
+                            />
                             {!showAllGwas ? (
                                 <th className="py-3 px-6 font-bold text-center min-w-[120px]">
                                     {semesterLabel}
                                 </th>
                             ) : (
                                 gwaColumns.map(col => (
-                                    <th key={col} className="py-3 px-2 font-bold text-center w-[90px] min-w-[90px] text-[10px] whitespace-nowrap border-l border-white/10">
+                                    <th key={col} className="py-3 px-6 font-bold text-center min-w-[120px]">
                                         {col}
                                     </th>
                                 ))
@@ -161,7 +188,7 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                                         </span>
                                     )}
                                 </td>
-                                <td className="py-3 px-6 sticky left-[150px] bg-inherit z-10 shadow-md whitespace-nowrap">
+                                <td className="py-3 px-6 text-gray-800 uppercase font-bold sticky left-[150px] bg-inherit z-10 shadow-md">
                                     {student.name}
                                 </td>
                                 
@@ -174,7 +201,7 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                                         const [year, sem] = col.split('Y-').map(s => s.replace('S', ''));
                                         const record = student.all_gwas.find(r => r.year_level == year && r.semester == sem);
                                         return (
-                                            <td key={col} className="py-3 px-2 text-center text-[11px] border-l border-gray-100 font-semibold">
+                                            <td key={col} className="py-3 px-6 text-center font-bold text-[#5c297c]">
                                                 {record ? record.gwa : <span className="text-gray-200">-</span>}
                                             </td>
                                         );

@@ -108,10 +108,21 @@ export default function StatToolModal({
     ];
 
     const METRIC_OPTIONS = [
+        // --- Existing Categorical Demographics ---
         { value: "Gender", label: "Gender (Male/Female)", type: "categorical", hasSub: false },
+        { value: "WorkStatus", label: "Work Status", type: "categorical", hasSub: false },
+        
+        // 🧠 NEW: ADDED CATEGORICAL DEMOGRAPHICS
+        { value: "LivingArrangement", label: "Living Arrangement", type: "categorical", hasSub: false },
+        { value: "Scholarship", label: "Scholarship Status", type: "categorical", hasSub: false },
+        { value: "Language", label: "Language Spoken", type: "categorical", hasSub: false },
+        { value: "LastSchool", label: "Last School Attended", type: "categorical", hasSub: false },
+        
+        // --- Existing Numerical Demographics ---
         { value: "Age", label: "Age", type: "numerical", hasSub: false },
         { value: "Socioeconomic", label: "Socioeconomic Status", type: "numerical", hasSub: false },
-        { value: "WorkStatus", label: "Work Status", type: "categorical", hasSub: false },
+        
+        // --- Existing Academic / Program Metrics ---
         { value: "GWA", label: "General Weighted Average (GWA)", type: "numerical", hasSub: true },
         { value: "BoardGrades", label: "Grades in Board Subjects", type: "numerical", hasSub: true },
         { value: "MockScores", label: "Mock Board Exam Scores", type: "numerical", hasSub: true },
@@ -119,6 +130,8 @@ export default function StatToolModal({
         { value: "SimExam", label: "Simulation Exam Results", type: "numerical", hasSub: true },
         { value: "Attendance", label: "Review Attendance", type: "numerical", hasSub: false },
         { value: "Retakes", label: "Back Subjects / Retakes", type: "numerical", hasSub: false },
+        
+        // --- Output Variable ---
         { value: "Licensure", label: "Licensure Exam Result", type: "categorical", hasSub: false },
     ];
 

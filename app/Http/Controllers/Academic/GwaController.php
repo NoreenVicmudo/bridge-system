@@ -33,16 +33,32 @@ class GwaController extends Controller
         $semesterMap = ['1st' => '1', '2nd' => '2', 'summer' => 'summer'];
         $dbSemester = $semesterMap[$filter['semester']] ?? $filter['semester'];
 
-        $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
+        // 1. Initialize the query
+        $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])
                 ->where('program_id', $filter['program'])
                 ->where('year_level', $filter['year_level'])
                 ->where('semester', $filter['semester'])
                 ->where('section', $filter['section'])
                 ->where('is_active', 1);
-        })
-        ->paginate(10)
-        ->withQueryString();
+        });
+
+        // 2. Apply Search
+        $search = $request->get('search');
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                  ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        // 3. Apply Sorting
+        $sortColumn = $request->get('sort', 'student_info.student_id');
+        $sortDirection = $request->get('direction', 'desc');
+        $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
+
+        // 4. Paginate
+        $students = $query->paginate(10)->withQueryString();
 
         $allGwaRecords = StudentGwa::whereIn('student_number', $students->pluck('student_number'))
             ->where('is_active', 1)
@@ -71,6 +87,9 @@ class GwaController extends Controller
             'students' => $students,
             'filter' => $filter,
             'maxYears' => $program->years ?? 4,
+            'search' => $search ?? '',
+            'sort' => $sortColumn,
+            'direction' => $sortDirection,
         ]);
     }
 

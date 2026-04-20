@@ -36,37 +36,35 @@ export default function StudentMasterlist({ students }) {
     const activeSortDirection = isBackendReady ? currentDirectionParam : mock.sortDirection;
 
     const sortKeyMap = {
-        student_number: 'student_number',
-        name: 'student_lname',
-        college: 'college_id',
-        program: 'program_id',
-        age: 'student_birthdate',
-        sex: 'student_sex',
-        socioeconomic: 'student_socioeconomic',
-        // NEW ADDITIONS
-        address: 'student_address_city', 
-        living: 'student_living',
-        work_status: 'student_work',
-        scholarship: 'student_scholarship',
-        language: 'student_language',
-        last_school: 'student_last_school',
+        student_number: 'student_info.student_number', 
+        name: 'student_info.student_lname',
+        college: 'colleges.name',
+        program: 'programs.name',
+        age: 'student_info.student_birthdate',
+        sex: 'student_info.student_sex',
+        socioeconomic: 'student_info.student_socioeconomic',
+        address: 'student_info.student_address_city', 
+        living: 'student_info.student_living',
+        work_status: 'student_info.student_work',
+        scholarship: 'student_info.student_scholarship',
+        language: 'student_info.student_language',
+        last_school: 'student_info.student_last_school',
     };
 
     const reverseSortKeyMap = {
-        student_number: 'student_number',
-        student_lname: 'name',
-        college_id: 'college',
-        program_id: 'program',
-        student_birthdate: 'age',
-        student_sex: 'sex',
-        student_socioeconomic: 'socioeconomic',
-        // NEW ADDITIONS
-        student_address_city: 'address',
-        student_living: 'living',
-        student_work: 'work_status',
-        student_scholarship: 'scholarship',
-        student_language: 'language',
-        student_last_school: 'last_school',
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'colleges.name': 'college',
+        'programs.name': 'program',
+        'student_info.student_birthdate': 'age',
+        'student_info.student_sex': 'sex',
+        'student_info.student_socioeconomic': 'socioeconomic',
+        'student_info.student_address_city': 'address',
+        'student_info.student_living': 'living',
+        'student_info.student_work': 'work_status',
+        'student_info.student_scholarship': 'scholarship',
+        'student_info.student_language': 'language',
+        'student_info.student_last_school': 'last_school',
     };
 
     const currentFrontendSort = reverseSortKeyMap[activeSortColumn] || '';

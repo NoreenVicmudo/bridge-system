@@ -42,8 +42,8 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
     const sortKeyMap = {
         student_number: 'student_info.student_number',
         name: 'student_info.student_lname',
-        college: 'student_info.college_id',
-        program: 'student_info.program_id',
+        college: 'colleges.name',
+        program: 'programs.name',
         age: 'student_info.student_birthdate',
         sex: 'student_info.student_sex',
         socioeconomic: 'student_info.student_socioeconomic',
@@ -52,8 +52,8 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
     const reverseSortKeyMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name',
-        'student_info.college_id': 'college',
-        'student_info.program_id': 'program',
+        'colleges.name': 'college',
+        'programs.name': 'program',
         'student_info.student_birthdate': 'age',
         'student_info.student_sex': 'sex',
         'student_info.student_socioeconomic': 'socioeconomic',

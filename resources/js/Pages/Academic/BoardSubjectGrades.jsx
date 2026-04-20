@@ -171,7 +171,7 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
                             
-                            {/* 🧠 FIX: Center the subject if it's the only one by applying w-full */}
+                            {/* 🧠 FIX: Center the subject if it's the only one by applying w-full AND centering the inner flex container */}
                             {visibleSubjects.map((subject, i) => (
                                 <SortableHeader 
                                     key={i} 
@@ -180,9 +180,12 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
                                     currentSort={sortColumn} 
                                     currentDirection={sortDirection} 
                                     onSort={handleSort} 
-                                    className={`text-center whitespace-nowrap ${visibleSubjects.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
+                                    className={`bg-[#5c297c] whitespace-nowrap [&>div]:w-full [&>div]:justify-center ${
+                                        visibleSubjects.length === 1 ? 'w-full' : 'min-w-[150px]'
+                                    }`} 
                                 />
                             ))}
+
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">

@@ -528,6 +528,37 @@ class ReportController extends Controller
                     ->pluck('student_work', 'student_number')->toArray();
                 break;
 
+            // 🧠 NEW: ADDED CATEGORICAL DEMOGRAPHICS
+            case 'LivingArrangement':
+                $records = DB::table('student_info')
+                    ->leftJoin('living_arrangements', 'student_info.student_living', '=', 'living_arrangements.id')
+                    ->whereIn('student_info.student_number', $studentNumbers)
+                    ->where('student_info.is_active', 1)
+                    ->pluck('living_arrangements.name', 'student_info.student_number')->toArray();
+                break;
+
+            case 'Scholarship':
+                $records = DB::table('student_info')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->pluck('student_scholarship', 'student_number')->toArray();
+                break;
+
+            case 'Language':
+                $records = DB::table('student_info')
+                    ->leftJoin('languages', 'student_info.student_language', '=', 'languages.id')
+                    ->whereIn('student_info.student_number', $studentNumbers)
+                    ->where('student_info.is_active', 1)
+                    ->pluck('languages.name', 'student_info.student_number')->toArray();
+                break;
+
+            case 'LastSchool':
+                $records = DB::table('student_info')
+                    ->whereIn('student_number', $studentNumbers)
+                    ->where('is_active', 1)
+                    ->pluck('student_last_school', 'student_number')->toArray();
+                break;
+
             case 'GWA':
                 $query = DB::table('student_gwa')
                     ->whereIn('student_number', $studentNumbers)
