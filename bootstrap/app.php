@@ -16,7 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        //
+        $middleware->alias([
+            'prevent-back-history' => \App\Http\Middleware\PreventBackHistory::class,
+            'role' => \App\Http\Middleware\CheckRole::class, // <-- Register it here
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

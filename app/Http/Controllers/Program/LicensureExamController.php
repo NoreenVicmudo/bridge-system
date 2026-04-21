@@ -24,14 +24,12 @@ class LicensureExamController extends Controller
 
         if (!$college || !$program || !$year || !$batchNumber) {
             return Inertia::render('Program/LicensureExam', [
-                'students' => ['data' => [], 'links' => []],
-                'filter' => $request->all(),
+                'students' => ['data' => [], 'links' => []], 'filter' => $request->all(),
                 'dbColleges' => College::where('is_active', 1)->get()->map(fn($c) => ['value' => $c->college_id, 'label' => $c->name]),
                 'dbPrograms' => Program::where('is_active', 1)->get(),
             ]);
         }
 
-        // 🛠️ FIXED: Query structure joins `programs` to safely get the college_id
         $query = StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
             ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
@@ -39,17 +37,10 @@ class LicensureExamController extends Controller
                 $join->on('board_batch.batch_id', '=', 'student_licensure_exam.batch_id')
                      ->where('student_licensure_exam.is_active', 1);
             })
-            ->where('student_info.is_active', 1)
-            ->where('board_batch.is_active', 1)
-            ->where('programs.college_id', $college)
-            ->where('board_batch.program_id', $program)
-            ->where('board_batch.year', $year)
-            ->where('board_batch.batch_number', $batchNumber)
-            ->select(
-                'board_batch.batch_id', 'student_info.student_number',
-                'student_info.student_lname', 'student_info.student_fname',
-                'student_licensure_exam.exam_result', 'student_licensure_exam.exam_date_taken'
-            );
+            ->where('student_info.is_active', 1)->where('board_batch.is_active', 1)
+            ->where('programs.college_id', $college)->where('board_batch.program_id', $program)
+            ->where('board_batch.year', $year)->where('board_batch.batch_number', $batchNumber)
+            ->select('board_batch.batch_id', 'student_info.student_number', 'student_info.student_lname', 'student_info.student_fname', 'student_licensure_exam.exam_result', 'student_licensure_exam.exam_date_taken');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -59,12 +50,19 @@ class LicensureExamController extends Controller
             });
         }
 
-        $rawSort = $request->get('sort');
-        $allowedSorts = ['student_info.student_number', 'student_info.student_lname', 'student_licensure_exam.exam_result'];
-        $sortColumn = in_array($rawSort, $allowedSorts) ? $rawSort : 'student_info.student_lname';
+        // 🧠 SORTING ENGINE
+        $rawSort = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $rawSort)[0];
         $sortDirection = $request->get('direction', 'asc') === 'desc' ? 'desc' : 'asc';
+        
+        $allowedSorts = ['student_info.student_number', 'student_info.student_lname', 'student_licensure_exam.exam_result'];
+        if (in_array($cleanSortColumn, $allowedSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $query->orderBy('student_info.student_lname', $sortDirection);
+        }
 
-        $batches = $query->orderBy($sortColumn, $sortDirection)->paginate(15)->withQueryString();
+        $batches = $query->paginate(15)->withQueryString();
 
         $batches->getCollection()->transform(fn($s) => [
             'batch_id' => $s->batch_id, 'student_number' => $s->student_number,
@@ -76,6 +74,7 @@ class LicensureExamController extends Controller
         return Inertia::render('Program/LicensureExam', [
             'students' => $batches,
             'filter' => ['college' => $college, 'program' => $program, 'calendar_year' => $year, 'batch_number' => $batchNumber],
+            'search' => $request->search ?? '', 'sort' => $cleanSortColumn, 'direction' => $sortDirection,
             'dbColleges' => College::where('is_active', 1)->get()->map(fn($c) => ['value' => $c->college_id, 'label' => $c->name]),
             'dbPrograms' => Program::where('is_active', 1)->get(),
         ]);
@@ -86,9 +85,7 @@ class LicensureExamController extends Controller
         if (!$batchId) {
             $batchRecord = BoardBatch::where('student_number', $request->query('student_number'))
                 ->where('year', $request->query('calendar_year') ?? $request->query('batch_year'))
-                ->where('batch_number', $request->query('batch_number') ?? $request->query('board_batch'))
-                ->first();
-
+                ->where('batch_number', $request->query('batch_number') ?? $request->query('board_batch'))->first();
             if (!$batchRecord) return redirect()->back()->with('error', 'Student not found in this batch.');
             $batchId = $batchRecord->batch_id;
         }
@@ -97,14 +94,9 @@ class LicensureExamController extends Controller
             ->join('student_info', 'board_batch.student_number', '=', 'student_info.student_number')
             ->leftJoin('student_licensure_exam', 'board_batch.batch_id', '=', 'student_licensure_exam.batch_id')
             ->where('board_batch.batch_id', $batchId)
-            ->select(
-                'board_batch.batch_id', 'board_batch.program_id', 'student_info.student_number', 
-                'student_info.student_lname as lname', 'student_info.student_fname as fname', 
-                'student_licensure_exam.exam_result', 'student_licensure_exam.exam_date_taken'
-            )
+            ->select('board_batch.batch_id', 'board_batch.program_id', 'student_info.student_number', 'student_info.student_lname as lname', 'student_info.student_fname as fname', 'student_licensure_exam.exam_result', 'student_licensure_exam.exam_date_taken')
             ->firstOrFail();
 
-        // 🔒 THE BOUNCER
         $studentModel = StudentInfo::where('student_number', $student->student_number)->first();
         $this->authorizeStudentAccess($request->user(), $studentModel, $student->program_id);
 
@@ -113,15 +105,9 @@ class LicensureExamController extends Controller
 
     public function update(Request $request, $batchId)
     {
-        $validated = $request->validate([
-            'exam_result' => 'required|in:PASSED,FAILED,N/A',
-            'exam_date_taken' => 'nullable|date',
-        ]);
-
+        $validated = $request->validate(['exam_result' => 'required|in:PASSED,FAILED,N/A', 'exam_date_taken' => 'nullable|date']);
         $batch = BoardBatch::findOrFail($batchId);
         $student = StudentInfo::where('student_number', $batch->student_number)->first();
-
-        // 🔒 THE BOUNCER
         $this->authorizeStudentAccess($request->user(), $student, $batch->program_id);
 
         StudentLicensureExam::updateOrCreate(
@@ -129,7 +115,6 @@ class LicensureExamController extends Controller
             array_merge($validated, ['is_active' => 1, 'date_created' => now()])
         );
 
-        // 📝 AUDIT LOG
         AuditService::logStudentProgram($student->student_number, "Updated Licensure Exam Result: {$validated['exam_result']} for Batch {$batch->batch_number} ({$batch->year})");
 
         return redirect()->back()->with('success', 'Licensure result updated successfully.');
@@ -142,51 +127,45 @@ class LicensureExamController extends Controller
         $year = $request->input('calendar_year') ?? $request->input('batch_year');
         $batchNumber = $request->input('batch_number') ?? $request->input('board_batch');
 
-        // 🧠 FIXED: Intercept sort parameters and map them to DB columns
-        $sort = $request->get('sort', 'name');
-        $direction = $request->get('direction', 'asc');
-        
-        $sortMap = [
-            'student_number' => 'student_info.student_number',
-            'name' => 'student_info.student_lname',
-            'status' => 'student_licensure_exam.exam_result'
-        ];
-        $sortColumn = $sortMap[$sort] ?? 'student_info.student_lname';
-
-        $batches = StudentInfo::query()
+        $query = StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
             ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
             ->leftJoin('student_licensure_exam', 'board_batch.batch_id', '=', 'student_licensure_exam.batch_id')
-            ->where('programs.college_id', $college)
-            ->where('board_batch.program_id', $program)
-            ->where('board_batch.year', $year)
-            ->where('board_batch.batch_number', $batchNumber)
-            ->select('student_info.student_number', 'student_info.student_lname', 'student_info.student_fname', 'student_licensure_exam.exam_result', 'student_licensure_exam.exam_date_taken')
-            ->orderBy($sortColumn, $direction) // 🧠 FIXED: Apply dynamic sorting
-            ->get();
+            ->where('programs.college_id', $college)->where('board_batch.program_id', $program)
+            ->where('board_batch.year', $year)->where('board_batch.batch_number', $batchNumber)
+            ->where('student_info.is_active', 1)->where('board_batch.is_active', 1)
+            ->select('student_info.student_number', 'student_info.student_lname', 'student_info.student_fname', 'student_licensure_exam.exam_result', 'student_licensure_exam.exam_date_taken');
 
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                  ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        // 🧠 EXPORT SORTING
+        $sort = $request->get('sort', 'name');
+        $cleanSortColumn = explode('?', $sort)[0];
+        $direction = $request->get('direction', 'asc');
+        
+        $sortMap = ['student_number' => 'student_info.student_number', 'name' => 'student_info.student_lname', 'status' => 'student_licensure_exam.exam_result'];
+        $sortColumn = $sortMap[$cleanSortColumn] ?? 'student_info.student_lname';
+
+        $batches = $query->orderBy($sortColumn, $direction)->get();
         $headers = ['Student Number', 'Student Name', 'Result', 'Date Taken'];
 
         $callback = function() use ($batches, $headers) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $headers);
-            foreach ($batches as $b) {
-                fputcsv($file, [$b->student_number, "{$b->student_lname}, {$b->student_fname}", $b->exam_result ?? 'N/A', $b->exam_date_taken ?? 'N/A']);
-            }
+            foreach ($batches as $b) fputcsv($file, [$b->student_number, "{$b->student_lname}, {$b->student_fname}", $b->exam_result ?? 'N/A', $b->exam_date_taken ?? 'N/A']);
             fclose($file);
         };
 
-        // 🧠 FIXED: Add timestamp to filename
         $timestamp = now()->format('Y-m-d_H-i');
         $fileName = "Licensure_Results_{$year}_B{$batchNumber}_{$timestamp}.csv";
 
-        return response()->stream($callback, 200, [
-            "Content-type" => "text/csv", 
-            "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
-            "Pragma" => "no-cache", 
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", 
-            "Expires" => "0"
-        ]);
+        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\""]);
     }
 
     public function import(Request $request)
@@ -212,7 +191,6 @@ class LicensureExamController extends Controller
             $student = StudentInfo::where('student_number', $studentNumber)->first();
             if (!$student) continue;
 
-            // 🔒 TRY-CATCH BOUNCER
             try {
                 $this->authorizeStudentAccess($request->user(), $student, $program);
             } catch (\Exception $e) { continue; }
@@ -224,8 +202,6 @@ class LicensureExamController extends Controller
                     ['batch_id' => $batch->batch_id],
                     ['exam_result' => $result, 'exam_date_taken' => $date, 'is_active' => 1, 'date_created' => now()]
                 );
-                
-                // 📝 AUDIT LOG
                 AuditService::logStudentProgram($studentNumber, "Imported CSV Licensure Result: {$result}");
                 $count++;
             }

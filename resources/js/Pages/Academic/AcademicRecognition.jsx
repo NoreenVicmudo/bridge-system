@@ -20,20 +20,17 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = sort || urlParams.get('sort') || "";
     const actualDirection = direction || urlParams.get('direction') || "asc";
 
-    // 🧠 Reverse Map for the Active Arrow Indicator
     const reverseDbKeyMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name',
-        'award_count': 'recognition_count' // Map backend 'award_count' back to frontend 'recognition_count'
+        'award_count': 'recognition_count' 
     };
     const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
 
-    // 🧠 2. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
@@ -45,17 +42,14 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
             router.get(route('academic.recognition'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
         return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery]); // ONLY watch searchQuery
+    }, [searchQuery]); 
 
-    // 🧠 3. Fast local state update
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
     
-    // 🧠 4. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
-        // Map frontend sortKey to DB column
         const dbKeyMap = {
             'student_number': 'student_info.student_number',
             'name': 'student_info.student_lname',
@@ -66,7 +60,6 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
         let nextDir = 'asc';
         let nextSort = dbKey;
 
-        // Check against actualSort (the URL value) to cycle the states properly
         if (actualSort === dbKey) {
             if (actualDirection === 'asc') {
                 nextDir = 'desc';
@@ -118,7 +111,6 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            {/* 🧠 FIX: Passed actualDirection and activeFrontendSort to cycle arrows, added bg color */}
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
                             <SortableHeader label="Dean's List" sortKey="recognition_count" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />

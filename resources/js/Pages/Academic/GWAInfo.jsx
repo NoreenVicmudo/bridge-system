@@ -19,23 +19,20 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showAllGwas, setShowAllGwas] = useState(false);
     
-    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = urlParams.get('sort') || sort || "student_info.student_id";
     const actualDirection = urlParams.get('direction') || direction || "desc";
 
-    // 🧠 Reverse Map for the Active Arrow Indicator
     const reverseDbColumnMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name',
         'gwa': 'gwa'
     };
-    // If the sort is a specific dynamic column (e.g. "1Y-1S"), it will just pass through as the string
     const activeFrontendSort = reverseDbColumnMap[actualSort] || actualSort;
 
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
-    const exportUrl = route('gwa.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection });
+    const exportUrl = route('gwa.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, showAllGwas: showAllGwas ? 1 : 0 });
 
     useEffect(() => {
         if (!initialFilter || Object.keys(initialFilter).length === 0) {
@@ -59,37 +56,33 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
         });
     };
 
-    // 🧠 3. Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            fetchGwaData(filter, true); // preserveState: true prevents typing interruption
+            fetchGwaData(filter, true); 
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 4. Search Handler
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
 
-    // 🧠 5. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (sortKey) => {
         const dbColumnMap = { 
             student_number: 'student_info.student_number', 
             name: 'student_info.student_lname',
-            gwa: 'gwa' // For the single semester view
+            gwa: 'gwa' 
         };
-        const dbColumn = dbColumnMap[sortKey] || sortKey; // For dynamic columns like '1Y-1S', it uses the string itself
+        const dbColumn = dbColumnMap[sortKey] || sortKey; 
         
         let nextDir = 'asc';
         let nextSort = dbColumn;
 
-        // Check against actualSort (the URL value) to cycle the states properly
         if (actualSort === dbColumn) {
             if (actualDirection === 'asc') {
                 nextDir = 'desc';
@@ -154,8 +147,8 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                                 onClick={() => setShowAllGwas(!showAllGwas)} 
                                 className={`flex items-center justify-center gap-2 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm shrink-0 
                                     ${showAllGwas 
-                                        ? "bg-[#ffb736] text-white border-[#ffb736]" // Active state
-                                        : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" // Standard state matching filter
+                                        ? "bg-[#ffb736] text-white border-[#ffb736]" 
+                                        : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" 
                                     }`}
                             >
                                 <i className={`bi ${showAllGwas ? 'bi-eye-fill' : 'bi-eye-slash-fill'}`}></i>
@@ -187,7 +180,6 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                 >
                     <thead className="min-w-full">
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            {/* FIX: Used actualDirection and activeFrontendSort with bg-[#5c297c] fix */}
                             <SortableHeader 
                                 label="Student ID" 
                                 sortKey="student_number" 

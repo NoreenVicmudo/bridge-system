@@ -27,15 +27,12 @@ export default function PerformanceRatingPage({ students, filter, search: backen
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     
-    // UI States
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [activeFilters, setActiveFilters] = useState(filter || { academic_year: "2025-2026", semester: "1st Semester", college: "1", program: "1", year_level: "3", section: "3-1" });
 
-    // Hybrid Dropdown State
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
     const categoryDropdownRef = useRef(null);
 
-    // Close Dropdown on Outside Click
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
@@ -46,19 +43,16 @@ export default function PerformanceRatingPage({ students, filter, search: backen
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = isBackendReady ? (sort || urlParams.get('sort') || "") : mock.sortColumn;
     const actualDirection = isBackendReady ? (direction || urlParams.get('direction') || "asc") : mock.sortDirection;
 
-    // Reverse Map for the Active Arrow Indicator
     const reverseDbColumnMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name'
     };
     const activeFrontendSort = reverseDbColumnMap[actualSort] || actualSort;
 
-    // The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
@@ -89,7 +83,6 @@ export default function PerformanceRatingPage({ students, filter, search: backen
         }
     } : mock.setPage;
     
-    // 3-State Sorting (Ascending -> Descending -> None)
     const handleSort = isBackendReady ? (key) => {
         const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
         const dbKey = dbColumnMap[key] || key;
@@ -133,11 +126,10 @@ export default function PerformanceRatingPage({ students, filter, search: backen
                     title="Performance Rating"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={paginator} onPageChange={handlePageChange}
-                    exportEndpoint={route('performance-rating.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection })}
+                    exportEndpoint={route('performance-rating.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, category: selectedCategory })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}
                     headerActions={
                         <>
-                            {/* HYBRID DROPDOWN - CATEGORIES */}
                             {ratingHeaders.length > 0 && (
                                 <div className="relative shrink-0 flex-1 md:flex-none" ref={categoryDropdownRef}>
                                     <button 
@@ -156,7 +148,6 @@ export default function PerformanceRatingPage({ students, filter, search: backen
                                         </svg>
                                     </button>
 
-                                    {/* MENU */}
                                     <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isCategoryDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
                                         <div className="overflow-hidden min-h-0">
                                             <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
@@ -199,7 +190,6 @@ export default function PerformanceRatingPage({ students, filter, search: backen
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
-                            {/* FIX: Used SortableHeader with bg fix for the dynamic categories */}
                             {visibleCategories.map((header, i) => (
                                 <SortableHeader 
                                     key={i} 
@@ -208,7 +198,7 @@ export default function PerformanceRatingPage({ students, filter, search: backen
                                     currentSort={activeFrontendSort} 
                                     currentDirection={actualDirection} 
                                     onSort={handleSort} 
-                                    className={`bg-[#5c297c] whitespace-nowrap [&>div]:justify-center ${visibleCategories.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
+                                    className={`bg-[#5c297c] whitespace-nowrap [&>div]:w-full [&>div]:justify-center ${visibleCategories.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
                                 />
                             ))}
                         </tr>

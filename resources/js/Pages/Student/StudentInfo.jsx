@@ -12,26 +12,22 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
     const isBackendReady = !!students;
     const mock = useMockInertia(MOCK_STUDENTS);
     
-    // --- RBAC AUTHORIZATION ---
     const { auth } = usePage().props;
     const user = auth.user;
     
-    // Academic Affairs / Admin are read-only. Everyone else can manage data.
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(user?.position);
     const canManageData = !isAcademicAffairs;
 
-    // Data source
     const data = isBackendReady ? students : mock.data;
     const handlePageChange = isBackendReady ? null : mock.setPage;
 
-    // Extract student list
     const studentList = Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
             ? data.data
             : Array.isArray(data?.data?.data) ? data.data.data : [];
 
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const currentSearch = urlParams.get('search') || '';
     const currentSortParam = urlParams.get('sort') || '';
     const currentDirectionParam = urlParams.get('direction') || 'asc';
@@ -61,7 +57,6 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
 
     const currentFrontendSort = reverseSortKeyMap[activeSortColumn] || '';
 
-    // 🧠 FIXED: Added local state and debounce ref for the search bar
     const [searchQuery, setSearchQuery] = useState(currentSearch);
     const [isRemoveMode, setIsRemoveMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -79,17 +74,12 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
         }
 
         const delayDebounceFn = setTimeout(() => {
-            const params = { 
-                ...activeFilters, 
-                search: searchQuery,
-                sort: activeSortColumn,
-                direction: activeSortDirection
-            };
+            const params = { ...activeFilters, search: searchQuery };
+            if (activeSortColumn) { params.sort = activeSortColumn; params.direction = activeSortDirection; }
             router.get(route('student.info'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
-        // 🧠 FIXED: ONLY watch searchQuery! Do not watch filters or sort here to prevent loops!
     }, [searchQuery]);
 
     const handleSearch = (value) => {
@@ -108,21 +98,17 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
         let newColumn = dbColumn;
         let newDirection = 'asc';
 
-        // 🧠 FIXED: 3-State Sort Logic (Ascending -> Descending -> None)
         if (activeSortColumn === dbColumn) {
             if (activeSortDirection === 'asc') {
                 newDirection = 'desc';
             } else if (activeSortDirection === 'desc') {
-                newColumn = ''; // Reset to None
-                newDirection = ''; // Reset to None
+                newColumn = ''; 
+                newDirection = ''; 
             }
         }
 
-        // Include activeFilters for this specific page
         const params = { ...activeFilters, search: searchQuery };
-        
-        if (newColumn) params.sort = newColumn;
-        if (newDirection) params.direction = newDirection;
+        if (newColumn) { params.sort = newColumn; params.direction = newDirection; }
 
         router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
     };
@@ -135,6 +121,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
 
     const handleApplyFilter = (newFilters, mode) => {
         const params = { ...newFilters, search: currentSearch };
+        if (activeSortColumn) { params.sort = activeSortColumn; params.direction = activeSortDirection; }
         router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
     };
 
@@ -175,7 +162,6 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                             <i className="bi bi-funnel-fill leading-none"></i><span className="leading-none">Filter</span>
                         </button>
                     }
-                    // Conditionally render Footer Actions based on RBAC
                     footerActions={
                         canManageData ? (
                             !isRemoveMode ? (
@@ -191,7 +177,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                                     </button>
                                 </>
                             )
-                        ) : null // Return null if Academic Affairs to hide buttons entirely
+                        ) : null 
                     }
                 >
                     <thead>
@@ -218,7 +204,6 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                                 {isRemoveMode && <td className="py-3 px-6 text-center"><input type="checkbox" checked={selectedIds.has(student.id)} onChange={() => toggleSelection(student.id)} className="accent-[#5c297c] cursor-pointer w-4 h-4" /></td>}
                                 
                                 <td className="py-3 px-6">
-                                    {/* RBAC: Turn ID into a plain badge if they can't edit, otherwise make it a Link */}
                                     {canManageData ? (
                                         <Link href={route('students.edit', student.id)} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all min-w-[100px] text-center">
                                             {student.student_number}

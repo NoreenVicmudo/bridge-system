@@ -7,8 +7,7 @@ import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
 import LicensureAddModal from "@/Components/Modals/Program/LicensureAddModal"; 
 
-export default function LicensureExamPage({ students, filter, search = "", sort = "", direction = "", dbColleges = [], dbPrograms = [] }) {
-    // --- RBAC ---
+export default function LicensureExamPage({ students, filter, search = "", sort = "", direction = "asc", dbColleges = [], dbPrograms = [] }) {
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
     const canManageData = !isAcademicAffairs;
@@ -26,16 +25,13 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
         batch_program_name: dbPrograms.find(p => p.program_id == filter?.program)?.name || filter?.program,
     };
 
-    // 🧠 1. Setup local state and debounce ref
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = sort || urlParams.get('sort') || "";
     const actualDirection = direction || urlParams.get('direction') || "asc";
 
-    // 🧠 Reverse Map for the Active Arrow Indicator
     const reverseDbKeyMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name',
@@ -43,7 +39,6 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
     };
     const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
 
-    // 🧠 2. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
@@ -57,13 +52,11 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 3. Handlers using searchQuery
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
 
-    // 🧠 4. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
         const dbKeyMap = { 'student_number': 'student_info.student_number', 'name': 'student_info.student_lname', 'status': 'student_licensure_exam.exam_result' };
         const dbKey = dbKeyMap[key] || key;
@@ -71,7 +64,6 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
         let nextDir = 'asc';
         let nextSort = dbKey;
 
-        // Check against actualSort (the URL value) to cycle the states properly
         if (actualSort === dbKey) {
             if (actualDirection === 'asc') {
                 nextDir = 'desc';
@@ -103,7 +95,7 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
                     title="Licensure Exam Results"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
-                    exportEndpoint={route('licensure.exam.export', filter)}
+                    exportEndpoint={route('licensure.exam.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />}
                     headerActions={
                         <>
@@ -119,7 +111,6 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            {/* 🧠 FIX: Passed activeFrontendSort and actualDirection to update arrows */}
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
                             <SortableHeader label="Status" sortKey="status" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />

@@ -20,11 +20,9 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 Hybrid Dropdown State
     const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
 
-    // Close Dropdown on Outside Click
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -35,12 +33,10 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = sort || urlParams.get('sort') || "";
     const actualDirection = direction || urlParams.get('direction') || "asc";
 
-    // 🧠 Reverse Map for the Active Arrow Indicator
     const reverseDbKeyMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name',
@@ -65,18 +61,16 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
         setSearchQuery(text);
     };
 
-    // 🧠 THE FIX: 3-State Sorting (Ascending -> Descending -> None)
     const handleSort = (key) => {
         const dbKeyMap = {
             'student_number': 'student_info.student_number',
             'name': 'student_info.student_lname',
         };
-        const dbKey = dbKeyMap[key] || key; // If it's a subject, it stays as the subject string
+        const dbKey = dbKeyMap[key] || key; 
 
         let nextDir = 'asc';
         let nextSort = dbKey;
 
-        // Check against actualSort (the URL value) to cycle the states properly
         if (actualSort === dbKey) {
             if (actualDirection === 'asc') {
                 nextDir = 'desc';
@@ -110,19 +104,18 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
                     title="Back Subjects & Retakes"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
-                    exportEndpoint={route('retakes.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })} 
+                    exportEndpoint={route('retakes.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, subject: selectedSubject })} 
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
                     headerActions={
                         <>
-                            {/* HYBRID SELECTGROUP DROPDOWN */}
                             {subjects.length > 0 && (
                                 <div className="relative shrink-0 flex-1 md:flex-none" ref={dropdownRef}>
                                     <button 
                                         onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
                                         className={`flex items-center justify-between gap-3 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm w-full md:w-[200px] ${
                                             isSubjectDropdownOpen 
-                                                ? "bg-white text-[#5c297c] border-[#ffb736] ring-1 ring-[#ffb736]" // Match SelectGroup Focus
-                                                : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" // Match Filter Idle
+                                                ? "bg-white text-[#5c297c] border-[#ffb736] ring-1 ring-[#ffb736]" 
+                                                : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" 
                                         }`}
                                     >
                                         <span className="truncate flex-1 text-left">
@@ -136,7 +129,6 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
                                         </svg>
                                     </button>
 
-                                    {/* MENU */}
                                     <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isSubjectDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
                                         <div className="overflow-hidden min-h-0">
                                             <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
@@ -179,7 +171,6 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
-                            {/* 🧠 FIXED: Apply SortableHeader to the subjects to map the arrows */}
                             {visibleSubjects.map((sub, i) => (
                                 <SortableHeader 
                                     key={i} 
@@ -188,7 +179,7 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
                                     currentSort={activeFrontendSort} 
                                     currentDirection={actualDirection} 
                                     onSort={handleSort} 
-                                    className={`bg-[#5c297c] whitespace-nowrap [&>div]:justify-center ${visibleSubjects.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
+                                    className={`bg-[#5c297c] whitespace-nowrap [&>div]:w-full [&>div]:justify-center ${visibleSubjects.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
                                 />
                             ))}
                         </tr>
@@ -223,10 +214,7 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
                 </TableContainer>
 
                 <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={filter} onApply={handleApplyFilter} />
-                
-                {/* 🧠 THE FIX: Corrected currentMetric string */}
                 <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Back Subjects/Retakes" filterData={filter} />
-                
                 {canManageData && <RetakesAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={filter} subjectHeaders={subjects} />}
             </div>
         </AuthenticatedLayout>
