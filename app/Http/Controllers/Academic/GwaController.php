@@ -171,7 +171,7 @@ class GwaController extends Controller
 
         $gwaColumns = [];
         foreach ($headers as $index => $header) {
-            if (preg_match('/^(\d+)Y-(\d+)S$/', $header, $matches)) {
+            if (preg_match('/^(\d+)Y-(\w+)S$/', $header, $matches)) {
                 $gwaColumns[] = [
                     'year' => (int)$matches[1], 
                     'semester' => (string)$matches[2], 

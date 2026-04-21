@@ -166,13 +166,32 @@ class BackSubjectsController extends Controller
         $sortDirection = $request->get('direction', 'asc');
         $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
 
-        $subjects = GeneralSubject::where('program_id', $filter['program'])->where('is_active', 1)->get();
+        // 🧠 1. SUBJECT FILTER LOGIC
+        $subjectQuery = GeneralSubject::where('program_id', $filter['program'])->where('is_active', 1);
+        
+        // If a specific subject is selected (and it's not "All"), filter the columns!
+        if ($request->filled('subject') && $request->subject !== 'All') {
+            $subjectQuery->where('general_subject_name', $request->subject);
+        }
+        $subjects = $subjectQuery->get();
 
-        $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
+        // Base Student Query
+        $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
                 ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
                 ->where('section', $filter['section'])->where('is_active', 1);
-        })->orderBy($sortColumn, $sortDirection)->get();
+        });
+
+        // 🧠 2. SEARCH FILTER LOGIC
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                    ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        $students = $query->orderBy($sortColumn, $sortDirection)->get();
 
         $retakes = StudentBackSubject::whereIn('student_number', $students->pluck('student_number'))
             ->where('is_active', 1)->get()->groupBy('student_number');
@@ -196,7 +215,10 @@ class BackSubjectsController extends Controller
         };
 
         $timestamp = now()->format('Y-m-d_H-i');
-        $fileName = "Retakes_{$filter['section']}_{$timestamp}.csv";
+        
+        // Optional: Add the subject name to the filename if filtered
+        $fileNameSub = $request->subject !== 'All' && $request->filled('subject') ? str_replace(' ', '', $request->subject) . '_' : '';
+        $fileName = "Retakes_{$fileNameSub}{$filter['section']}_{$timestamp}.csv";
 
         return response()->stream($callback, 200, [
             'Content-Type' => 'text/csv', 'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
