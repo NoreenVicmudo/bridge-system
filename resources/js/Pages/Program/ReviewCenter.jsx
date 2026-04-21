@@ -8,7 +8,6 @@ import FilterInfoCard from "@/Components/FilterInfoCard";
 import ReviewCenterAddModal from "@/Components/Modals/Program/ReviewCenterAddModal";
 
 export default function ReviewCenterPage({ students, filter, search = "", sort = "", direction = "asc", dbColleges = [], dbPrograms = [] }) {
-    // --- RBAC ---
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
     const canManageData = !isAcademicAffairs;
@@ -27,16 +26,13 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
         batch_program_name: dbPrograms.find(p => p.program_id == filter?.program)?.name || filter?.program,
     };
 
-    // 🧠 1. Setup local state and debounce ref
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 THE FIX: Read directly from URL to prevent backend defaults from keeping the arrow "stuck"
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-    const actualSort = urlParams.get('sort') || ""; 
-    const actualDirection = urlParams.get('direction') || "asc";
+    const actualSort = urlParams.get('sort') || sort || ""; 
+    const actualDirection = urlParams.get('direction') || direction || "asc";
 
-    // 🧠 2. Reverse Map for Active Arrow Indicator
     const reverseDbKeyMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name',
@@ -44,7 +40,6 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
     };
     const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
 
-    // 🧠 3. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
@@ -58,17 +53,13 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 4. Handlers using searchQuery
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
 
-    // 🧠 5. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
         const dbKeyMap = { 'student_number': 'student_info.student_number', 'name': 'student_info.student_lname', 'review_center': 'student_review_center.review_center' };
-        
-        // 🧠 THE FIX: Fall back to 'key' instead of defaulting to student name
         const dbKey = dbKeyMap[key] || key; 
         
         let nextDir = 'asc';
@@ -105,7 +96,7 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
                     title="Student Review Center"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
-                    exportEndpoint={route('review.center.export', filter)}
+                    exportEndpoint={route('review.center.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />}
                     headerActions={
                         <>
@@ -121,7 +112,6 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            {/* 🧠 FIX: Passed actualDirection and activeFrontendSort so the arrows cycle perfectly */}
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
                             <SortableHeader label="Review Center" sortKey="review_center" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />

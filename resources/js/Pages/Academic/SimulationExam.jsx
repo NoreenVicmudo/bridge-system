@@ -24,9 +24,8 @@ export default function SimulationExamPage({ students, filter, search: backendSe
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     
-    // --- NEW: UI States for filtering ---
     const [selectedSim, setSelectedSim] = useState("All");
-    const [examPeriod, setExamPeriod] = useState(filter?.exam_period || "Default"); // Pre-Test, Post-Test, etc.
+    const [examPeriod, setExamPeriod] = useState(filter?.exam_period || "Default"); 
 
     const [activeFilters, setActiveFilters] = useState(filter || {
         academic_year: "2025-2026", semester: "1st Semester", college: "1", program: "1", year_level: "4", section: "4-1",
@@ -37,13 +36,11 @@ export default function SimulationExamPage({ students, filter, search: backendSe
 
     const PERIOD_OPTIONS = ["Default Period", "Diagnostic", "Pre-Test", "Midterm", "Post-Test"];
 
-    // 🧠 Hybrid Dropdown States
     const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
     const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
     const periodDropdownRef = useRef(null);
     const subjectDropdownRef = useRef(null);
 
-    // Close Dropdowns on Outside Click
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (periodDropdownRef.current && !periodDropdownRef.current.contains(event.target)) {
@@ -57,12 +54,10 @@ export default function SimulationExamPage({ students, filter, search: backendSe
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = isBackendReady ? (sort || urlParams.get('sort') || "") : mock.sortColumn;
     const actualDirection = isBackendReady ? (direction || urlParams.get('direction') || "asc") : mock.sortDirection;
 
-    // 🧠 Reverse Map for the Active Arrow Indicator
     const reverseDbColumnMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name'
@@ -99,7 +94,6 @@ export default function SimulationExamPage({ students, filter, search: backendSe
         }
     } : mock.setPage;
 
-    // 🧠 THE FIX: 3-State Sorting (Ascending -> Descending -> None) using actualSort
     const handleSort = isBackendReady ? (key) => {
         const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
         const dbKey = dbColumnMap[key] || key; 
@@ -107,12 +101,11 @@ export default function SimulationExamPage({ students, filter, search: backendSe
         let nextDir = 'asc';
         let nextSort = dbKey;
 
-        // If clicking the currently active column...
         if (actualSort === dbKey) {
             if (actualDirection === 'asc') {
-                nextDir = 'desc'; // Switch to Descending
+                nextDir = 'desc'; 
             } else {
-                nextDir = null;   // Remove Sorting entirely
+                nextDir = null;   
                 nextSort = null;
             }
         }
@@ -157,11 +150,10 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                     title={`Simulation Exam Results (${displayPeriod})`}
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={paginator} onPageChange={handlePageChange}
-                    exportEndpoint={route('simulation-exam.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: examPeriod })}
+                    exportEndpoint={route('simulation-exam.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: examPeriod, simulation: selectedSim })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}
                     headerActions={
                         <>
-                            {/* HYBRID DROPDOWN - EXAM PERIOD */}
                             <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
                                 <button 
                                     onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
@@ -177,7 +169,6 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                                     </svg>
                                 </button>
 
-                                {/* PERIOD MENU */}
                                 <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isPeriodDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
                                     <div className="overflow-hidden min-h-0">
                                         <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
@@ -195,7 +186,6 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                                 </div>
                             </div>
 
-                            {/* HYBRID DROPDOWN - SUBJECTS */}
                             {simHeaders.length > 0 && (
                                 <div className="relative shrink-0 flex-1 md:flex-none" ref={subjectDropdownRef}>
                                     <button 
@@ -214,7 +204,6 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                                         </svg>
                                     </button>
 
-                                    {/* SUBJECT MENU */}
                                     <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isSubjectDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
                                         <div className="overflow-hidden min-h-0">
                                             <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">

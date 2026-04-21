@@ -31,10 +31,7 @@ class BoardGradeController extends Controller
         $filter['college_name'] = $college ? $college->name : 'N/A';
         $filter['program_name'] = $program ? $program->name : 'N/A';
 
-        $boardSubjects = BoardSubject::where('program_id', $filter['program'])
-            ->where('is_active', 1)
-            ->get();
-            
+        $boardSubjects = BoardSubject::where('program_id', $filter['program'])->where('is_active', 1)->get();
         $subjectHeaders = $boardSubjects->pluck('subject_name')->toArray();
 
         $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
@@ -44,7 +41,7 @@ class BoardGradeController extends Controller
               ->where('semester', $filter['semester'])
               ->where('section', $filter['section'])
               ->where('is_active', 1);
-        });
+        })->select('student_info.*'); 
 
         $search = $request->get('search');
         if (!empty($search)) {
@@ -54,26 +51,38 @@ class BoardGradeController extends Controller
             });
         }
 
-        $sortColumn = $request->get('sort', 'student_info.student_id');
-        $sortDirection = $request->get('direction', 'desc');
-        $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
+        $sortColumn = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $sortColumn)[0];
+        $sortDirection = $request->get('direction', 'asc');
+        $standardSorts = ['student_info.student_id', 'student_info.student_number', 'student_info.student_lname'];
+
+        if (in_array($cleanSortColumn, $standardSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $subjectSort = $boardSubjects->firstWhere('subject_name', $cleanSortColumn);
+            if ($subjectSort) {
+                $query->leftJoin('student_board_subjects_grades as sbg_sort', function($join) use ($subjectSort) {
+                    $join->on('student_info.student_number', '=', 'sbg_sort.student_number')
+                         ->where('sbg_sort.subject_id', $subjectSort->subject_id)
+                         ->where('sbg_sort.is_active', 1);
+                })->orderBy('sbg_sort.subject_grade', $sortDirection);
+            } else {
+                $query->orderBy('student_info.student_lname', $sortDirection); 
+            }
+        }
 
         $students = $query->paginate(10)->withQueryString();
 
         $grades = StudentBoardGrade::whereIn('student_number', $students->pluck('student_number'))
-            ->where('is_active', 1)
-            ->get()
-            ->groupBy('student_number');
+            ->where('is_active', 1)->get()->groupBy('student_number');
 
         $students->getCollection()->transform(function ($student) use ($grades, $boardSubjects) {
             $studentGrades = $grades->get($student->student_number) ?? collect();
-            
             $gradeMap = [];
             foreach ($boardSubjects as $subject) {
                 $record = $studentGrades->where('subject_id', $subject->subject_id)->first();
                 $gradeMap[$subject->subject_name] = $record ? $record->subject_grade : null; 
             }
-
             return [
                 'id' => $student->student_id,
                 'student_number' => $student->student_number,
@@ -89,7 +98,7 @@ class BoardGradeController extends Controller
             ],
             'filter' => $filter,
             'search' => $search ?? '',
-            'sort' => $sortColumn,
+            'sort' => $cleanSortColumn,
             'direction' => $sortDirection,
         ]);
     }
@@ -100,10 +109,7 @@ class BoardGradeController extends Controller
         $programId = $request->query('program_id');
 
         $student = StudentInfo::findOrFail($studentId);
-
-        // 🔒 THE BOUNCER
         $this->authorizeStudentAccess($request->user(), $student, $programId);
-
         $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
         
         $subjects = BoardSubject::where('program_id', $targetProgram)
@@ -133,11 +139,8 @@ class BoardGradeController extends Controller
         ]);
 
         $student = StudentInfo::findOrFail($studentId);
-        
-        // Fetch the subject to securely grab its program_id context
         $subject = BoardSubject::findOrFail($validated['subject_id']);
 
-        // 🔒 THE BOUNCER ensures the user can access this specific program's grades
         $this->authorizeStudentAccess($request->user(), $student, $subject->program_id);
 
         StudentBoardGrade::updateOrCreate(
@@ -152,7 +155,6 @@ class BoardGradeController extends Controller
             ]
         );
 
-        // 📝 AUDIT LOG
         AuditService::logStudentAcademic($student->student_number, "Updated Board Grade for {$subject->subject_name}: {$validated['subject_grade']}");
 
         return redirect()->back()->with('success', 'Board subject grade updated successfully.');
@@ -165,20 +167,49 @@ class BoardGradeController extends Controller
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
-        $sortColumn = $request->get('sort', 'student_info.student_id');
-        $sortDirection = $request->get('direction', 'asc');
-        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
+        $cleanSubject = $request->filled('subject') ? explode('?', $request->subject)[0] : 'All';
 
-        $boardSubjects = BoardSubject::where('program_id', $filter['program'])->where('is_active', 1)->get();
+        $subjectQuery = BoardSubject::where('program_id', $filter['program'])->where('is_active', 1);
+        if ($cleanSubject !== 'All') {
+            $subjectQuery->where('subject_name', $cleanSubject);
+        }
+        $boardSubjects = $subjectQuery->get();
 
-        $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
+        $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
               ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
               ->where('section', $filter['section'])->where('is_active', 1);
-        })->orderBy($sortColumn, $sortDirection)->get();
+        })->select('student_info.*');
 
-        $grades = StudentBoardGrade::whereIn('student_number', $students->pluck('student_number'))
-            ->where('is_active', 1)->get()->groupBy('student_number');
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                  ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        $sortColumn = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $sortColumn)[0];
+        $sortDirection = $request->get('direction', 'asc');
+        $standardSorts = ['student_info.student_id', 'student_info.student_number', 'student_info.student_lname'];
+
+        if (in_array($cleanSortColumn, $standardSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $subjectSort = BoardSubject::where('program_id', $filter['program'])->where('subject_name', $cleanSortColumn)->where('is_active', 1)->first();
+            if ($subjectSort) {
+                $query->leftJoin('student_board_subjects_grades as sbg_sort', function($join) use ($subjectSort) {
+                    $join->on('student_info.student_number', '=', 'sbg_sort.student_number')
+                         ->where('sbg_sort.subject_id', $subjectSort->subject_id)->where('sbg_sort.is_active', 1);
+                })->orderBy('sbg_sort.subject_grade', $sortDirection);
+            } else {
+                $query->orderBy('student_info.student_lname', $sortDirection);
+            }
+        }
+
+        $students = $query->get();
+        $grades = StudentBoardGrade::whereIn('student_number', $students->pluck('student_number'))->where('is_active', 1)->get()->groupBy('student_number');
 
         $headers = ['Student Number', 'Student Name'];
         foreach ($boardSubjects as $sub) $headers[] = $sub->subject_name;
@@ -199,7 +230,8 @@ class BoardGradeController extends Controller
         };
 
         $timestamp = now()->format('Y-m-d_H-i');
-        $fileName = "BoardGrades_{$filter['section']}_{$timestamp}.csv";
+        $fileNameSub = $cleanSubject !== 'All' ? str_replace(' ', '', $cleanSubject) . '_' : '';
+        $fileName = "BoardGrades_{$fileNameSub}{$filter['section']}_{$timestamp}.csv";
 
         return response()->stream($callback, 200, [
             "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
@@ -225,10 +257,7 @@ class BoardGradeController extends Controller
         
         if (!$headers) return response()->json(['success' => false, 'message' => 'Empty file'], 422);
 
-        $boardSubjects = BoardSubject::where('program_id', $request->filter['program'])
-            ->where('is_active', 1)
-            ->get();
-            
+        $boardSubjects = BoardSubject::where('program_id', $request->filter['program'])->where('is_active', 1)->get();
         $subjectMap = [];
         foreach ($boardSubjects as $sub) {
             $subjectMap[strtolower(trim($sub->subject_name))] = $sub->subject_id;
@@ -238,92 +267,58 @@ class BoardGradeController extends Controller
         foreach ($headers as $index => $header) {
             $cleanHeader = strtolower(trim($header));
             if (isset($subjectMap[$cleanHeader])) {
-                $subjectColumns[] = [
-                    'subject_id' => $subjectMap[$cleanHeader],
-                    'index' => $index
-                ];
+                $subjectColumns[] = ['subject_id' => $subjectMap[$cleanHeader], 'index' => $index];
             }
         }
 
         if (empty($subjectColumns)) {
-            return response()->json(['success' => false, 'message' => 'No matching board subjects found in headers. Ensure your column names match the subjects.'], 422);
+            return response()->json(['success' => false, 'message' => 'No matching board subjects found in headers.'], 422);
         }
 
         $now = now();
         $recordsProcessed = 0;
-        
-        $targetProgram = $request->filter['program']; // Make sure you have this variable defined above the loop!
+        $targetProgram = $request->filter['program']; 
 
         while (($row = fgetcsv($handle)) !== false) {
             $studentNumber = $row[0] ?? null;
             if (!$studentNumber) continue;
 
-            // 1. Fetch the actual student model
             $student = StudentInfo::where('student_number', $studentNumber)->first();
             if (!$student) continue;
 
-            // 2. 🔒 THE BOUNCER: Test the student against the user's permissions and the target program
             try {
                 $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
-            } catch (\Exception $e) {
-                // If the user doesn't have access, or the student was never in this program, SKIP them!
-                continue; 
-            }
+            } catch (\Exception $e) { continue; }
 
             foreach ($subjectColumns as $col) {
                 $gradeValue = $row[$col['index']] ?? null;
-                
                 if ($gradeValue !== null && $gradeValue !== '') {
                     StudentBoardGrade::updateOrCreate(
-                        [
-                            'student_number' => $studentNumber,
-                            'subject_id'     => $col['subject_id'],
-                        ],
-                        [
-                            'subject_grade' => (float)$gradeValue,
-                            'date_created'  => $now,
-                            'is_active'     => 1,
-                        ]
+                        ['student_number' => $studentNumber, 'subject_id' => $col['subject_id']],
+                        ['subject_grade' => (float)$gradeValue, 'date_created'  => $now, 'is_active' => 1]
                     );
-                    // 📝 AUDIT LOG PER SUBJECT
                     AuditService::logStudentAcademic($studentNumber, "Imported CSV Board Grade for Subject ID: {$col['subject_id']}");
                     $recordsProcessed++;
                 }
             }
         }
         fclose($handle);
-
         return response()->json(['success' => true, 'message' => 'Import completed successfully.', 'records_processed' => $recordsProcessed]);
     }
 
-    /**
-     * Prevent IDOR: Check if the logged-in user is allowed to access this student.
-     */
     private function authorizeStudentAccess($user, $student, $requestedProgramId = null)
     {
         if (!$user->college_id && !$user->program_id) return;
-
         if ($user->college_id) {
-            $hasCollegeRecord = $student->programs()
-                ->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')
-                ->where('p.college_id', $user->college_id)
-                ->exists();
+            $hasCollegeRecord = $student->programs()->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')->where('p.college_id', $user->college_id)->exists();
             if (!$hasCollegeRecord) abort(403, 'Unauthorized: Student has no historical or active records in your College.');
         }
-
         if ($user->program_id) {
-            $hasProgramRecord = DB::table('student_programs')
-                ->where('student_number', $student->student_number)
-                ->where('program_id', $user->program_id)
-                ->exists();
+            $hasProgramRecord = DB::table('student_programs')->where('student_number', $student->student_number)->where('program_id', $user->program_id)->exists();
             if (!$hasProgramRecord) abort(403, 'Unauthorized: Student has no historical or active records in your Program.');
         }
-
         if ($requestedProgramId) {
-            $isValidRequest = DB::table('student_programs')
-                ->where('student_number', $student->student_number)
-                ->where('program_id', $requestedProgramId)
-                ->exists();
+            $isValidRequest = DB::table('student_programs')->where('student_number', $student->student_number)->where('program_id', $requestedProgramId)->exists();
             if (!$isValidRequest) abort(404, 'Invalid Context: Student has never been enrolled in the requested program.');
         }
     }

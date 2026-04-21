@@ -41,7 +41,7 @@ class PerformanceRatingController extends Controller
               ->where('semester', $filter['semester'])
               ->where('section', $filter['section'])
               ->where('is_active', 1);
-        });
+        })->select('student_info.*');
 
         $search = $request->get('search');
         if (!empty($search)) {
@@ -51,9 +51,25 @@ class PerformanceRatingController extends Controller
             });
         }
 
-        $sortColumn = $request->get('sort', 'student_info.student_id');
-        $sortDirection = $request->get('direction', 'desc');
-        $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
+        $sortColumn = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $sortColumn)[0];
+        $sortDirection = $request->get('direction', 'asc');
+        $standardSorts = ['student_info.student_id', 'student_info.student_number', 'student_info.student_lname'];
+
+        if (in_array($cleanSortColumn, $standardSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $catSort = $categories->firstWhere('category_name', $cleanSortColumn);
+            if ($catSort) {
+                $query->leftJoin('student_performance_rating as spr_sort', function($join) use ($catSort) {
+                    $join->on('student_info.student_number', '=', 'spr_sort.student_number')
+                         ->where('spr_sort.category_id', $catSort->category_id)
+                         ->where('spr_sort.is_active', 1);
+                })->orderBy('spr_sort.rating', $sortDirection);
+            } else {
+                $query->orderBy('student_info.student_lname', $sortDirection);
+            }
+        }
 
         $students = $query->paginate(10)->withQueryString();
 
@@ -86,7 +102,7 @@ class PerformanceRatingController extends Controller
             ],
             'filter' => $filter,
             'search' => $search ?? '',
-            'sort' => $sortColumn,
+            'sort' => $cleanSortColumn,
             'direction' => $sortDirection,
         ]);
     }
@@ -97,10 +113,7 @@ class PerformanceRatingController extends Controller
         $programId = $request->query('program_id');
 
         $student = StudentInfo::findOrFail($studentId);
-
-        // 🔒 THE BOUNCER
         $this->authorizeStudentAccess($request->user(), $student, $programId);
-        
         $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
 
         $categories = RatingCategory::where('program_id', $targetProgram)
@@ -128,10 +141,8 @@ class PerformanceRatingController extends Controller
         ]);
 
         $student = StudentInfo::findOrFail($studentId);
-
         $category = RatingCategory::findOrFail($validated['category_id']);
 
-        // 🔒 THE BOUNCER
         $this->authorizeStudentAccess($request->user(), $student, $category->program_id);
 
         StudentPerformanceRating::updateOrCreate(
@@ -146,7 +157,6 @@ class PerformanceRatingController extends Controller
             ]
         );
 
-        // 📝 AUDIT LOG
         AuditService::logStudentAcademic($student->student_number, "Updated Performance Rating for {$category->category_name}: {$validated['rating']}%");
 
         return redirect()->back()->with('success', 'Performance rating updated successfully.');
@@ -159,19 +169,50 @@ class PerformanceRatingController extends Controller
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
-        $sortColumn = $request->get('sort', 'student_info.student_id');
-        $sortDirection = $request->get('direction', 'asc');
-        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
+        $cleanCategory = $request->filled('category') ? explode('?', $request->category)[0] : 'All';
 
-        $categories = RatingCategory::where('program_id', $filter['program'])->where('is_active', 1)->get();
+        $catQuery = RatingCategory::where('program_id', $filter['program'])->where('is_active', 1);
+        if ($cleanCategory !== 'All') {
+            $catQuery->where('category_name', $cleanCategory);
+        }
+        $categories = $catQuery->get();
         
-        $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
+        $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
               ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
               ->where('section', $filter['section'])->where('is_active', 1);
-        })->orderBy($sortColumn, $sortDirection)->get();
+        })->select('student_info.*');
 
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                  ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        $sortColumn = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $sortColumn)[0];
+        $sortDirection = $request->get('direction', 'asc');
+        $standardSorts = ['student_info.student_id', 'student_info.student_number', 'student_info.student_lname'];
+
+        if (in_array($cleanSortColumn, $standardSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $catSort = RatingCategory::where('program_id', $filter['program'])->where('category_name', $cleanSortColumn)->where('is_active', 1)->first();
+            if ($catSort) {
+                $query->leftJoin('student_performance_rating as spr_sort', function($join) use ($catSort) {
+                    $join->on('student_info.student_number', '=', 'spr_sort.student_number')
+                         ->where('spr_sort.category_id', $catSort->category_id)->where('spr_sort.is_active', 1);
+                })->orderBy('spr_sort.rating', $sortDirection);
+            } else {
+                $query->orderBy('student_info.student_lname', $sortDirection);
+            }
+        }
+
+        $students = $query->get();
         $ratings = StudentPerformanceRating::whereIn('student_number', $students->pluck('student_number'))->where('is_active', 1)->get()->groupBy('student_number');
+        
         $headers = ['Student Number', 'Student Name'];
         foreach ($categories as $cat) $headers[] = $cat->category_name;
 
@@ -191,12 +232,10 @@ class PerformanceRatingController extends Controller
         };
 
         $timestamp = now()->format('Y-m-d_H-i');
-        $fileName = "PerformanceRatings_{$filter['section']}_{$timestamp}.csv";
+        $fileNameSub = $cleanCategory !== 'All' ? str_replace(' ', '', $cleanCategory) . '_' : '';
+        $fileName = "PerformanceRatings_{$fileNameSub}{$filter['section']}_{$timestamp}.csv";
 
-        return response()->stream($callback, 200, [
-            "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
-            "Pragma" => "no-cache", "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", "Expires" => "0"
-        ]);
+        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\""]);
     }
 
     public function import(Request $request)
@@ -225,23 +264,18 @@ class PerformanceRatingController extends Controller
 
         $recordsProcessed = 0;
         $now = now();
-        $targetProgram = $request->filter['program']; // Make sure you have this variable defined above the loop!
+        $targetProgram = $request->filter['program']; 
 
         while (($row = fgetcsv($handle)) !== false) {
             $studentNumber = $row[0] ?? null;
             if (!$studentNumber) continue;
 
-            // 1. Fetch the actual student model
             $student = StudentInfo::where('student_number', $studentNumber)->first();
             if (!$student) continue;
 
-            // 2. 🔒 THE BOUNCER: Test the student against the user's permissions and the target program
             try {
                 $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
-            } catch (\Exception $e) {
-                // If the user doesn't have access, or the student was never in this program, SKIP them!
-                continue; 
-            }
+            } catch (\Exception $e) { continue; }
 
             foreach ($categoryColumns as $col) {
                 $ratingValue = $row[$col['index']] ?? null;
@@ -250,7 +284,6 @@ class PerformanceRatingController extends Controller
                         ['student_number' => $studentNumber, 'category_id' => $col['category_id']],
                         ['rating' => (float)$ratingValue, 'date_created' => $now, 'is_active' => 1]
                     );
-                    // 📝 AUDIT LOG
                     AuditService::logStudentAcademic($studentNumber, "Imported CSV Performance Rating for Category ID: {$col['category_id']}");
                     $recordsProcessed++;
                 }
@@ -261,34 +294,19 @@ class PerformanceRatingController extends Controller
         return response()->json(['success' => true, 'message' => 'Import completed', 'records_processed' => $recordsProcessed]);
     }
 
-    /**
-     * Prevent IDOR: Check if the logged-in user is allowed to access this student.
-     */
     private function authorizeStudentAccess($user, $student, $requestedProgramId = null)
     {
         if (!$user->college_id && !$user->program_id) return;
-
         if ($user->college_id) {
-            $hasCollegeRecord = $student->programs()
-                ->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')
-                ->where('p.college_id', $user->college_id)
-                ->exists();
+            $hasCollegeRecord = $student->programs()->join('programs as p', 'student_programs.program_id', '=', 'p.program_id')->where('p.college_id', $user->college_id)->exists();
             if (!$hasCollegeRecord) abort(403, 'Unauthorized: Student has no historical or active records in your College.');
         }
-
         if ($user->program_id) {
-            $hasProgramRecord = DB::table('student_programs')
-                ->where('student_number', $student->student_number)
-                ->where('program_id', $user->program_id)
-                ->exists();
+            $hasProgramRecord = DB::table('student_programs')->where('student_number', $student->student_number)->where('program_id', $user->program_id)->exists();
             if (!$hasProgramRecord) abort(403, 'Unauthorized: Student has no historical or active records in your Program.');
         }
-
         if ($requestedProgramId) {
-            $isValidRequest = DB::table('student_programs')
-                ->where('student_number', $student->student_number)
-                ->where('program_id', $requestedProgramId)
-                ->exists();
+            $isValidRequest = DB::table('student_programs')->where('student_number', $student->student_number)->where('program_id', $requestedProgramId)->exists();
             if (!$isValidRequest) abort(404, 'Invalid Context: Student has never been enrolled in the requested program.');
         }
     }

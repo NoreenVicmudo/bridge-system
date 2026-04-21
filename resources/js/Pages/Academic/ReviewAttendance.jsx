@@ -16,12 +16,10 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = sort || urlParams.get('sort') || "";
     const actualDirection = direction || urlParams.get('direction') || "asc";
 
-    // 🧠 Reverse Map for the Active Arrow Indicator
     const reverseDbKeyMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name',
@@ -31,7 +29,6 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
     };
     const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
 
-    // 🧠 2. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
@@ -45,15 +42,12 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 3. Fast local state update
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
 
-    // 🧠 4. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
-        // Map frontend sortKey to DB column
         const dbKeyMap = {
             'student_number': 'student_info.student_number',
             'name': 'student_info.student_lname',
@@ -66,7 +60,6 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
         let nextDir = 'asc';
         let nextSort = dbKey;
 
-        // Check against actualSort (the URL value) to cycle the states properly
         if (actualSort === dbKey) {
             if (actualDirection === 'asc') {
                 nextDir = 'desc';
@@ -118,7 +111,6 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase">
-                            {/* 🧠 FIX: Changed all to SortableHeader, added bg-[#5c297c], and used actualDirection/activeFrontendSort */}
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
                             <SortableHeader label="Attended" sortKey="attended" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />

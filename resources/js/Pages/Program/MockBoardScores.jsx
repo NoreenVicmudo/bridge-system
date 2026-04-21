@@ -8,7 +8,6 @@ import MockAddStudentModal from "@/Components/Modals/Program/MockAddStudentModal
 import ProgramFilterModal from "@/Components/Modals/Program/ProgramFilterModal";
 
 export default function MockExamScoresPage({ students, filter, search = "", sort = "", direction = "asc", dbColleges = [], dbPrograms = [] }) {
-    // --- RBAC ---
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
     const canManageData = !isAcademicAffairs;
@@ -23,7 +22,6 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
 
     const currentExamPeriod = filter?.exam_period || "Default";
 
-    // Hybrid Dropdown States
     const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
     const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
     const periodDropdownRef = useRef(null);
@@ -31,7 +29,6 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
 
     const PERIOD_OPTIONS = ["Default Period", "Diagnostic", "Pre-Test", "Midterm", "Post-Test"];
 
-    // Close Dropdowns on Outside Click
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (periodDropdownRef.current && !periodDropdownRef.current.contains(event.target)) {
@@ -53,23 +50,19 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
         batch_program_name: dbPrograms.find(p => p.program_id == filter?.program)?.name || filter?.program,
     };
 
-    // 🧠 1. Setup local state and debounce ref
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = urlParams.get('sort') || sort || "";
     const actualDirection = urlParams.get('direction') || direction || "asc";
 
-    // 🧠 2. Translate backend DB columns back to frontend React keys for the active indicator
     const reverseDbColumnMap = {
         'student_info.student_number': 'student_number',
         'student_info.student_lname': 'name'
     };
     const activeFrontendSort = reverseDbColumnMap[actualSort] || actualSort;
 
-    // 🧠 3. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
@@ -83,13 +76,11 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 4. Handlers using searchQuery
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
     
-    // 🧠 THE FIX: 3-State Sorting (Ascending -> Descending -> None) using actualSort
     const handleSort = (key) => {
         const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
         const dbKey = dbColumnMap[key] || key; 
@@ -97,12 +88,11 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
         let nextDir = 'asc';
         let nextSort = dbKey;
 
-        // If clicking the currently active column...
         if (actualSort === dbKey) {
             if (actualDirection === 'asc') {
-                nextDir = 'desc'; // Switch to Descending
+                nextDir = 'desc'; 
             } else {
-                nextDir = null;   // Remove Sorting entirely
+                nextDir = null;   
                 nextSort = null;
             }
         }
@@ -111,7 +101,7 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
         if (nextSort) {
             params.sort = nextSort;
             params.direction = nextDir;
-        } // If nextSort is null, we omit sort/direction from params to clear the URL!
+        } 
 
         router.get(route('mock.board.scores'), params, { preserveState: true, preserveScroll: true });
     };
@@ -141,11 +131,10 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                     title={`Mock Board Scores (${displayPeriod})`}
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students?.data} 
-                    exportEndpoint={route('mock-scores.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: currentExamPeriod })}
+                    exportEndpoint={route('mock-scores.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: currentExamPeriod, subject: selectedSubject })}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />} 
                     headerActions={
                         <>
-                            {/* HYBRID DROPDOWN - EXAM PERIOD */}
                             <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
                                 <button 
                                     onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
@@ -161,7 +150,6 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                                     </svg>
                                 </button>
 
-                                {/* PERIOD MENU */}
                                 <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isPeriodDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
                                     <div className="overflow-hidden min-h-0">
                                         <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
@@ -179,7 +167,6 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                                 </div>
                             </div>
 
-                            {/* HYBRID DROPDOWN - SUBJECTS */}
                             {subjectHeaders.length > 0 && (
                                 <div className="relative shrink-0 flex-1 md:flex-none" ref={subjectDropdownRef}>
                                     <button 
@@ -198,7 +185,6 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                                         </svg>
                                     </button>
 
-                                    {/* SUBJECT MENU */}
                                     <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isSubjectDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
                                         <div className="overflow-hidden min-h-0">
                                             <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
@@ -235,7 +221,6 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            {/* 🧠 THE FIX: Pass activeFrontendSort to currentSort AND actualDirection to currentDirection */}
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
                             

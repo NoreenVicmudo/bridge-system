@@ -43,7 +43,7 @@ class BackSubjectsController extends Controller
                 ->where('semester', $filter['semester'])
                 ->where('section', $filter['section'])
                 ->where('is_active', 1);
-        });
+        })->select('student_info.*');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -53,9 +53,25 @@ class BackSubjectsController extends Controller
             });
         }
 
-        $sortColumn = $request->get('sort', 'student_info.student_id');
-        $sortDirection = $request->get('direction', 'desc');
-        $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
+        $sortColumn = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $sortColumn)[0];
+        $sortDirection = $request->get('direction', 'asc');
+        $standardSorts = ['student_info.student_id', 'student_info.student_number', 'student_info.student_lname'];
+
+        if (in_array($cleanSortColumn, $standardSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $subjectSort = $subjects->firstWhere('general_subject_name', $cleanSortColumn);
+            if ($subjectSort) {
+                $query->leftJoin('student_back_subjects as sbs_sort', function($join) use ($subjectSort) {
+                    $join->on('student_info.student_number', '=', 'sbs_sort.student_number')
+                         ->where('sbs_sort.general_subject_id', $subjectSort->general_subject_id)
+                         ->where('sbs_sort.is_active', 1);
+                })->orderBy('sbs_sort.terms_repeated', $sortDirection);
+            } else {
+                $query->orderBy('student_info.student_lname', $sortDirection);
+            }
+        }
 
         $students = $query->paginate(10)->withQueryString();
 
@@ -69,7 +85,7 @@ class BackSubjectsController extends Controller
             $grades = [];
             foreach ($subjects as $subject) {
                 $record = $studentRetakes->firstWhere('general_subject_id', $subject->general_subject_id);
-                $grades[$subject->general_subject_name] = $record ? $record->terms_repeated : 0;
+                $grades[$subject->general_subject_name] = $record ? $record->terms_repeated : null; 
             }
 
             return [
@@ -85,7 +101,7 @@ class BackSubjectsController extends Controller
             'subjects' => $subjectHeaders,
             'filter'   => $filter,
             'search'   => $request->search ?? '',
-            'sort'     => $sortColumn,
+            'sort'     => $cleanSortColumn,
             'direction'=> $sortDirection,
         ]);
     }
@@ -96,10 +112,7 @@ class BackSubjectsController extends Controller
         $programId = $request->query('program_id');
 
         $student = StudentInfo::findOrFail($studentId);
-
-        // 🔒 THE BOUNCER
         $this->authorizeStudentAccess($request->user(), $student, $programId);
-
         $targetProgram = $programId ?? $student->activeProgram->first()?->program_id;
 
         $subjectOptions = GeneralSubject::where('program_id', $targetProgram)
@@ -131,11 +144,8 @@ class BackSubjectsController extends Controller
         ]);
 
         $student = StudentInfo::findOrFail($studentId);
-        
-        // 1. Fetch the subject to find out what Program it belongs to
         $subject = GeneralSubject::findOrFail($validated['general_subject_id']);
 
-        // 2. 🔒 THE BOUNCER: Check if the student has EVER been in that program!
         $this->authorizeStudentAccess($request->user(), $student, $subject->program_id);
 
         StudentBackSubject::updateOrCreate(
@@ -149,7 +159,7 @@ class BackSubjectsController extends Controller
                 'is_active'      => true,
             ]
         );
-        // 📝 AUDIT LOG
+        
         AuditService::logStudentAcademic($student->student_number, "Updated Retake Count for {$subject->general_subject_name}: {$validated['terms_repeated']} times");
 
         return redirect()->back()->with('success', 'Retake count updated successfully.');
@@ -162,20 +172,49 @@ class BackSubjectsController extends Controller
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
-        $sortColumn = $request->get('sort', 'student_info.student_id');
-        $sortDirection = $request->get('direction', 'asc');
-        $sortColumn = $sortColumn === 'name' ? 'student_info.student_lname' : $sortColumn;
+        $cleanSubject = $request->filled('subject') ? explode('?', $request->subject)[0] : 'All';
 
-        $subjects = GeneralSubject::where('program_id', $filter['program'])->where('is_active', 1)->get();
+        $subjectQuery = GeneralSubject::where('program_id', $filter['program'])->where('is_active', 1);
+        if ($cleanSubject !== 'All') {
+            $subjectQuery->where('general_subject_name', $cleanSubject);
+        }
+        $subjects = $subjectQuery->get();
 
-        $students = StudentInfo::whereHas('sections', function ($q) use ($filter) {
+        $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
                 ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
                 ->where('section', $filter['section'])->where('is_active', 1);
-        })->orderBy($sortColumn, $sortDirection)->get();
+        })->select('student_info.*'); 
 
-        $retakes = StudentBackSubject::whereIn('student_number', $students->pluck('student_number'))
-            ->where('is_active', 1)->get()->groupBy('student_number');
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                    ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        $sortColumn = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $sortColumn)[0];
+        $sortDirection = $request->get('direction', 'asc');
+        $standardSorts = ['student_info.student_id', 'student_info.student_number', 'student_info.student_lname'];
+
+        if (in_array($cleanSortColumn, $standardSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $subjectSort = GeneralSubject::where('program_id', $filter['program'])->where('general_subject_name', $cleanSortColumn)->where('is_active', 1)->first();
+            if ($subjectSort) {
+                $query->leftJoin('student_back_subjects as sbs_sort', function($join) use ($subjectSort) {
+                    $join->on('student_info.student_number', '=', 'sbs_sort.student_number')
+                         ->where('sbs_sort.general_subject_id', $subjectSort->general_subject_id)->where('sbs_sort.is_active', 1);
+                })->orderBy('sbs_sort.terms_repeated', $sortDirection);
+            } else {
+                $query->orderBy('student_info.student_lname', $sortDirection);
+            }
+        }
+
+        $students = $query->get();
+        $retakes = StudentBackSubject::whereIn('student_number', $students->pluck('student_number'))->where('is_active', 1)->get()->groupBy('student_number');
 
         $headers = ['Student Number', 'Student Name'];
         foreach ($subjects as $subject) $headers[] = $subject->general_subject_name;
@@ -196,11 +235,11 @@ class BackSubjectsController extends Controller
         };
 
         $timestamp = now()->format('Y-m-d_H-i');
-        $fileName = "Retakes_{$filter['section']}_{$timestamp}.csv";
+        $fileNameSub = $cleanSubject !== 'All' ? str_replace(' ', '', $cleanSubject) . '_' : '';
+        $fileName = "Retakes_{$fileNameSub}{$filter['section']}_{$timestamp}.csv";
 
         return response()->stream($callback, 200, [
-            'Content-Type' => 'text/csv', 'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
-            'Pragma' => 'no-cache', 'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0', 'Expires' => '0',
+            'Content-Type' => 'text/csv', 'Content-Disposition' => "attachment; filename=\"{$fileName}\""
         ]);
     }
 
@@ -245,23 +284,18 @@ class BackSubjectsController extends Controller
         $recordsProcessed = 0;
         $now = now();
 
-        $targetProgram = $request->filter['program']; // Make sure you have this variable defined above the loop!
+        $targetProgram = $request->filter['program']; 
 
         while (($row = fgetcsv($handle)) !== false) {
             $studentNumber = $row[0] ?? null;
             if (!$studentNumber) continue;
 
-            // 1. Fetch the actual student model
             $student = StudentInfo::where('student_number', $studentNumber)->first();
             if (!$student) continue;
 
-            // 2. 🔒 THE BOUNCER: Test the student against the user's permissions and the target program
             try {
                 $this->authorizeStudentAccess($request->user(), $student, $targetProgram);
-            } catch (\Exception $e) {
-                // If the user doesn't have access, or the student was never in this program, SKIP them!
-                continue; 
-            }
+            } catch (\Exception $e) { continue; }
 
             foreach ($subjectColumns as $col) {
                 $termsRepeated = $row[$col['index']] ?? null;
@@ -277,7 +311,6 @@ class BackSubjectsController extends Controller
                             'is_active'      => true,
                         ]
                     );
-                    // 📝 AUDIT LOG
                     AuditService::logStudentAcademic($studentNumber, "Imported CSV Retake count for Subject ID: {$col['subject_id']}");
                     $recordsProcessed++;
                 }

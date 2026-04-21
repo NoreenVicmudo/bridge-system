@@ -23,14 +23,12 @@ class ReviewCenterController extends Controller
 
         if (!$college || !$program || !$year || !$batchNumber) {
             return Inertia::render('Program/ReviewCenter', [
-                'students' => ['data' => [], 'links' => []],
-                'filter' => $request->all(),
+                'students' => ['data' => [], 'links' => []], 'filter' => $request->all(),
                 'dbColleges' => College::where('is_active', 1)->get()->map(fn($c) => ['value' => $c->college_id, 'label' => $c->name]),
                 'dbPrograms' => Program::where('is_active', 1)->get(),
             ]);
         }
 
-        // 🛠️ FIXED: `programs` join protects `college_id` filter
         $query = StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
             ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
@@ -38,17 +36,10 @@ class ReviewCenterController extends Controller
                 $join->on('board_batch.batch_id', '=', 'student_review_center.batch_id')
                      ->where('student_review_center.is_active', 1);
             })
-            ->where('student_info.is_active', 1)
-            ->where('board_batch.is_active', 1)
-            ->where('programs.college_id', $college)
-            ->where('board_batch.program_id', $program)
-            ->where('board_batch.year', $year)
-            ->where('board_batch.batch_number', $batchNumber)
-            ->select(
-                'board_batch.batch_id', 'student_info.student_number',
-                'student_info.student_lname', 'student_info.student_fname',
-                'student_review_center.review_center'
-            );
+            ->where('student_info.is_active', 1)->where('board_batch.is_active', 1)
+            ->where('programs.college_id', $college)->where('board_batch.program_id', $program)
+            ->where('board_batch.year', $year)->where('board_batch.batch_number', $batchNumber)
+            ->select('board_batch.batch_id', 'student_info.student_number', 'student_info.student_lname', 'student_info.student_fname', 'student_review_center.review_center');
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -59,13 +50,18 @@ class ReviewCenterController extends Controller
             });
         }
 
-        $rawSort = $request->get('sort');
-        if ($rawSort && str_starts_with($rawSort, 'si.')) $rawSort = str_replace('si.', 'student_info.', $rawSort);
-        $allowedSorts = ['student_info.student_number', 'student_info.student_lname', 'student_review_center.review_center'];
-        $sortColumn = in_array($rawSort, $allowedSorts) ? $rawSort : 'student_info.student_lname';
+        // 🧠 SORTING ENGINE
+        $rawSort = $request->get('sort', 'student_info.student_lname');
+        $cleanSortColumn = explode('?', $rawSort)[0];
         $sortDirection = $request->get('direction', 'asc') === 'desc' ? 'desc' : 'asc';
+        
+        $allowedSorts = ['student_info.student_number', 'student_info.student_lname', 'student_review_center.review_center'];
+        if (in_array($cleanSortColumn, $allowedSorts)) {
+            $query->orderBy($cleanSortColumn, $sortDirection);
+        } else {
+            $query->orderBy('student_info.student_lname', $sortDirection);
+        }
 
-        $query->orderBy($sortColumn, $sortDirection);
         $batches = $query->paginate(15)->withQueryString();
 
         $batches->getCollection()->transform(function ($student) {
@@ -75,7 +71,8 @@ class ReviewCenterController extends Controller
         $activeFilter = ['college' => $college, 'program' => $program, 'calendar_year' => $year, 'batch_number' => $batchNumber];
 
         return Inertia::render('Program/ReviewCenter', [
-            'students'   => $batches, 'filter' => $activeFilter, 'search' => $request->search ?? '', 'sort' => $sortColumn, 'direction'  => $sortDirection,
+            'students' => $batches, 'filter' => $activeFilter, 'search' => $request->search ?? '', 
+            'sort' => $cleanSortColumn, 'direction' => $sortDirection,
             'dbColleges' => College::where('is_active', 1)->get()->map(fn($c) => ['value' => $c->college_id, 'label' => $c->name]),
             'dbPrograms' => Program::where('is_active', 1)->get(),
         ]);
@@ -104,7 +101,6 @@ class ReviewCenterController extends Controller
             ->select('board_batch.batch_id', 'board_batch.program_id', 'student_info.student_number', 'student_info.student_lname as lname', 'student_info.student_fname as fname', 'student_review_center.review_center')
             ->firstOrFail();
 
-        // 🔒 THE BOUNCER
         $studentModel = StudentInfo::where('student_number', $student->student_number)->first();
         $this->authorizeStudentAccess($request->user(), $studentModel, $student->program_id);
 
@@ -114,11 +110,8 @@ class ReviewCenterController extends Controller
     public function update(Request $request, $batchId)
     {
         $validated = $request->validate(['review_center' => 'required|string|max:100']);
-
         $batch = BoardBatch::findOrFail($batchId);
         $student = StudentInfo::where('student_number', $batch->student_number)->first();
-
-        // 🔒 THE BOUNCER
         $this->authorizeStudentAccess($request->user(), $student, $batch->program_id);
 
         DB::table('student_review_center')->updateOrInsert(
@@ -126,9 +119,7 @@ class ReviewCenterController extends Controller
             ['review_center' => $validated['review_center'], 'is_active' => 1, 'date_created' => now()]
         );
 
-        // 📝 AUDIT LOG
         AuditService::logStudentAcademic($student->student_number, "Updated Review Center to: {$validated['review_center']}");
-
         return redirect()->back()->with('success', 'Review Center successfully updated!');
     }
 
@@ -139,35 +130,37 @@ class ReviewCenterController extends Controller
         $year = $request->input('calendar_year') ?? $request->input('batch_year');
         $batchNumber = $request->input('batch_number') ?? $request->input('board_batch');
 
-        // 🧠 FIXED: Intercept sort parameters
-        $sort = $request->get('sort', 'name');
-        $direction = $request->get('direction', 'asc');
-        
-        $sortMap = [
-            'student_number' => 'student_info.student_number',
-            'name' => 'student_info.student_lname',
-            'review_center' => 'student_review_center.review_center'
-        ];
-        $sortColumn = $sortMap[$sort] ?? 'student_info.student_lname';
-
-        $batches = StudentInfo::query()
+        $query = StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
             ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
             ->leftJoin('student_review_center', function($join) {
                 $join->on('board_batch.batch_id', '=', 'student_review_center.batch_id')->where('student_review_center.is_active', 1);
             })
-            ->where('student_info.is_active', 1)
-            ->where('board_batch.is_active', 1)
-            ->where('programs.college_id', $college)
-            ->where('board_batch.program_id', $program)
-            ->where('board_batch.year', $year)
-            ->where('board_batch.batch_number', $batchNumber)
-            ->select('student_info.student_number', 'student_info.student_lname', 'student_info.student_fname', 'student_review_center.review_center')
-            ->orderBy($sortColumn, $direction) // 🧠 FIXED: Replaced static orderBy with dynamic sort
-            ->get();
+            ->where('student_info.is_active', 1)->where('board_batch.is_active', 1)
+            ->where('programs.college_id', $college)->where('board_batch.program_id', $program)
+            ->where('board_batch.year', $year)->where('board_batch.batch_number', $batchNumber)
+            ->select('student_info.student_number', 'student_info.student_lname', 'student_info.student_fname', 'student_review_center.review_center');
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('student_info.student_number', 'LIKE', "%{$search}%")
+                  ->orWhereRaw("CONCAT(student_info.student_lname, ', ', student_info.student_fname) LIKE ?", ["%{$search}%"])
+                  ->orWhere('student_review_center.review_center', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // 🧠 EXPORT SORTING
+        $sort = $request->get('sort', 'name');
+        $cleanSortColumn = explode('?', $sort)[0];
+        $direction = $request->get('direction', 'asc');
+        
+        $sortMap = ['student_number' => 'student_info.student_number', 'name' => 'student_info.student_lname', 'review_center' => 'student_review_center.review_center'];
+        $sortColumn = $sortMap[$cleanSortColumn] ?? 'student_info.student_lname';
+
+        $batches = $query->orderBy($sortColumn, $direction)->get();
 
         $headers = ['Student Number', 'Student Name', 'Review Center'];
-
         $callback = function() use ($batches, $headers) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $headers);
@@ -175,17 +168,10 @@ class ReviewCenterController extends Controller
             fclose($file);
         };
 
-        // 🧠 FIXED: Add timestamp to filename
         $timestamp = now()->format('Y-m-d_H-i');
         $fileName = "ReviewCenter_Export_{$year}_Batch{$batchNumber}_{$timestamp}.csv";
 
-        return response()->stream($callback, 200, [
-            "Content-type" => "text/csv", 
-            "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
-            "Pragma" => "no-cache", 
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0", 
-            "Expires" => "0"
-        ]);
+        return response()->stream($callback, 200, ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\""]);
     }
 
     public function import(Request $request)
@@ -206,32 +192,26 @@ class ReviewCenterController extends Controller
         while (($row = fgetcsv($handle)) !== false) {
             $studentNumber = $row[0] ?? null;
             $reviewCenter = $row[2] ?? null; 
-
             if (!$studentNumber || !$reviewCenter) continue;
 
             $student = StudentInfo::where('student_number', $studentNumber)->first();
             if (!$student) continue;
 
-            // 🔒 TRY-CATCH BOUNCER
             try {
                 $this->authorizeStudentAccess($request->user(), $student, $program);
             } catch (\Exception $e) { continue; }
 
             $batch = BoardBatch::where('student_number', $studentNumber)->where('year', $year)->where('batch_number', $batchNumber)->first();
-            
             if ($batch) {
                 DB::table('student_review_center')->updateOrInsert(
                     ['batch_id' => $batch->batch_id],
                     ['review_center' => trim($reviewCenter), 'is_active' => 1, 'date_created' => $now]
                 );
-
-                // 📝 AUDIT LOG
                 AuditService::logStudentAcademic($studentNumber, "Imported CSV Review Center: {$reviewCenter}");
                 $recordsProcessed++;
             }
         }
         fclose($handle);
-
         return response()->json(['success' => true, 'message' => "Successfully imported {$recordsProcessed} review centers."]);
     }
 
