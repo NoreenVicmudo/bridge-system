@@ -32,20 +32,16 @@ class ReportController extends Controller
             ->distinct()
             ->get();
 
-        // 🧠 FIXED: Changed to criteria_id so it matches the extraction logic.
-        // NOTE: If you have a separate table with the criteria NAMES, add a ->join() here just like boardSubjects above!
-        $performanceCriteria = DB::table('student_performance_rating')
-            ->select('category_id as value', 'category_id as label')
-            ->distinct()
-            ->get();
+        $performanceCriteria = \App\Models\Academic\RatingCategory::where('program_id', $filters['program'])
+            ->where('is_active', 1)
+            ->get()
+            ->map(fn($c) => ['value' => $c->category_id, 'label' => $c->category_name]);
 
-        // 🧠 FETCH SIMULATION EXAMS
-        $simExams = DB::table('student_simulation_exam')
-            ->select('simulation_id as value', 'simulation_id as label')
-            ->distinct()
-            ->get();
+        $simExams = \App\Models\Academic\SimulationExam::where('program_id', $filters['program'])
+            ->where('is_active', 1)
+            ->get()
+            ->map(fn($s) => ['value' => $s->simulation_id, 'label' => $s->simulation_name]);
 
-        // 🧠 NEW: Fetch distinct Year & Semester combinations for GWA
         $gwaTerms = DB::table('student_gwa')
             ->select('year_level', 'semester')
             ->distinct()
@@ -53,7 +49,6 @@ class ReportController extends Controller
             ->orderBy('semester')
             ->get()
             ->map(function ($gwa) {
-                // Creates a value like "1|1st" and a label like "Year 1 - Semester 1st"
                 return [
                     'value' => $gwa->year_level . '|' . $gwa->semester, 
                     'label' => "Year {$gwa->year_level} - Semester {$gwa->semester}"
@@ -65,7 +60,7 @@ class ReportController extends Controller
             'BoardGrades'       => $boardSubjects,
             'PerformanceRating' => $performanceCriteria,
             'SimExam'           => $simExams,
-            'GWA'               => $gwaTerms, // Add to the map!
+            'GWA'               => $gwaTerms, 
         ];
 
         return Inertia::render('Reports/ReportGeneration', [
@@ -73,13 +68,13 @@ class ReportController extends Controller
             'subMetricMap' => $subMetricMap
         ]);
     }
+    
     public function generate(Request $request)
     {
         try {
             $filters = $request->only(['college', 'program', 'year_start', 'year_end']);
             $config = $request->except(['college', 'program', 'year_start', 'year_end']);
 
-            // 🛠️ FIXED: Added `programs` join to safely filter by college & program
             $studentQuery = StudentInfo::query()
                 ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
                 ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
@@ -100,7 +95,6 @@ class ReportController extends Controller
             $batchContext = "College {$filters['college']}, Program {$filters['program']}, Batch {$filters['year_start']}-{$filters['year_end']}";
             AuditService::logReportGeneration($batchContext, $treatment, "Generated {$treatment} report");
 
-            // Route to the correct statistical treatment
             if ($config['tool'] === 'descriptive') {
                 return $this->processDescriptive($batchStudents, $config);
             }
@@ -175,7 +169,7 @@ class ReportController extends Controller
         }
 
         $stats = StatisticsService::pearsonR($x, $y);
-        $regStats = StatisticsService::regression($x, $y); // 🧠 Generate Line data
+        $regStats = StatisticsService::regression($x, $y); 
 
         $absR = abs($stats['R-Value']);
         if ($absR >= 0.9) $interp = 'Very High';
@@ -200,7 +194,7 @@ class ReportController extends Controller
                 'Conclusion' => $stats['Significance']
             ],
             'raw_data' => $rawData,
-            'regression_line' => [ // 🧠 Activates the trendline in React!
+            'regression_line' => [
                 'm' => $regStats['Slope (m)'],
                 'b' => $regStats['Intercept (b)'],
                 'minX' => $regStats['minX'],
@@ -297,13 +291,76 @@ class ReportController extends Controller
                     else $group2[] = $yData[$key];
                 }
                 $group1Label = "Passed Licensure"; $group2Label = "Failed Licensure";
-            } else if (count($uniqueX) > 2) {
+            }
+            // ==================================================
+            // 🧠 SMART CATEGORY GROUPING ENGINE
+            // Automatically splits multi-variant categories into 2 standard groups!
+            // ==================================================
+            elseif ($config['var1Field'] === 'Scholarship') {
                 foreach ($commonKeys as $key => $dummy) {
-                    if ($xData[$key] > 0) $group1[] = $yData[$key];
-                    else $group2[] = $yData[$key];
+                    $val = strtolower(trim($xData[$key]));
+                    if (in_array($val, ['none', 'n/a', 'unspecified', ''])) {
+                        $group2[] = $yData[$key];
+                    } else {
+                        $group1[] = $yData[$key];
+                    }
                 }
-                $group1Label = $config['var1FieldLabel'] . " (> 0)"; $group2Label = "Zero " . $config['var1FieldLabel'];
+                $group1Label = "With Scholarship"; $group2Label = "No Scholarship";
+            } 
+            elseif ($config['var1Field'] === 'WorkStatus') {
+                foreach ($commonKeys as $key => $dummy) {
+                    $val = strtolower(trim($xData[$key]));
+                    if (in_array($val, ['none', 'unemployed', 'n/a', 'unspecified', 'not working', ''])) {
+                        $group2[] = $yData[$key];
+                    } else {
+                        $group1[] = $yData[$key]; // Part-time, Full-time, etc.
+                    }
+                }
+                $group1Label = "Employed"; $group2Label = "Unemployed";
+            } 
+            elseif ($config['var1Field'] === 'LivingArrangement') {
+                foreach ($commonKeys as $key => $dummy) {
+                    $val = strtolower(trim($xData[$key]));
+                    if (str_contains($val, 'parent') || str_contains($val, 'family') || str_contains($val, 'home') || $val === 'none') {
+                        $group1[] = $yData[$key]; 
+                    } else {
+                        $group2[] = $yData[$key]; // Dorm, Boarding House, Independent, etc.
+                    }
+                }
+                $group1Label = "Living w/ Parents/Family"; $group2Label = "Independent/Dorm";
+            } 
+            elseif ($config['var1Field'] === 'Language') {
+                foreach ($commonKeys as $key => $dummy) {
+                    $val = strtolower(trim($xData[$key]));
+                    if (str_contains($val, 'english')) {
+                        $group1[] = $yData[$key];
+                    } else {
+                        $group2[] = $yData[$key]; // Tagalog, Cebuano, etc.
+                    }
+                }
+                $group1Label = "English Speakers"; $group2Label = "Local/Other Languages";
+            } 
+            // Fallback for Numerical Data or Unknown Categorical Data (> 2 values)
+            elseif (count($uniqueX) > 2) {
+                if (is_numeric(reset($uniqueX))) {
+                    foreach ($commonKeys as $key => $dummy) {
+                        if ((float)$xData[$key] > 0) $group1[] = $yData[$key];
+                        else $group2[] = $yData[$key];
+                    }
+                    $group1Label = $config['var1FieldLabel'] . " (> 0)"; $group2Label = "Zero " . $config['var1FieldLabel'];
+                } else {
+                    foreach ($commonKeys as $key => $dummy) {
+                        $val = strtolower(trim($xData[$key]));
+                        if (in_array($val, ['none', 'n/a', 'unspecified', ''])) {
+                            $group2[] = $yData[$key];
+                        } else {
+                            $group1[] = $yData[$key];
+                        }
+                    }
+                    $group1Label = "Has " . $config['var1FieldLabel']; $group2Label = "No " . $config['var1FieldLabel'];
+                }
             } else {
+                // Exactly 2 generic categories (e.g. Gender: Male/Female)
                 $vals = array_values($uniqueX);
                 $val1 = $vals[0] ?? null; $val2 = $vals[1] ?? null;
                 foreach ($commonKeys as $key => $dummy) {
@@ -313,6 +370,7 @@ class ReportController extends Controller
                 }
                 $group1Label = $val1 ?? "Group 1"; $group2Label = $val2 ?? "Group 2";
             }
+            // ==================================================
 
             $variableName = $config['var2FieldLabel'] . ' grouped by ' . $config['var1FieldLabel'];
         }
@@ -342,7 +400,7 @@ class ReportController extends Controller
                 'labels' => [$group1Label, $group2Label],
                 'means' => [$stats['mean1'], $stats['mean2']]
             ],
-            'raw_data' => [ // 🧠 Sends raw points to React to draw the scatter overlay!
+            'raw_data' => [ 
                 'group1' => $group1,
                 'group2' => $group2
             ]
@@ -387,7 +445,7 @@ class ReportController extends Controller
                 'labels' => [$config['period_1'], $config['period_2']],
                 'means' => [$stats['mean1'], $stats['mean2']]
             ],
-            'raw_data' => [ // 🧠 Sends raw points to React to draw the scatter overlay!
+            'raw_data' => [
                 'group1' => $paired1,
                 'group2' => $paired2
             ]
@@ -454,7 +512,6 @@ class ReportController extends Controller
     {
         $data = $this->extractMetricData($students, $config['var1Field'], $config['var1Sub']);
         
-        // Map 1.0 and 0.0 to PASSED and FAILED to match React Expected Ratios
         if ($config['var1Field'] === 'Licensure') {
             $data = array_map(function($val) {
                 return $val == 1.0 ? 'PASSED' : 'FAILED';
@@ -498,12 +555,26 @@ class ReportController extends Controller
         
         $records = [];
 
+        // 🧠 Data Sanitizer for Categorical "Blanks"
+        $sanitizeCategory = function($rawArray) {
+            $cleaned = [];
+            foreach ($rawArray as $k => $v) {
+                $val = trim((string)($v ?? ''));
+                $cleaned[$k] = (empty($val) || strtoupper($val) === 'N/A' || strtoupper($val) === 'NULL') ? 'None' : $val;
+            }
+            return $cleaned;
+        };
+
         switch ($field) {
             case 'Gender':
-                $records = DB::table('student_info')
+                $raw = DB::table('student_info')
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1)
                     ->pluck('student_sex', 'student_number')->toArray();
+                foreach ($raw as $k => $v) {
+                    $val = trim((string)($v ?? ''));
+                    $records[$k] = (empty($val) || strtoupper($val) === 'N/A') ? 'Unspecified' : $val;
+                }
                 break;
 
             case 'Age':
@@ -515,48 +586,53 @@ class ReportController extends Controller
                 break;
 
             case 'Socioeconomic':
-                $records = DB::table('student_info')
+                $raw = DB::table('student_info')
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1)
                     ->pluck('student_socioeconomic', 'student_number')->toArray();
+                $records = $sanitizeCategory($raw);
                 break;
 
             case 'WorkStatus':
-                $records = DB::table('student_info')
+                $raw = DB::table('student_info')
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1)
                     ->pluck('student_work', 'student_number')->toArray();
+                $records = $sanitizeCategory($raw);
                 break;
 
-            // 🧠 NEW: ADDED CATEGORICAL DEMOGRAPHICS
             case 'LivingArrangement':
-                $records = DB::table('student_info')
+                $raw = DB::table('student_info')
                     ->leftJoin('living_arrangements', 'student_info.student_living', '=', 'living_arrangements.id')
                     ->whereIn('student_info.student_number', $studentNumbers)
                     ->where('student_info.is_active', 1)
                     ->pluck('living_arrangements.name', 'student_info.student_number')->toArray();
+                $records = $sanitizeCategory($raw);
                 break;
 
             case 'Scholarship':
-                $records = DB::table('student_info')
+                $raw = DB::table('student_info')
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1)
                     ->pluck('student_scholarship', 'student_number')->toArray();
+                $records = $sanitizeCategory($raw);
                 break;
 
             case 'Language':
-                $records = DB::table('student_info')
+                $raw = DB::table('student_info')
                     ->leftJoin('languages', 'student_info.student_language', '=', 'languages.id')
                     ->whereIn('student_info.student_number', $studentNumbers)
                     ->where('student_info.is_active', 1)
                     ->pluck('languages.name', 'student_info.student_number')->toArray();
+                $records = $sanitizeCategory($raw);
                 break;
 
             case 'LastSchool':
-                $records = DB::table('student_info')
+                $raw = DB::table('student_info')
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1)
                     ->pluck('student_last_school', 'student_number')->toArray();
+                $records = $sanitizeCategory($raw);
                 break;
 
             case 'GWA':
@@ -565,7 +641,6 @@ class ReportController extends Controller
                     ->where('is_active', 1);
 
                 if ($subField !== 'overall') {
-                    // 🧠 NEW: Split the "1|1st" value back into two separate database filters!
                     $parts = explode('|', $subField);
                     if (count($parts) === 2) {
                         $query->where('year_level', $parts[0])
@@ -643,7 +718,7 @@ class ReportController extends Controller
                 break;
 
             case 'SimExam':
-                $query = DB::table('student_simulation_exam') 
+                $query = DB::table('student_simulation_exams') 
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1);
 
@@ -661,7 +736,7 @@ class ReportController extends Controller
                 break;
 
             case 'Attendance':
-                $records = DB::table('student_attendance_reviews') 
+                $records = DB::table('student_attendance_review') 
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1)
                     ->groupBy('student_number')
@@ -697,7 +772,6 @@ class ReportController extends Controller
             return response()->json(['categories' => []]);
         }
 
-        // 🛠️ FIXED: Added `programs` join to safely filter by college & program
         $students = \App\Models\Student\StudentInfo::query()
             ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
             ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')

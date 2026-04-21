@@ -289,7 +289,7 @@ export default function GenerateReport(props) {
 
                         // 2. Overlay individual student scores as jittered dots
                         if (res.raw_data && res.raw_data.group1 && res.raw_data.group2) {
-                            const jitter = () => (Math.random() - 0.5) * 0.3; // Spread dots horizontally
+                            const jitter = () => (Math.random() - 0.5) * 0.15; // Spread dots horizontally
                             
                             // X axis is categorical (Index 0 = Group 1, Index 1 = Group 2)
                             const scatter1 = res.raw_data.group1.map(val => ({ x: 0 + jitter(), y: parseFloat(val) }));
