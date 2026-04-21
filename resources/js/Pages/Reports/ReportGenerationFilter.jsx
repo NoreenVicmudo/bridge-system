@@ -71,11 +71,7 @@ export default function ReportGenerationFilter({ dbColleges = [], dbPrograms = [
         );
 
         if (activeYears.size === 0) {
-            const currentYear = new Date().getFullYear();
-            return [
-                { value: currentYear.toString(), label: currentYear.toString() },
-                { value: (currentYear - 1).toString(), label: (currentYear - 1).toString() }
-            ];
+            
         }
 
         return Array.from(activeYears)

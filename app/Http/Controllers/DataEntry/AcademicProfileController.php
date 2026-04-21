@@ -5,6 +5,7 @@ namespace App\Http\Controllers\DataEntry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB; // 🧠 ADDED DB FACADE
 use App\Models\Academic\BoardSubject;
 use App\Models\Academic\GeneralSubject;
 use App\Models\Academic\RatingCategory;
@@ -52,29 +53,56 @@ class AcademicProfileController extends Controller
 
     public function store(Request $request)
     {
-        $user = Auth::user();
+        $user = auth()->user();
+
         $validated = $request->validate([
             'metric' => 'required|string',
             'sub_metric' => 'required',
             'detail_name' => 'required|string',
             'is_hidden' => 'boolean',
-            // 🧠 FIXED: Must be nullable so Program Heads don't trigger a 422 crash
-            'program_id' => 'nullable|integer|exists:programs,program_id' 
+            'program_id' => 'nullable|integer|exists:programs,program_id'
         ]);
 
-        $isActive = !$validated['is_hidden'];
         $isNew = $validated['sub_metric'] === 'add';
+        $isActive = !$validated['is_hidden'];
 
         if (!$isNew) {
             $this->authorizeAccess($validated['metric'], $validated['sub_metric'], $user);
         }
 
-        // 🧠 SMART FALLBACK: Use User's Program ID first, then fallback to Request Payload
         $targetProgramId = $user->program_id ?? $validated['program_id'];
 
         if (!$targetProgramId) {
             return redirect()->back()->withErrors(['program_id' => 'A specific program must be selected.']);
         }
+
+        // ==========================================
+        // 🧠 THE SAFEGUARD BOUNCER
+        // ==========================================
+        if (!$isNew && !$isActive) {
+            $inUse = false;
+            switch ($validated['metric']) {
+                case 'BoardSubjects':
+                    $inUse = DB::table('student_board_grades')->where('subject_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+                case 'GeneralSubjects':
+                    $inUse = DB::table('student_back_subjects')->where('general_subject_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+                case 'TypeOfRating':
+                    $inUse = DB::table('student_performance_rating')->where('category_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+                case 'TypeOfSimulation':
+                    $inUse = DB::table('student_simulation_exams')->where('simulation_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+            }
+
+            if ($inUse) {
+                return redirect()->back()->withErrors([
+                    'is_hidden' => 'Cannot hide this metric. It is currently associated with active student records.'
+                ]);
+            }
+        }
+        // ==========================================
 
         switch ($validated['metric']) {
             case 'BoardSubjects':
