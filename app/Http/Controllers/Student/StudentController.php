@@ -137,6 +137,7 @@ class StudentController extends Controller
         $query = StudentInfo::query()
             ->join('student_programs', 'student_info.student_number', '=', 'student_programs.student_number')
             ->join('programs', 'student_programs.program_id', '=', 'programs.program_id')
+            ->join('colleges', 'programs.college_id', '=', 'colleges.college_id')
             ->where('student_programs.status', 'Active') 
             ->where('student_info.is_active', 1)
             ->select('student_info.*');
@@ -199,6 +200,8 @@ class StudentController extends Controller
 
         if ($isBatchMode) {
             $query->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
+                ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
+                ->join('colleges', 'programs.college_id', '=', 'colleges.college_id')
                 ->where('board_batch.is_active', 1)
                 ->select('student_info.*', 'board_batch.program_id as contextual_program_id')
                 ->distinct();
@@ -223,6 +226,8 @@ class StudentController extends Controller
             if ($request->filled('batch_program')) $filterData['batch_program_name'] = Program::find($request->batch_program)?->name;
         } else {
             $query->join('student_section', 'student_info.student_number', '=', 'student_section.student_number')
+                ->join('programs', 'student_section.program_id', '=', 'programs.program_id')
+                ->join('colleges', 'programs.college_id', '=', 'colleges.college_id')
                 ->where('student_section.is_active', 1)
                 ->select('student_info.*', 'student_section.program_id as contextual_program_id')
                 ->distinct();
@@ -577,6 +582,8 @@ class StudentController extends Controller
         // 2. Apply Filters & Role Restrictions based on Mode
         if ($mode === 'batch') {
             $query->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
+                ->join('programs', 'board_batch.program_id', '=', 'programs.program_id')
+                ->join('colleges', 'programs.college_id', '=', 'colleges.college_id')
                 ->where('board_batch.is_active', 1)
                 ->select('student_info.*', 'board_batch.program_id as contextual_program_id')
                 ->distinct();
@@ -588,7 +595,8 @@ class StudentController extends Controller
 
         } elseif ($mode === 'section') {
             $query->join('student_section', 'student_info.student_number', '=', 'student_section.student_number')
-                ->where('student_section.is_active', 1)
+                ->join('programs', 'student_section.program_id', '=', 'programs.program_id')
+                ->join('colleges', 'programs.college_id', '=', 'colleges.college_id')->where('student_section.is_active', 1)
                 ->select('student_info.*', 'student_section.program_id as contextual_program_id')
                 ->distinct();
 
@@ -603,6 +611,7 @@ class StudentController extends Controller
             // Masterlist Mode - Join Active Pivot
             $query->join('student_programs', 'student_info.student_number', '=', 'student_programs.student_number')
                 ->join('programs', 'student_programs.program_id', '=', 'programs.program_id')
+                ->join('colleges', 'programs.college_id', '=', 'colleges.college_id')
                 ->where('student_programs.status', 'Active')
                 ->select('student_info.*');
                 
