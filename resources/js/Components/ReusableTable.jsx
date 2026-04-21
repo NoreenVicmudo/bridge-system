@@ -63,7 +63,6 @@ export const SortableHeader = ({
     );
 };
 
-
 export function TableContainer({
     title,
     paginationData,
@@ -81,7 +80,6 @@ export function TableContainer({
 
     const [localSearch, setLocalSearch] = useState(search !== undefined ? search : urlSearch);
     
-    // 🧠 THE FIX: We use a 'ref' to keep track of the typing timer
     const searchTimeout = useRef(null);
 
     useEffect(() => {
@@ -90,21 +88,18 @@ export function TableContainer({
 
     const handleSearchChange = (e) => {
         const val = e.target.value;
-        setLocalSearch(val); // Update the input box instantly so it feels fast
+        setLocalSearch(val); 
 
         if (onSearch) {
             onSearch(val);
             return;
         }
 
-        // 🧠 THE FIX: Clear the old timer if they are still typing
         if (searchTimeout.current) {
             clearTimeout(searchTimeout.current);
         }
 
-        // 🧠 THE FIX: Set a new 300ms timer. It only fires when they STOP typing.
         searchTimeout.current = setTimeout(() => {
-            // Read fresh URL params at the exact moment the timer fires
             const currentParams = new URLSearchParams(window.location.search);
             
             if (val) {
@@ -119,7 +114,41 @@ export function TableContainer({
                 preserveScroll: true,
                 replace: true
             });
-        }, 300); // 300 milliseconds
+        }, 300);
+    };
+
+    const getVisibleLinks = (links) => {
+        if (!links || links.length <= 5) return links;
+
+        const prev = links[0];
+        const next = links[links.length - 1];
+        
+        const numberLinks = links.slice(1, -1).filter(l => l.label !== '...');
+        
+        if (numberLinks.length <= 5) return links;
+
+        const activeIndex = numberLinks.findIndex(l => l.active);
+        const lastIndex = numberLinks.length - 1;
+        const delta = 1; 
+
+        const result = [];
+        let lastAdded = -1;
+
+        numberLinks.forEach((link, index) => {
+            if (
+                index === 0 || 
+                index === lastIndex || 
+                (index >= activeIndex - delta && index <= activeIndex + delta)
+            ) {
+                if (lastAdded !== -1 && index - lastAdded > 1) {
+                    result.push({ label: "...", url: null, active: false });
+                }
+                result.push(link);
+                lastAdded = index;
+            }
+        });
+
+        return [prev, ...result, next];
     };
 
     return (
@@ -144,7 +173,8 @@ export function TableContainer({
                         </div>
                     )}
 
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
+                    {/* 🧠 FIXED: Header actions container layout */}
+                    <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-4 w-full">
                         <div className="w-full md:w-auto">
                             <input
                                 type="text"
@@ -155,7 +185,8 @@ export function TableContainer({
                             />
                         </div>
                         
-                        <div className="flex shrink-0 gap-2 items-center">
+                        {/* Added flex-wrap and responsive justification */}
+                        <div className="flex flex-wrap justify-center md:justify-end gap-2 items-center w-full md:w-auto">
                             {exportEndpoint && <ExportButton endpoint={exportEndpoint} />}
                             {headerActions}
                         </div>
@@ -175,11 +206,15 @@ export function TableContainer({
                                 <div className="text-sm text-gray-600 font-medium">
                                     Showing {paginationData.from || 0} to {paginationData.to || 0} of {paginationData.total || 0} entries
                                 </div>
-                                <div className="flex gap-1">
-                                    {paginationData.links.map((link, i) => {
-                                        const className = `px-3 py-1.5 rounded text-sm font-medium transition-all duration-300 ease-in-out ${
-                                            link.active ? "bg-[#ffb736] text-white shadow-sm" : "bg-[#5c297c] text-white hover:bg-[#4a1f63]"
-                                        } ${!link.url ? "opacity-50 cursor-not-allowed bg-gray-400" : ""}`;
+                                <div className="flex flex-wrap justify-center gap-1">
+                                    {getVisibleLinks(paginationData.links).map((link, i) => {
+                                        const isEllipsis = link.label === '...';
+                                        
+                                        const className = isEllipsis
+                                            ? "px-2 py-1.5 text-gray-500 font-bold flex items-end"
+                                            : `px-3 py-1.5 rounded text-sm font-medium transition-all duration-300 ease-in-out ${
+                                                link.active ? "bg-[#ffb736] text-white shadow-sm" : "bg-[#5c297c] text-white hover:bg-[#4a1f63]"
+                                            } ${!link.url ? "opacity-50 cursor-not-allowed bg-gray-400" : ""}`;
 
                                         return link.url ? (
                                             <Link 

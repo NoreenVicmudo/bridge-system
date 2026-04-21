@@ -181,10 +181,10 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 p-4 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             
             {/* Modal Card */}
-            <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            <div className={`bg-white rounded-2xl w-full max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
                 {/* Header */}
                 <div className="bg-[#5c297c] p-6 text-center relative">
@@ -201,29 +201,29 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                 </div>
 
                 {/* Content Area */}
-                <div className="p-8">
+                <div className="p-6 md:p-8">
                     
                     {/* --- VIEW 1: INITIAL OPTIONS --- */}
                     {view === "options" && (
                         <div className="grid grid-cols-2 gap-4">
                             <button 
                                 onClick={() => setView("import")}
-                                className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300"
+                                className="flex flex-col items-center justify-center gap-3 p-4 md:p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300"
                             >
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-file-earmark-excel text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
                                 </div>
-                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Import File</span>
+                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c] text-center">Import File</span>
                             </button>
 
                             <button 
                                 onClick={() => setView("manual")}
-                                className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300"
+                                className="flex flex-col items-center justify-center gap-3 p-4 md:p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300"
                             >
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-person-plus text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
                                 </div>
-                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Manual Entry</span>
+                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c] text-center">Manual Entry</span>
                             </button>
                         </div>
                     )}
@@ -233,7 +233,7 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                         <form onSubmit={handleImportSubmit} className="flex flex-col gap-4 animate-fade-in-up">
                             
                             {/* Hidden file input wrapped in the gorgeous old design label */}
-                            <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
+                            <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-8 md:p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
                                 <input 
                                     type="file" 
                                     accept=".csv, .xlsx"
@@ -241,7 +241,7 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                     className="hidden" 
                                     required 
                                 />
-                                <i className="bi bi-cloud-arrow-up text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
+                                <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 
                                 {importFile ? (
                                     <p className="text-[#5c297c] font-bold truncate px-4">{importFile.name}</p>
@@ -274,24 +274,25 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                     {view === "manual" && (
                         <div className="flex flex-col gap-4 animate-fade-in-up">
                             
-                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 overflow-hidden">
                                 <label className="block text-sm font-bold text-[#5c297c] mb-2">Check Student ID</label>
-                                <div className="flex gap-2">
+                                {/* 🧠 FIXED: Added shrink-0 to button so it doesn't get squished out on mobile */}
+                                <div className="flex gap-2 w-full">
                                     <input 
                                         type="text" 
                                         value={studentNumberInput}
                                         onChange={(e) => {
                                             setStudentNumberInput(e.target.value);
-                                            setCheckStatus("idle"); // Reset status on typing
+                                            setCheckStatus("idle"); 
                                         }}
                                         onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
                                         placeholder="e.g. 2023-1005" 
-                                        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5c297c] focus:border-transparent outline-none transition-all"
+                                        className="flex-1 w-full min-w-0 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5c297c] focus:border-transparent outline-none transition-all text-sm md:text-base"
                                     />
                                     <button 
                                         onClick={handleCheck}
                                         disabled={!studentNumberInput.trim() || checkStatus === "loading"}
-                                        className="px-6 py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] shadow-md hover:shadow-lg transition-all disabled:opacity-60"
+                                        className="shrink-0 px-4 md:px-6 py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] shadow-md hover:shadow-lg transition-all disabled:opacity-60 text-sm md:text-base"
                                     >
                                         {checkStatus === "loading" ? <div className="loader-dots tracking-[0.2em]">...</div> : "Check"}
                                     </button>
@@ -301,9 +302,9 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                             {/* Status Messages based on Backend Logic */}
                             {checkStatus === "exists" && (
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
-                                    <div className="flex items-center gap-3 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100 shadow-sm">
-                                        <i className="bi bi-info-circle-fill text-xl"></i>
-                                        <span className="text-sm font-medium">
+                                    <div className="flex items-start md:items-center gap-3 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100 shadow-sm text-sm">
+                                        <i className="bi bi-info-circle-fill text-lg mt-0.5 md:mt-0"></i>
+                                        <span className="font-medium leading-tight">
                                             {filterMode === 'masterlist' 
                                                 ? "Student profile found! You can proceed to edit their details." 
                                                 : "Student found! You can proceed to enroll them."
@@ -322,8 +323,8 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
 
                             {checkStatus === "not_exists" && (
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
-                                    <div className="flex items-center gap-2 text-green-600 font-medium">
-                                        <i className="bi bi-check-circle-fill text-xl"></i>
+                                    <div className="flex items-center gap-2 text-green-600 font-medium text-sm">
+                                        <i className="bi bi-check-circle-fill text-lg"></i>
                                         <span>ID is available!</span>
                                     </div>
                                     <button 
