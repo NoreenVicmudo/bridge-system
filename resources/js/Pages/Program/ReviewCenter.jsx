@@ -31,32 +31,71 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 2. The Debounce Effect
+    // 🧠 THE FIX: Read directly from URL to prevent backend defaults from keeping the arrow "stuck"
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = urlParams.get('sort') || ""; 
+    const actualDirection = urlParams.get('direction') || "asc";
+
+    // 🧠 2. Reverse Map for Active Arrow Indicator
+    const reverseDbKeyMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'student_review_center.review_center': 'review_center'
+    };
+    const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
+
+    // 🧠 3. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            router.get(route('review.center'), { ...filter, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true, replace: true });
+            const params = { ...filter, search: searchQuery };
+            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+            router.get(route('review.center'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 3. Handlers using searchQuery
+    // 🧠 4. Handlers using searchQuery
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
 
+    // 🧠 5. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
         const dbKeyMap = { 'student_number': 'student_info.student_number', 'name': 'student_info.student_lname', 'review_center': 'student_review_center.review_center' };
-        const dbKey = dbKeyMap[key] || 'student_info.student_lname';
-        const dir = sort === dbKey && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('review.center'), { ...filter, search: searchQuery, sort: dbKey, direction: dir }, { preserveState: true, preserveScroll: true });
+        
+        // 🧠 THE FIX: Fall back to 'key' instead of defaulting to student name
+        const dbKey = dbKeyMap[key] || key; 
+        
+        let nextDir = 'asc';
+        let nextSort = dbKey;
+
+        if (actualSort === dbKey) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc';
+            } else {
+                nextDir = null;
+                nextSort = null;
+            }
+        }
+
+        const params = { ...filter, search: searchQuery };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        }
+        router.get(route('review.center'), params, { preserveState: true, preserveScroll: true });
     };
 
-    const handleApplyFilter = (newFilters) => router.get(route('review.center'), { ...newFilters, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true });
+    const handleApplyFilter = (newFilters) => {
+        const params = { ...newFilters, search: searchQuery };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('review.center'), params, { preserveState: true, preserveScroll: true });
+    };
     
     return (
         <AuthenticatedLayout>
@@ -82,9 +121,10 @@ export default function ReviewCenterPage({ students, filter, search = "", sort =
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sort} currentDirection={direction} onSort={handleSort} />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sort} currentDirection={direction} onSort={handleSort} />
-                            <SortableHeader label="Review Center" sortKey="review_center" currentSort={sort} currentDirection={direction} onSort={handleSort} className="text-center" />
+                            {/* 🧠 FIX: Passed actualDirection and activeFrontendSort so the arrows cycle perfectly */}
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Review Center" sortKey="review_center" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">

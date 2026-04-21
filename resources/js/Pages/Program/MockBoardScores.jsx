@@ -23,6 +23,28 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
 
     const currentExamPeriod = filter?.exam_period || "Default";
 
+    // Hybrid Dropdown States
+    const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
+    const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
+    const periodDropdownRef = useRef(null);
+    const subjectDropdownRef = useRef(null);
+
+    const PERIOD_OPTIONS = ["Default Period", "Diagnostic", "Pre-Test", "Midterm", "Post-Test"];
+
+    // Close Dropdowns on Outside Click
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (periodDropdownRef.current && !periodDropdownRef.current.contains(event.target)) {
+                setIsPeriodDropdownOpen(false);
+            }
+            if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(event.target)) {
+                setIsSubjectDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     const enrichedFilter = {
         ...filter,
         batch_year: filter?.calendar_year,
@@ -35,88 +57,207 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
-    // 🧠 2. The Debounce Effect
+    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = urlParams.get('sort') || sort || "";
+    const actualDirection = urlParams.get('direction') || direction || "asc";
+
+    // 🧠 2. Translate backend DB columns back to frontend React keys for the active indicator
+    const reverseDbColumnMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name'
+    };
+    const activeFrontendSort = reverseDbColumnMap[actualSort] || actualSort;
+
+    // 🧠 3. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            router.get(route('mock.board.scores'), { ...filter, search: searchQuery, sort, direction, exam_period: currentExamPeriod }, { preserveState: true, preserveScroll: true, replace: true });
+            const params = { ...filter, search: searchQuery, exam_period: currentExamPeriod };
+            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+            router.get(route('mock.board.scores'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 3. Handlers using searchQuery
+    // 🧠 4. Handlers using searchQuery
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
     
+    // 🧠 THE FIX: 3-State Sorting (Ascending -> Descending -> None) using actualSort
     const handleSort = (key) => {
-        const dbKey = key === 'student_number' ? 'student_info.student_number' : 'student_info.student_lname';
-        const dir = sort === dbKey && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('mock.board.scores'), { ...filter, search: searchQuery, sort: dbKey, direction: dir }, { preserveState: true, preserveScroll: true });
+        const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
+        const dbKey = dbColumnMap[key] || key; 
+        
+        let nextDir = 'asc';
+        let nextSort = dbKey;
+
+        // If clicking the currently active column...
+        if (actualSort === dbKey) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc'; // Switch to Descending
+            } else {
+                nextDir = null;   // Remove Sorting entirely
+                nextSort = null;
+            }
+        }
+
+        const params = { ...filter, search: searchQuery, exam_period: currentExamPeriod };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        } // If nextSort is null, we omit sort/direction from params to clear the URL!
+
+        router.get(route('mock.board.scores'), params, { preserveState: true, preserveScroll: true });
     };
 
-    const handleApplyFilter = (newFilters) => router.get(route('mock.board.scores'), { ...newFilters, search: searchQuery, sort, direction, exam_period: currentExamPeriod }, { preserveState: true, preserveScroll: true });
+    const handleApplyFilter = (newFilters) => {
+        const params = { ...newFilters, search: searchQuery, exam_period: currentExamPeriod };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('mock.board.scores'), params, { preserveState: true, preserveScroll: true });
+    };
 
-    const handlePeriodChange = (e) => {
-        const newPeriod = e.target.value;
-        router.get(route('mock.board.scores'), { ...filter, search: searchQuery, sort, direction, exam_period: newPeriod }, { preserveState: true, preserveScroll: true });
+    const handlePeriodChange = (newPeriod) => {
+        setIsPeriodDropdownOpen(false);
+        const backendValue = newPeriod === "Default Period" ? "Default" : newPeriod;
+        const params = { ...filter, search: searchQuery, exam_period: backendValue };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('mock.board.scores'), params, { preserveState: true, preserveScroll: true });
     };
 
     const visibleSubjects = selectedSubject === "All" ? subjectHeaders : subjectHeaders.filter(s => s === selectedSubject);
+    const displayPeriod = currentExamPeriod === "Default" ? "Default Period" : currentExamPeriod;
 
     return (
         <AuthenticatedLayout>
             <Head title="Mock Exam Scores" />
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
-                    title={`Mock Board Scores (${currentExamPeriod})`}
+                    title={`Mock Board Scores (${displayPeriod})`}
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students?.data} 
-                    exportEndpoint={route('mock-scores.export', filter)}
+                    exportEndpoint={route('mock-scores.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: currentExamPeriod })}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />} 
                     headerActions={
                         <>
-                            <select value={currentExamPeriod} onChange={handlePeriodChange} className="px-4 h-[40px] border border-[#ffb736] text-[#ffb736] bg-amber-50 rounded-[5px] text-sm font-bold shadow-sm outline-none cursor-pointer">
-                                <option value="Default">Default Period</option>
-                                <option value="Diagnostic">Diagnostic</option>
-                                <option value="Pre-Test">Pre-Test</option>
-                                <option value="Midterm">Midterm</option>
-                                <option value="Post-Test">Post-Test</option>
-                            </select>
+                            {/* HYBRID DROPDOWN - EXAM PERIOD */}
+                            <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
+                                <button 
+                                    onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
+                                    className={`flex items-center justify-between gap-3 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm w-full md:w-[180px] ${
+                                        isPeriodDropdownOpen 
+                                            ? "bg-amber-50 text-[#ffb736] border-[#ffb736] ring-1 ring-[#ffb736]" 
+                                            : "bg-amber-50 text-[#ffb736] border-[#ffb736] hover:bg-[#ffb736] hover:text-white" 
+                                    }`}
+                                >
+                                    <span className="truncate flex-1 text-left">{displayPeriod}</span>
+                                    <svg className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isPeriodDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
 
+                                {/* PERIOD MENU */}
+                                <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isPeriodDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
+                                    <div className="overflow-hidden min-h-0">
+                                        <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
+                                            {PERIOD_OPTIONS.map(period => (
+                                                <li 
+                                                    key={period}
+                                                    onClick={() => handlePeriodChange(period)}
+                                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${displayPeriod === period ? "bg-[#5c297c] text-white font-bold" : "text-black hover:bg-[#ffb736]/20 font-medium"}`}
+                                                >
+                                                    {period}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* HYBRID DROPDOWN - SUBJECTS */}
                             {subjectHeaders.length > 0 && (
-                                <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} className="px-4 h-[40px] border border-[#5c297c] text-[#5c297c] rounded-[5px] text-sm font-bold shadow-sm outline-none cursor-pointer">
-                                    <option value="All">All Subjects</option>
-                                    {subjectHeaders.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                                <div className="relative shrink-0 flex-1 md:flex-none" ref={subjectDropdownRef}>
+                                    <button 
+                                        onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
+                                        className={`flex items-center justify-between gap-3 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm w-full md:w-[200px] ${
+                                            isSubjectDropdownOpen 
+                                                ? "bg-white text-[#5c297c] border-[#ffb736] ring-1 ring-[#ffb736]" 
+                                                : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" 
+                                        }`}
+                                    >
+                                        <span className="truncate flex-1 text-left">
+                                            {selectedSubject === "All" ? "All Subjects" : selectedSubject}
+                                        </span>
+                                        <svg className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isSubjectDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    {/* SUBJECT MENU */}
+                                    <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isSubjectDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
+                                        <div className="overflow-hidden min-h-0">
+                                            <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
+                                                <li 
+                                                    onClick={() => { setSelectedSubject("All"); setIsSubjectDropdownOpen(false); }}
+                                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${selectedSubject === "All" ? "bg-[#5c297c] text-white font-bold" : "text-black hover:bg-[#ffb736]/20 font-medium"}`}
+                                                >
+                                                    All Subjects
+                                                </li>
+                                                {subjectHeaders.map(sub => (
+                                                    <li
+                                                        key={sub}
+                                                        onClick={() => { setSelectedSubject(sub); setIsSubjectDropdownOpen(false); }}
+                                                        className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${selectedSubject === sub ? "bg-[#5c297c] text-white font-bold" : "text-black hover:bg-[#ffb736]/20 font-medium"}`}
+                                                    >
+                                                        {sub}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
+
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 ease-in-out shadow-sm shrink-0"><i className="bi bi-funnel-fill"></i> Filter</button>
-                            <button onClick={() => setIsMetricModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-bold shadow-sm"><i className="bi bi-bar-chart-fill"></i> Change Metric</button>
+                            <button onClick={() => setIsMetricModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm shrink-0"><i className="bi bi-bar-chart-fill"></i> Change Metric</button>
                         </>
                     }
                     footerActions={
                         canManageData ? (
-                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium shadow-sm">Manage Scores</button>
+                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm">Manage Scores</button>
                         ) : null
                     }
                 >
                     <thead>
-                        <tr className="bg-[#5c297c] text-white text-sm uppercase">
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sort} currentDirection={direction} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sort} currentDirection={direction} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
-                            {visibleSubjects.map((header, i) => <th key={i} className="py-3 px-6 text-center whitespace-nowrap min-w-[150px]">{header}</th>)}
+                        <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
+                            {/* 🧠 THE FIX: Pass activeFrontendSort to currentSort AND actualDirection to currentDirection */}
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
+                            
+                            {visibleSubjects.map((header, i) => (
+                                <SortableHeader 
+                                    key={i} 
+                                    label={header} 
+                                    sortKey={header} 
+                                    currentSort={activeFrontendSort} 
+                                    currentDirection={actualDirection} 
+                                    onSort={handleSort} 
+                                    className={`bg-[#5c297c] whitespace-nowrap [&>div]:justify-center ${visibleSubjects.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
+                                />
+                            ))}
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
                         {records.map((student, i) => (
-                            <tr key={student.batch_id} className={`border-b hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
+                            <tr key={student.batch_id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 <td className="py-3 px-6 sticky left-0 z-10 bg-inherit">
                                     {canManageData ? (
-                                        <Link href={route('mock.scores.entry', { batch_id: student.batch_id, exam_period: currentExamPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold text-center">{student.student_number}</Link>
+                                        <Link href={route('mock.scores.entry', { batch_id: student.batch_id, exam_period: currentExamPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold text-center hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all">{student.student_number}</Link>
                                     ) : (
                                         <span className="inline-block px-4 py-1.5 rounded-[6px] bg-gray-400 text-white font-bold text-center shadow-sm">{student.student_number}</span>
                                     )}
@@ -125,8 +266,8 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                                 {visibleSubjects.map((header, idx) => (
                                     <td key={idx} className="py-3 px-6 text-center">
                                         {student.scores[header] !== undefined && student.scores[header] !== null 
-                                            ? <span className={`font-bold ${student.scores[header] < 75 ? 'text-red-500' : 'text-[#5c297c]'}`}>{student.scores[header]}%</span> 
-                                            : "-"}
+                                            ? <span className="font-bold text-black">{student.scores[header]}%</span> 
+                                            : <span className="text-gray-300">-</span>}
                                     </td>
                                 ))}
                             </tr>

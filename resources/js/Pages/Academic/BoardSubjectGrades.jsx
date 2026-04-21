@@ -162,7 +162,7 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
                     }
                     footerActions={
                         canManageData ? (
-                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm">Add Student</button>
+                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm">Manage Records</button>
                         ) : null
                     }
                 >
