@@ -42,6 +42,16 @@ class ReportController extends Controller
             ->get()
             ->map(fn($s) => ['value' => $s->simulation_id, 'label' => $s->simulation_name]);
 
+        $performanceCriteria = \App\Models\Academic\RatingCategory::where('program_id', $filters['program'])
+            ->where('is_active', 1)
+            ->get()
+            ->map(fn($c) => ['value' => $c->category_id, 'label' => $c->category_name]);
+
+        $simExams = \App\Models\Academic\SimulationExam::where('program_id', $filters['program'])
+            ->where('is_active', 1)
+            ->get()
+            ->map(fn($s) => ['value' => $s->simulation_id, 'label' => $s->simulation_name]);
+
         $gwaTerms = DB::table('student_gwa')
             ->select('year_level', 'semester')
             ->distinct()
@@ -68,6 +78,7 @@ class ReportController extends Controller
             'subMetricMap' => $subMetricMap
         ]);
     }
+    
     
     
     public function generate(Request $request)
