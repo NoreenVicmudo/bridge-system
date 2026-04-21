@@ -11,10 +11,13 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search', '');
-        $collegeFilter = $request->query('college', 'ALL'); // Now expects college_id
-        $programFilter = $request->query('program', 'ALL'); // Expects program_id
+        $collegeFilter = $request->query('college', 'ALL'); 
+        $programFilter = $request->query('program', 'ALL'); 
         $actionFilter = $request->query('action', 'ALL');
-        $sort = $request->query('sort', 'created_at');
+        
+        // 🧠 FIXED: URL Sanitizer and Empty State Handling
+        $rawSort = $request->query('sort', '');
+        $cleanSortColumn = explode('?', $rawSort)[0];
         $direction = $request->query('direction', 'desc');
 
         // --- SUB-QUERIES ---
@@ -90,13 +93,18 @@ class TransactionController extends Controller
             $query->where('action', $actionFilter);
         }
 
+        // 🧠 FIXED: Dynamic sorting with fallback
         $allowedSorts = ['log_id', 'user', 'college', 'role', 'action', 'target_entity', 'created_at'];
-        $sort = in_array($sort, $allowedSorts) ? $sort : 'created_at';
-        $direction = in_array(strtolower($direction), ['asc', 'desc']) ? $direction : 'desc';
+        
+        if (!empty($cleanSortColumn) && in_array($cleanSortColumn, $allowedSorts)) {
+            $dir = in_array(strtolower($direction), ['asc', 'desc']) ? $direction : 'desc';
+            $query->orderBy($cleanSortColumn, $dir);
+        } else {
+            // Default sort if no column is clicked
+            $query->orderBy('created_at', 'desc');
+        }
 
-        $transactions = $query->orderBy($sort, $direction)
-            ->paginate(15)
-            ->withQueryString(); 
+        $transactions = $query->paginate(15)->withQueryString(); 
 
         $transactions->getCollection()->transform(function ($item) {
             $item->college = $item->college ?? 'SYSTEM';
@@ -111,7 +119,9 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'queryParams' => (object) request()->query(),
             'dbColleges' => $dbColleges,
-            'dbPrograms' => $dbPrograms
+            'dbPrograms' => $dbPrograms,
+            'sort' => $cleanSortColumn,
+            'direction' => $direction
         ]);
     }
 }
