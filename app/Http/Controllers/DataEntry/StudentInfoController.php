@@ -5,6 +5,7 @@ namespace App\Http\Controllers\DataEntry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB; // 🧠 ADDED DB FACADE
 use App\Models\Student\SocioeconomicStatus;
 use App\Models\Student\Language;
 use App\Models\Student\LivingArrangement;
@@ -41,99 +42,105 @@ class StudentInfoController extends Controller
         $metric = $request->input('metric');
 
         if ($metric === 'SocioeconomicStatus') {
-            if ($user->college_id || $user->program_id) {
-                abort(403, 'Unauthorized: Only system administrators can update socioeconomic ranges.');
+            if ($user->college_id || $user->program_id) abort(403, 'Unauthorized: Global metric edit access denied.');
+            
+            $validated = $request->validate([
+                'sub_metric' => 'required',
+                'detail_name' => 'required|string',
+                'ranges' => 'required|array',
+            ]);
+
+            $isNew = $validated['sub_metric'] === 'add';
+
+            SocioeconomicStatus::updateOrCreate(
+                ['id' => $isNew ? null : $validated['sub_metric']],
+                [
+                    'name' => $validated['detail_name'],
+                    'min_income' => $validated['ranges']['poor_min'] ?? null,
+                    'max_income' => $validated['ranges']['poor_max'] ?? null,
+                ]
+            );
+
+            $action = $isNew ? 'Added' : 'Updated';
+            AuditService::logAdditionalEntry('SocioeconomicStatus', "{$action} '{$validated['detail_name']}' thresholds");
+
+            return redirect()->back()->with('success', 'Socioeconomic thresholds saved successfully.');
+        } else {
+            $validated = $request->validate([
+                'metric' => 'required|string',
+                'sub_metric' => 'required',
+                'detail_name' => 'required|string',
+                'is_hidden' => 'boolean'
+            ]);
+
+            $isNew = $validated['sub_metric'] === 'add';
+            $isActive = !$validated['is_hidden'];
+
+            // ==========================================
+            // 🧠 THE SAFEGUARD BOUNCER
+            // ==========================================
+            if (!$isNew && !$isActive) {
+                $inUse = false;
+                switch ($metric) {
+                    case 'College':
+                        $inUse = DB::table('programs')->where('college_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                        break;
+                    case 'Program':
+                        $inUse = DB::table('student_programs')->where('program_id', $validated['sub_metric'])->where('status', 'Active')->exists();
+                        break;
+                    case 'CurrentLivingArrangement':
+                        $inUse = DB::table('student_info')->where('student_living', $validated['sub_metric'])->where('is_active', 1)->exists();
+                        break;
+                    case 'LanguageSpoken':
+                        $inUse = DB::table('student_info')->where('student_language', $validated['sub_metric'])->where('is_active', 1)->exists();
+                        break;
+                }
+
+                if ($inUse) {
+                    return redirect()->back()->withErrors([
+                        'is_hidden' => 'Cannot hide this option because it is currently assigned to active students or programs.'
+                    ]);
+                }
+            }
+            // ==========================================
+
+            switch ($metric) {
+                case 'College':
+                    if ($user->college_id || $user->program_id) abort(403);
+                    College::updateOrCreate(
+                        ['college_id' => $isNew ? null : $validated['sub_metric']],
+                        ['name' => $validated['detail_name'], 'is_active' => $isActive] 
+                    );
+                    break;
+
+                case 'Program':
+                    if (!$isNew) $this->authorizeProgramAccess($validated['sub_metric'], $user);
+                    Program::updateOrCreate(
+                        ['program_id' => $isNew ? null : $validated['sub_metric']],
+                        ['name' => $validated['detail_name'], 'is_active' => $isActive, 'college_id' => $request->input('college_id')]
+                    );
+                    break;
+
+                case 'CurrentLivingArrangement':
+                    LivingArrangement::updateOrCreate(
+                        ['id' => $isNew ? null : $validated['sub_metric']],
+                        ['name' => $validated['detail_name'], 'is_active' => $isActive] 
+                    );
+                    break;
+
+                case 'LanguageSpoken':
+                    Language::updateOrCreate(
+                        ['id' => $isNew ? null : $validated['sub_metric']],
+                        ['name' => $validated['detail_name'], 'is_active' => $isActive] 
+                    );
+                    break;
             }
 
-            $ranges = $request->input('ranges');
-            $statusMap = [
-                'Rich'         => ['min' => $ranges['rich_min'],      'max' => null],
-                'High Income'  => ['min' => $ranges['high_min'],      'max' => $ranges['high_max']],
-                'Upper Middle' => ['min' => $ranges['upper_min'],     'max' => $ranges['upper_max']],
-                'Middle Class' => ['min' => $ranges['mid_min'],       'max' => $ranges['mid_max']],
-                'Lower Middle' => ['min' => $ranges['lower_mid_min'], 'max' => $ranges['lower_mid_max']],
-                'Low Income'   => ['min' => $ranges['low_min'],       'max' => $ranges['low_max']],
-                'Poor'         => ['min' => null,                     'max' => $ranges['poor_max']],
-            ];
+            $action = $isNew ? 'Added' : 'Updated';
+            AuditService::logAdditionalEntry($metric, "{$action} '{$validated['detail_name']}' configuration");
 
-            foreach ($statusMap as $status => $bounds) {
-                SocioeconomicStatus::updateOrCreate(
-                    ['status' => $status],
-                    [
-                        'minimum' => $bounds['min'] === '' ? null : $bounds['min'],
-                        'maximum' => $bounds['max'] === '' ? null : $bounds['max']
-                    ]
-                );
-            }
-
-            AuditService::logAdditionalEntry('SocioeconomicStatus', 'Updated system-wide socioeconomic bounds/ranges');
-
-            return redirect()->back()->with('success', 'Socioeconomic ranges updated successfully.');
+            return redirect()->back()->with('success', 'Student information configuration saved successfully.');
         }
-
-        $validated = $request->validate([
-            'sub_metric' => 'required',
-            'detail_name' => 'required|string',
-            'is_hidden' => 'boolean',
-            // 🧠 FIXED: Validating the college_id so Super Admins can safely pass it
-            'college_id' => 'nullable|integer|exists:colleges,college_id'
-        ]);
-
-        $isNew = $validated['sub_metric'] === 'add';
-        $isActive = !$validated['is_hidden'];
-
-        switch ($metric) {
-            case 'College':
-                if ($user->college_id || $user->program_id) {
-                    abort(403, 'Unauthorized: You do not have permission to manage colleges.');
-                }
-
-                College::updateOrCreate(
-                    ['college_id' => $isNew ? null : $validated['sub_metric']],
-                    ['name' => $validated['detail_name'], 'is_active' => $isActive]
-                );
-                break;
-
-            case 'Program':
-                if (!$isNew) {
-                    $this->authorizeProgramAccess($validated['sub_metric'], $user);
-                }
-                
-                $collegeId = $user->college_id ?? $validated['college_id'];
-
-                if (!$collegeId) {
-                    return redirect()->back()->withErrors(['college_id' => 'A college must be selected.']);
-                }
-
-                Program::updateOrCreate(
-                    ['program_id' => $isNew ? null : $validated['sub_metric']],
-                    [
-                        'name' => $validated['detail_name'], 
-                        'is_active' => $isActive,
-                        'college_id' => $collegeId
-                    ]
-                );
-                break;
-
-            case 'CurrentLivingArrangement':
-                LivingArrangement::updateOrCreate(
-                    ['id' => $isNew ? null : $validated['sub_metric']],
-                    ['name' => $validated['detail_name'], 'is_active' => $isActive] // 🧠 Added is_active
-                );
-                break;
-
-            case 'LanguageSpoken':
-                Language::updateOrCreate(
-                    ['id' => $isNew ? null : $validated['sub_metric']],
-                    ['name' => $validated['detail_name'], 'is_active' => $isActive] // 🧠 Added is_active
-                );
-                break;
-        }
-
-        $action = $isNew ? 'Added' : 'Updated';
-        AuditService::logAdditionalEntry($metric, "{$action} '{$validated['detail_name']}' configuration");
-
-        return redirect()->back()->with('success', 'Student information configuration saved successfully.');
     }
 
     private function authorizeProgramAccess($programId, $user)
