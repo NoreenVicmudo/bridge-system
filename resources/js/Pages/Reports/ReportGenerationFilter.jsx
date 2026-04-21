@@ -146,16 +146,15 @@ export default function ReportGenerationFilter({ dbColleges = [], dbPrograms = [
     return (
         <AuthenticatedLayout>
             <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
-                <div className="w-full max-w-[700px] bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] p-6 md:p-8 animate-fade-in-up">
+                <div className="w-full max-w-[700px] bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] p-6 md:p-8 flex flex-col animate-fade-in-up">
                     <form onSubmit={handleSubmit}>
-                        <h2 className="text-center text-2xl md:text-[28px] font-bold text-[#5c297c] mb-2">
-                            Generate Statistical Report
+                        
+                        {/* Title Header matches OLD design */}
+                        <h2 className="text-center text-2xl md:text-[28px] font-bold text-[#5c297c] mb-6">
+                            Generate Reports Filter
                         </h2>
-                        <p className="text-center text-sm text-gray-500 mb-8">
-                            Select a program and a year range to generate the statistical treatment report.
-                        </p>
 
-                        <div className="space-y-4">
+                        <div className="animate-fade-in">
                             <CustomSelectGroup
                                 label="College"
                                 value={values.college}
@@ -173,7 +172,14 @@ export default function ReportGenerationFilter({ dbColleges = [], dbPrograms = [
                                 placeholder={!values.college ? "Select College first" : "Select Program"}
                             />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Section Header matches OLD design */}
+                            <div className="mt-6 mb-3 border-t border-gray-200 pt-4">
+                                <h3 className="text-[#5c297c] font-bold text-sm uppercase tracking-wider mb-3">
+                                    Batch Year Range
+                                </h3>
+                            </div>
+
+                            <div className="space-y-0">
                                 <CustomSelectGroup
                                     label="Start Year"
                                     value={values.year_start}
@@ -182,7 +188,7 @@ export default function ReportGenerationFilter({ dbColleges = [], dbPrograms = [
                                     disabled={!values.program}
                                     placeholder={!values.program ? "Select Program first" : "Select Start Year"}
                                 />
-
+                                
                                 <CustomSelectGroup
                                     label="End Year"
                                     value={values.year_end}
@@ -194,11 +200,12 @@ export default function ReportGenerationFilter({ dbColleges = [], dbPrograms = [
                             </div>
                         </div>
 
-                        <div className="mt-10 flex justify-center gap-3 w-full">
+                        {/* Buttons match OLD design exactly */}
+                        <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 w-full">
                             <button
                                 type="button"
                                 onClick={handleClear}
-                                className="px-10 py-3 bg-white text-gray-600 border border-gray-300 font-bold rounded-md hover:bg-[#ffb736] hover:text-white hover:border-[#ffb736] transition-all shadow-sm"
+                                className="px-6 py-3 bg-white text-gray-600 border border-gray-300 font-medium rounded-md hover:bg-[#ffb736] hover:text-white hover:border-[#ffb736] transition-all duration-300 text-base shadow-sm"
                             >
                                 Clear
                             </button>
@@ -206,12 +213,13 @@ export default function ReportGenerationFilter({ dbColleges = [], dbPrograms = [
                             <button
                                 type="submit"
                                 disabled={!isFormComplete}
-                                className={`px-10 py-3 font-bold rounded-md transition-all shadow-md
+                                className={`px-6 py-3 font-medium rounded-md transition-all duration-300 text-base
                                     ${isFormComplete 
-                                        ? "bg-[#5c297c] text-white hover:bg-[#ffb736]" 
-                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
+                                        ? "bg-[#5c297c] text-white hover:bg-[#ffb736] cursor-pointer shadow-md" 
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    }`}
                             >
-                                Continue to Dashboard
+                                Generate Report
                             </button>
                         </div>
                     </form>

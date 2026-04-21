@@ -18,10 +18,24 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showAllGwas, setShowAllGwas] = useState(false);
-    const urlParams = new URLSearchParams(window.location.search);
+    
+    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = urlParams.get('sort') || sort || "student_info.student_id";
+    const actualDirection = urlParams.get('direction') || direction || "desc";
+
+    // 🧠 Reverse Map for the Active Arrow Indicator
+    const reverseDbColumnMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'gwa': 'gwa'
+    };
+    // If the sort is a specific dynamic column (e.g. "1Y-1S"), it will just pass through as the string
+    const activeFrontendSort = reverseDbColumnMap[actualSort] || actualSort;
+
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
-    const exportUrl = route('gwa.export', filter);
+    const exportUrl = route('gwa.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection });
 
     useEffect(() => {
         if (!initialFilter || Object.keys(initialFilter).length === 0) {
@@ -35,7 +49,10 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
     }, []);
 
     const fetchGwaData = (f, preserveState = false) => {
-        router.get(route('gwa.info'), f, { 
+        const params = { ...f, search: searchQuery };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        
+        router.get(route('gwa.info'), params, { 
             preserveState: preserveState, 
             preserveScroll: true, 
             onSuccess: (page) => setStudents(page.props.students) 
@@ -49,7 +66,7 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            fetchGwaData({ ...filter, search: searchQuery }, true); // preserveState: true prevents typing interruption
+            fetchGwaData(filter, true); // preserveState: true prevents typing interruption
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
@@ -60,26 +77,47 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
         setSearchQuery(text);
     };
 
+    // 🧠 5. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (sortKey) => {
-        const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
-        const dbColumn = dbColumnMap[sortKey] || sortKey; 
-        const newDir = sort === dbColumn && direction === 'asc' ? 'desc' : 'asc';
+        const dbColumnMap = { 
+            student_number: 'student_info.student_number', 
+            name: 'student_info.student_lname',
+            gwa: 'gwa' // For the single semester view
+        };
+        const dbColumn = dbColumnMap[sortKey] || sortKey; // For dynamic columns like '1Y-1S', it uses the string itself
         
-        router.get(route('gwa.info'), 
-            { ...filter, search: searchQuery, sort: dbColumn, direction: newDir }, 
-            { 
-                preserveState: true, 
-                preserveScroll: true, 
-                onSuccess: (page) => setStudents(page.props.students) 
+        let nextDir = 'asc';
+        let nextSort = dbColumn;
+
+        // Check against actualSort (the URL value) to cycle the states properly
+        if (actualSort === dbColumn) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc';
+            } else {
+                nextDir = null;
+                nextSort = null;
             }
-        );
+        }
+        
+        const params = { ...filter, search: searchQuery };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        }
+
+        router.get(route('gwa.info'), params, { 
+            preserveState: true, 
+            preserveScroll: true, 
+            onSuccess: (page) => setStudents(page.props.students) 
+        });
     };
 
     const handleApplyFilter = (newFilters) => {
         setFilter(newFilters);
         localStorage.setItem("academicFilterData", JSON.stringify(newFilters));
-        // Include search when filtering
-        fetchGwaData({ ...newFilters, search: searchQuery });
+        const params = { ...newFilters, search: searchQuery };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        fetchGwaData(params);
     };
 
     const handleEdit = (student) => router.get(route('gwa.entry'), { student_id: student.id });
@@ -102,7 +140,11 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                     onSearch={handleSearch}
                     paginationData={students} 
                     onPageChange={(url) => {
-                        if(url) router.get(url, { ...filter, search: searchQuery, sort, direction }, { preserveScroll: true, preserveState: true, onSuccess: (page) => setStudents(page.props.students) });
+                        if(url) {
+                            const params = { ...filter, search: searchQuery };
+                            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+                            router.get(url, params, { preserveScroll: true, preserveState: true, onSuccess: (page) => setStudents(page.props.students) });
+                        }
                     }}
                     exportEndpoint={exportUrl}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
@@ -145,31 +187,43 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                 >
                     <thead className="min-w-full">
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
+                            {/* FIX: Used actualDirection and activeFrontendSort with bg-[#5c297c] fix */}
                             <SortableHeader 
                                 label="Student ID" 
                                 sortKey="student_number" 
-                                currentSort={sort} 
-                                currentDirection={direction} 
+                                currentSort={activeFrontendSort} 
+                                currentDirection={actualDirection} 
                                 onSort={handleSort} 
                                 className="sticky left-0 bg-[#5c297c] z-20 w-[150px] min-w-[150px]" 
                             />
                             <SortableHeader 
                                 label="Student Name" 
                                 sortKey="name" 
-                                currentSort={sort} 
-                                currentDirection={direction} 
+                                currentSort={activeFrontendSort} 
+                                currentDirection={actualDirection} 
                                 onSort={handleSort} 
                                 className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] min-w-[250px] shadow-md" 
                             />
                             {!showAllGwas ? (
-                                <th className="py-3 px-6 font-bold text-center min-w-[120px]">
-                                    {semesterLabel}
-                                </th>
+                                <SortableHeader 
+                                    label={semesterLabel} 
+                                    sortKey="gwa" 
+                                    currentSort={activeFrontendSort} 
+                                    currentDirection={actualDirection} 
+                                    onSort={handleSort} 
+                                    className="bg-[#5c297c] text-center min-w-[120px] [&>div]:justify-center" 
+                                />
                             ) : (
                                 gwaColumns.map(col => (
-                                    <th key={col} className="py-3 px-6 font-bold text-center min-w-[120px]">
-                                        {col}
-                                    </th>
+                                    <SortableHeader 
+                                        key={col} 
+                                        label={col} 
+                                        sortKey={col} 
+                                        currentSort={activeFrontendSort} 
+                                        currentDirection={actualDirection} 
+                                        onSort={handleSort} 
+                                        className="bg-[#5c297c] text-center min-w-[120px] [&>div]:justify-center" 
+                                    />
                                 ))
                             )}
                         </tr>

@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePage } from "@inertiajs/react";
 import axios from "axios";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 
-export default function AcademicProfileFilter() {
+// 🧠 FIX 1: Add dbColleges and dbPrograms to the props
+export default function AcademicProfileFilter({ dbColleges = [], dbPrograms = [] }) {
     const { auth } = usePage().props;
     const user = auth.user;
 
@@ -77,17 +78,45 @@ export default function AcademicProfileFilter() {
         return () => { isMounted = false; };
     }, [academicYears]);
 
+    // Apply user restrictions
+    useEffect(() => {
+        setValues(prev => {
+            let initial = { ...prev };
+            if (isCollegeRestricted) initial.college = user.college_id.toString();
+            if (isProgramRestricted) initial.program = user.program_id.toString();
+            return initial;
+        });
+    }, [user, isCollegeRestricted, isProgramRestricted]);
+
     // Options for the selected academic year
     const currentOptions = useMemo(() => {
         if (!values.academic_year) return null;
         return optionsCache[values.academic_year] || null;
     }, [values.academic_year, optionsCache]);
 
-    const collegeOptions = currentOptions?.colleges || [];
+    // 🧠 FIX 2: Fallback to global DB lists if academic year isn't selected yet
+    const collegeOptions = useMemo(() => {
+        if (currentOptions?.colleges?.length > 0) return currentOptions.colleges;
+        
+        return dbColleges.map(c => ({
+            value: c.value ? c.value.toString() : (c.college_id ? c.college_id.toString() : ""),
+            label: c.label || c.name || "Unknown College"
+        }));
+    }, [currentOptions, dbColleges]);
+
     const programOptions = useMemo(() => {
-        if (!values.college || !currentOptions) return [];
-        return currentOptions.programs[values.college] || [];
-    }, [values.college, currentOptions]);
+        if (!values.college) return [];
+        if (currentOptions?.programs?.[values.college]?.length > 0) {
+            return currentOptions.programs[values.college];
+        }
+
+        return dbPrograms
+            .filter(p => p.college_id && p.college_id.toString() === values.college)
+            .map(p => ({
+                value: p.program_id?.toString() || "",
+                label: p.name || "Unknown Program"
+            }));
+    }, [values.college, currentOptions, dbPrograms]);
 
     const yearLevelOptions = useMemo(() => {
         if (!currentOptions) return [];
@@ -107,14 +136,6 @@ export default function AcademicProfileFilter() {
         const filtered = currentOptions.sections.filter(s => s.startsWith(`${values.year_level}-`));
         return filtered.map(s => ({ value: s, label: s }));
     }, [currentOptions, values.year_level]);
-
-    // Apply user restrictions only once on mount
-    useEffect(() => {
-        let initial = { ...values };
-        if (isCollegeRestricted) initial.college = user.college_id.toString();
-        if (isProgramRestricted) initial.program = user.program_id.toString();
-        setValues(initial);
-    }, []); // ✅ Empty array – runs once
 
     const handleChange = (field, value) => {
         let newValues = { ...values, [field]: value };
@@ -160,7 +181,6 @@ export default function AcademicProfileFilter() {
         setValues(newValues);
     };
 
-    // ✅ Correct handleSubmit – only saves to localStorage and opens modal
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!values.academic_year || !values.college || !values.program || !values.year_level || !values.semester || !values.section) {

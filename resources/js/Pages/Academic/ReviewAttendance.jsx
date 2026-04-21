@@ -7,7 +7,7 @@ import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
 import AttendanceAddStudentModal from "@/Components/Modals/Academic/AttendanceAddStudentModal";
 
-export default function ReviewAttendance({ students, filter, search = "", sort = "", direction = "asc" }) {
+export default function ReviewAttendance({ students, filter, search = "", sort = "", direction = "" }) {
     const records = students?.data || [];
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
@@ -16,27 +16,78 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
 
+    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = sort || urlParams.get('sort') || "";
+    const actualDirection = direction || urlParams.get('direction') || "asc";
+
+    // 🧠 Reverse Map for the Active Arrow Indicator
+    const reverseDbKeyMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'attended': 'attended',
+        'total': 'total',
+        'percentage': 'percentage'
+    };
+    const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
+
+    // 🧠 2. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            // Note: Change 'review.attendance' to 'retakes.info' if applying this to RetakesInfo.jsx!
-            router.get(route('review.attendance'), { ...filter, search: searchQuery, sort, direction }, { preserveState: true, preserveScroll: true, replace: true });
+            const params = { ...filter, search: searchQuery };
+            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+            router.get(route('review.attendance'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
+    // 🧠 3. Fast local state update
     const handleSearch = (val) => {
         const text = typeof val === 'string' ? val : val?.target?.value || "";
         setSearchQuery(text);
     };
 
+    // 🧠 4. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (key) => {
-        const dbKey = key === 'student_number' ? 'student_info.student_number' : 'student_info.student_lname';
-        const dir = sort === dbKey && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('review.attendance'), { ...filter, search: searchQuery, sort: dbKey, direction: dir }, { preserveState: true, preserveScroll: true });
+        // Map frontend sortKey to DB column
+        const dbKeyMap = {
+            'student_number': 'student_info.student_number',
+            'name': 'student_info.student_lname',
+            'attended': 'attended',
+            'total': 'total',
+            'percentage': 'percentage'
+        };
+        const dbKey = dbKeyMap[key] || key;
+
+        let nextDir = 'asc';
+        let nextSort = dbKey;
+
+        // Check against actualSort (the URL value) to cycle the states properly
+        if (actualSort === dbKey) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc';
+            } else {
+                nextDir = null;
+                nextSort = null;
+            }
+        }
+
+        const params = { ...filter, search: searchQuery };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        }
+        router.get(route('review.attendance'), params, { preserveState: true, preserveScroll: true });
+    };
+
+    const handleApplyFilter = (newFilters) => {
+        const params = { ...newFilters, search: searchQuery };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('review.attendance'), params, { preserveState: true, preserveScroll: true });
     };
 
     return (
@@ -47,7 +98,7 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
                     title="Attendance in Review Classes"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
-                    exportEndpoint={route('review.attendance.export', filter)}
+                    exportEndpoint={route('review.attendance.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
                     headerActions={
                         <>
@@ -59,19 +110,24 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
                             </button>
                         </>
                     }
-                    footerActions={<button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all">Manage Records</button>}
+                    footerActions={
+                        <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all">
+                            Manage Records
+                        </button>
+                    }
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase">
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sort} currentDirection={direction} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sort} currentDirection={direction} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
-                            <th className="py-3 px-6 text-center">Attended</th>
-                            <th className="py-3 px-6 text-center">Total</th>
-                            <th className="py-3 px-6 text-center">Percentage</th>
+                            {/* 🧠 FIX: Changed all to SortableHeader, added bg-[#5c297c], and used actualDirection/activeFrontendSort */}
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
+                            <SortableHeader label="Attended" sortKey="attended" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />
+                            <SortableHeader label="Total" sortKey="total" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />
+                            <SortableHeader label="Percentage" sortKey="percentage" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
-                        {records.map((student, i) => (
+                        {records.length > 0 ? records.map((student, i) => (
                             <tr key={student.id} className={`border-b hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 <td className="py-3 px-6 sticky left-0 bg-inherit z-10">
                                     <Link href={route('review.attendance.entry', { student_id: student.id })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] transition-all text-center">{student.student_number}</Link>
@@ -83,11 +139,13 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
                                     <span className={student.percentage < 80 ? "text-red-500" : "text-[#5c297c]"}>{student.percentage}%</span>
                                 </td>
                             </tr>
-                        ))}
+                        )) : (
+                            <tr><td colSpan={5} className="py-8 text-center text-gray-500 italic">No records found.</td></tr>
+                        )}
                     </tbody>
                 </TableContainer>
 
-                <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={filter} onApply={(v) => router.get(route('review.attendance'), v)} />
+                <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={filter} onApply={handleApplyFilter} />
                 <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Attendance in Review Classes" filterData={filter} />
                 <AttendanceAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={filter} />
             </div>

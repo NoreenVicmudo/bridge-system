@@ -134,13 +134,13 @@ export default function UserList({ users, queryParams = {} }) {
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
                             {isRemoveMode && <th className="py-3 px-6 text-center w-[50px]"><input type="checkbox" onChange={toggleSelectAll} className="accent-[#5c297c] cursor-pointer w-4 h-4" /></th>}
-                            <SortableHeader label="Username" sortKey="username" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Full Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Email" sortKey="email" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="College" sortKey="college" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Position" sortKey="position" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Program" sortKey="program" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Date Registered" sortKey="date_registered" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
+                            <SortableHeader label="Username" sortKey="username" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Full Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Email" sortKey="email" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="College" sortKey="college" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Position" sortKey="position" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Program" sortKey="program" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Date Registered" sortKey="date_registered" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="bg-[#5c297c]" />
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">

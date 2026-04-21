@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import TextInput from "@/Components/TextInput";
 import CustomSelectGroup from "@/Components/SelectGroup";
 import ConfirmSaveModal from "@/Components/Modals/ConfirmSaveModal";
+import { router } from "@inertiajs/react";
 
 export default function UpdateUserForm({
     data, setData, errors = {}, processing = false, submit, user,
@@ -26,7 +27,6 @@ export default function UpdateUserForm({
     const needsCollege = ["Dean", "Administrative Assistant", "Program Head"].includes(data.position);
     const needsProgram = data.position === "Program Head";
 
-    // 🧠 FIXED: Extracted handlers
     const handlePositionChange = (e) => {
         const newPos = e.target.value;
         const willNeedCollege = ["Dean", "Administrative Assistant", "Program Head"].includes(newPos);
@@ -45,16 +45,23 @@ export default function UpdateUserForm({
         setData(prev => ({
             ...prev,
             college_id: selectedCollegeId,
-            program_id: "" // Reset program!
+            program_id: "" 
         }));
     };
 
-    // 🧠 FIXED: Bulletproof filtering
+    // 🧠 THE FIX: Force all college option values to be strings to match the form state
+    const normalizedCollegeOptions = useMemo(() => {
+        return collegeOptions.map(c => ({
+            ...c,
+            value: c.value ? String(c.value) : ""
+        }));
+    }, [collegeOptions]);
+
     const filteredPrograms = useMemo(() => {
         if (!data.college_id) return [];
         return programOptions
-            .filter(p => p.college_id && p.college_id.toString() === data.college_id.toString())
-            .map(p => ({ value: p.value.toString(), label: p.label }));
+            .filter(p => p.college_id && String(p.college_id) === String(data.college_id))
+            .map(p => ({ value: String(p.value), label: p.label }));
     }, [data.college_id, programOptions]);
 
     const isFormValid =
@@ -66,6 +73,10 @@ export default function UpdateUserForm({
     const openConfirmModal = (e) => {
         e.preventDefault();
         if (isFormValid) setIsModalOpen(true);
+    };
+
+    const handleBack = () => {
+        router.get(route('users.index')); 
     };
 
     return (
@@ -108,7 +119,8 @@ export default function UpdateUserForm({
                                         <CustomSelectGroup
                                             label="College:" value={data.college_id}
                                             onChange={handleCollegeChange}
-                                            options={collegeOptions} placeholder="Select College" vertical={true} className={selectGroupOverride} labelClassName={selectLabelOverride}
+                                            options={normalizedCollegeOptions} /* 🧠 Using normalized options */
+                                            placeholder="Select College" vertical={true} className={selectGroupOverride} labelClassName={selectLabelOverride}
                                         />
                                     </div>
                                 )}
@@ -132,7 +144,9 @@ export default function UpdateUserForm({
                         </div>
 
                         <div className="flex justify-end gap-3 mt-4 mb-2 flex-shrink-0">
-                            <button type="button" onClick={() => window.history.back()} className="px-6 py-2.5 text-sm font-bold text-[#666] bg-white border border-[#ddd] rounded-[6px] hover:bg-[#ffb736] hover:text-white transition-all duration-300 shadow-sm font-montserrat">Back</button>
+                            <button type="button" onClick={handleBack} className="px-6 py-2.5 text-sm font-bold text-[#666] bg-white border border-[#ddd] rounded-[6px] hover:bg-[#ffb736] hover:text-white transition-all duration-300 shadow-sm font-montserrat">
+                                Back
+                            </button>
                             <button type="submit" disabled={processing || !isFormValid} className={`px-6 py-2.5 text-sm font-bold text-white rounded-[6px] transition-all duration-300 shadow-md flex items-center gap-2 ${!isFormValid ? "bg-gray-400 cursor-not-allowed opacity-70" : "bg-[#5c297c] hover:bg-[#ffb736] cursor-pointer"}`}>
                                 {processing ? <><div className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Saving...</> : "Update User"}
                             </button>

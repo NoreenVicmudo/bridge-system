@@ -7,73 +7,8 @@ import ReportDocument from "@/Components/Reports/ReportDocument";
 import ReportLoadingAnimation from "@/Components/Reports/ReportLoadingAnimation";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-
-const generateDummyData = (configData) => {
-    const toolMap = {
-        descriptive: "Descriptive Statistics",
-        regression: "Regression Analysis",
-        pearson: "Pearson R Correlation",
-        chiSquareGOF: "Chi Square - Goodness of Fit",
-        chiSquareTOI: "Chi Square - Test of Independence",
-        tTestIND: "Independent T Test",
-        tTestDEP: "Dependent T Test",
-    };
-    const toolText =
-        toolMap[
-            configData.tool === "inferential"
-                ? configData.inferentialType
-                : "descriptive"
-        ];
-
-    let fieldsText = "";
-    if (configData.tool === "descriptive") {
-        fieldsText = `Field: ${configData.descField || "Selected Metric"}`;
-    } else {
-        fieldsText = `Field 1: ${configData.var1Field || "Variable 1"}\nField 2: ${configData.var2Field || "Variable 2"}`;
-    }
-
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-
-    return {
-        title: "BRIDGE Statistical Report",
-        timestamp: timestamp,
-        tool: toolText,
-        fields: fieldsText,
-        metricName: configData.descField || "Diagnostic Examinations",
-        tableData: {
-            dataset: [
-                { label: "2022", val: "0.000" },
-                { label: "2024", val: "0.000" },
-                { label: "2025", val: "0.000" },
-                { label: "2026", val: "0.000" },
-                { label: "2027", val: "0.000" },
-            ],
-            stats: [
-                { metric: "Count", val: "5" },
-                { metric: "Mean", val: "0.0000" },
-                { metric: "Median", val: "0.0000" },
-                { metric: "Minimum", val: "0.0000" },
-                { metric: "Maximum", val: "0.0000" },
-                { metric: "Std. Deviation", val: "0.0000" },
-                { metric: "Variance", val: "0.0000" },
-            ],
-        },
-        chartType: "bar",
-        chartData: {
-            labels: ["2022", "2024", "2025", "2026", "2027"],
-            datasets: [
-                {
-                    label: "Diagnostic Examinations",
-                    data: [0, 0, 0, 0, 0],
-                    backgroundColor: "#5c297c",
-                    borderColor: "#5c297c",
-                    borderWidth: 1,
-                },
-            ],
-        },
-    };
-};
+import axios from "axios";
+import { toast } from "react-toastify"; // 🧠 NEW: Import toastify directly
 
 export default function GenerateReport(props) {
     const { auth = {} } = usePage().props;
@@ -201,7 +136,8 @@ export default function GenerateReport(props) {
             }, 60000);
         } catch (error) {
             console.error("Error preparing print:", error);
-            alert("An error occurred while preparing the print document.");
+            // 🧠 FIXED: Replaced alert with global toast
+            toast.error("An error occurred while preparing the print document.");
         } finally {
             setIsProcessing(false);
         }
@@ -249,7 +185,8 @@ export default function GenerateReport(props) {
             pdf.save(`report_${formattedDate}.pdf`);
         } catch (error) {
             console.error("Error generating PDF:", error);
-            alert("An error occurred while generating the PDF.");
+            // 🧠 FIXED: Replaced alert with global toast
+            toast.error("An error occurred while generating the PDF.");
         } finally {
             setIsProcessing(false);
         }
@@ -541,10 +478,17 @@ export default function GenerateReport(props) {
                 });
 
                 setIsStatModalOpen(false);
+                
+                // 🧠 FIXED: Success Toast
+                toast.success("Report generated successfully!");
             }
         } catch (error) {
             console.error("Report Error:", error);
-            alert(error.response?.data?.error || "An error occurred during calculation.");
+            
+            // 🧠 FIXED: Replaced alert with global toast
+            const errorMessage = error.response?.data?.error || error.response?.data?.message || "An error occurred during calculation. Please check your data selection.";
+            toast.error(errorMessage);
+
         } finally {
             setIsGenerating(false);
         }

@@ -82,15 +82,18 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
     return (
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                <div className="bg-[#5c297c] p-6 text-center relative">
-                    <h2 className="text-2xl font-bold text-white tracking-wide">Manage Performance Ratings</h2>
-                    <p className="text-purple-200 text-sm mt-1">Import CSV or edit a student's grades</p>
+                
+                {/* Modal Header */}
+                <div className="bg-[#5c297c] p-6 text-center relative text-white">
+                    <h2 className="text-2xl font-bold tracking-wide">Manage Performance Ratings</h2>
+                    <p className="text-purple-200 text-sm mt-1">Import CSV or edit a student's ratings</p>
                     <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 rounded-full p-1 transition-all">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
                 <div className="p-8">
+                    {/* View 1: Selection Options */}
                     {view === "options" && (
                         <div className="grid grid-cols-2 gap-4">
                             <button onClick={() => setView("import")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
@@ -108,42 +111,65 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                         </div>
                     )}
 
+                    {/* View 2: CSV Import */}
                     {view === "import" && (
-                        <div className="flex flex-col gap-5 animate-fade-in-up">
-                            <div className="bg-purple-50 p-5 rounded-lg border border-purple-100 text-center">
-                                <i className="bi bi-cloud-arrow-up text-4xl text-[#5c297c] mb-2 block"></i>
-                                <h3 className="font-bold text-[#5c297c] mb-1">Upload Board Grades Data</h3>
-                                <p className="text-xs text-gray-600 mb-4">
-                                    Expected columns: <strong>student_number</strong> + Exact subject names like <strong>"{subjectHeaders[0] || 'Subject 1'}"</strong>.
+                        <form onSubmit={handleImportSubmit} className="flex flex-col gap-4 animate-fade-in-up">
+                            <div className="text-center mb-1">
+                                <h3 className="font-bold text-[#5c297c] text-lg">Upload Performance Data</h3>
+                                <p className="text-xs text-gray-600 mt-1">
+                                    Expected columns: <strong>student_number</strong> + Exact category names like <strong>"{subjectHeaders[0] || 'Category 1'}"</strong>.
                                 </p>
-                                <form onSubmit={handleImportSubmit} className="flex flex-col gap-3">
-                                    <input 
-                                        type="file" 
-                                        accept=".csv"
-                                        onChange={(e) => setImportFile(e.target.files[0])}
-                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-[#5c297c] hover:file:bg-purple-200 cursor-pointer"
-                                        required
-                                    />
-                                    {importError && <div className="text-red-500 text-xs mt-1 font-medium">{importError}</div>}
-                                    <button 
-                                        type="submit"
-                                        disabled={importProcessing || !importFile}
-                                        className="mt-2 w-full py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] transition-all disabled:opacity-50 shadow-md"
-                                    >
-                                        {importProcessing ? "Uploading & Processing..." : "Import Records"}
-                                    </button>
-                                </form>
                             </div>
-                            <button onClick={() => setView("options")} className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-2">
+
+                            {/* Drag & Drop Label Design */}
+                            <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
+                                <input 
+                                    type="file" 
+                                    accept=".csv"
+                                    onChange={(e) => setImportFile(e.target.files[0])}
+                                    className="hidden" 
+                                    required 
+                                />
+                                <i className="bi bi-cloud-arrow-up text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
+                                
+                                {importFile ? (
+                                    <p className="text-[#5c297c] font-bold truncate px-4">{importFile.name}</p>
+                                ) : (
+                                    <p className="text-gray-600 font-medium">Drag & Drop your CSV file here</p>
+                                )}
+                                
+                                <p className="text-sm text-gray-400 mt-1 mb-4">Supports .csv</p>
+                                
+                                <span className="px-5 py-2 bg-white border border-[#5c297c] text-[#5c297c] font-bold rounded-lg text-sm group-hover:bg-[#5c297c] group-hover:text-white transition-all inline-block">
+                                    {importFile ? "Change File" : "Browse Files"}
+                                </span>
+                            </label>
+
+                            {importError && <div className="text-red-500 text-xs font-medium text-center">{importError}</div>}
+
+                            <button 
+                                type="submit"
+                                disabled={importProcessing || !importFile}
+                                className="w-full py-3 bg-[#5c297c] text-white font-bold rounded-lg shadow-md hover:bg-[#4a1f63] hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100"
+                            >
+                                {importProcessing ? "Uploading & Processing..." : "Import Records"}
+                            </button>
+
+                            <button 
+                                type="button" 
+                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); }} 
+                                className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
+                            >
                                 ← Back to Options
                             </button>
-                        </div>
+                        </form>
                     )}
 
+                    {/* View 3: Manual Search */}
                     {view === "manual" && (
                         <div className="flex flex-col gap-5 animate-fade-in-up">
                             <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-                                <label className="block text-sm font-bold text-[#5c297c] mb-2">Check Student ID</label>
+                                <label className="block text-sm font-bold text-[#5c297c] mb-2">Search Student ID</label>
                                 <div className="flex gap-2">
                                     <input 
                                         type="text" 
@@ -167,7 +193,7 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
                                     <div className="flex items-center gap-2 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100">
                                         <i className="bi bi-info-circle-fill text-xl"></i>
-                                        <span className="text-sm font-medium">Student found! Proceed to update grades.</span>
+                                        <span className="text-sm font-medium">Student found! Proceed to update ratings.</span>
                                     </div>
                                     <button 
                                         onClick={handleProceedToEdit} 

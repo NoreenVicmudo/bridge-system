@@ -8,7 +8,7 @@ import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
 import SimAddStudentModal from "@/Components/Modals/Academic/SimAddStudentModal";
 
-export default function SimulationExamPage({ students, filter, search: backendSearch = "", sort = "", direction = "asc" }) {
+export default function SimulationExamPage({ students, filter, search: backendSearch = "", sort = "", direction = "" }) {
     const isBackendReady = !!students;
     const mock = useMockInertia(MOCK_STUDENTS_SIMULATION);
 
@@ -16,42 +16,9 @@ export default function SimulationExamPage({ students, filter, search: backendSe
     const records = isBackendReady ? students.data.data : mock.data.data;
 
     const search = isBackendReady ? backendSearch : mock.search;
-    const sortColumn = isBackendReady ? sort : mock.sortColumn;
-    const sortDirection = isBackendReady ? direction : mock.sortDirection;
 
     const [searchQuery, setSearchQuery] = useState(search);
     const initialRender = useRef(true);
-
-    useEffect(() => {
-        if (initialRender.current) {
-            initialRender.current = false;
-            return;
-        }
-        const delayDebounceFn = setTimeout(() => {
-            if (isBackendReady) {
-                router.get(route('simulation.exam'), { ...filter, search: searchQuery, sort, direction, exam_period: examPeriod }, { preserveState: true, preserveScroll: true, replace: true });
-            } else {
-                mock.setSearch(searchQuery);
-            }
-        }, 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery]);
-
-    const handleSearch = (val) => {
-        const text = typeof val === 'string' ? val : val?.target?.value || "";
-        setSearchQuery(text);
-    };
-
-    const handlePageChange = isBackendReady ? (url) => {
-        if(url) router.get(url, { ...filter, search: searchQuery, sort, direction, exam_period: examPeriod }, { preserveScroll: true, preserveState: true });
-    } : mock.setPage;
-
-    const handleSort = isBackendReady ? (sortKey) => {
-        const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
-        const dbColumn = dbColumnMap[sortKey] || 'student_info.student_id';
-        const newDir = sort === dbColumn && direction === 'asc' ? 'desc' : 'asc';
-        router.get(route('simulation.exam'), { ...filter, search: searchQuery, sort: dbColumn, direction: newDir, exam_period: examPeriod }, { preserveState: true, preserveScroll: true });
-    } : mock.handleSort;
 
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
@@ -65,59 +32,215 @@ export default function SimulationExamPage({ students, filter, search: backendSe
         academic_year: "2025-2026", semester: "1st Semester", college: "1", program: "1", year_level: "4", section: "4-1",
     });
 
+    const simHeaders = isBackendReady ? students.simulations : MOCK_SIMULATION_EXAMS;
+    const visibleSims = selectedSim === "All" ? simHeaders : simHeaders.filter(s => s === selectedSim);
+
+    const PERIOD_OPTIONS = ["Default Period", "Diagnostic", "Pre-Test", "Midterm", "Post-Test"];
+
+    // 🧠 Hybrid Dropdown States
+    const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
+    const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
+    const periodDropdownRef = useRef(null);
+    const subjectDropdownRef = useRef(null);
+
+    // Close Dropdowns on Outside Click
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (periodDropdownRef.current && !periodDropdownRef.current.contains(event.target)) {
+                setIsPeriodDropdownOpen(false);
+            }
+            if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(event.target)) {
+                setIsSubjectDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // 🧠 THE FIX: Grab sort params directly from the URL if the backend didn't pass them back
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = isBackendReady ? (sort || urlParams.get('sort') || "") : mock.sortColumn;
+    const actualDirection = isBackendReady ? (direction || urlParams.get('direction') || "asc") : mock.sortDirection;
+
+    // 🧠 Reverse Map for the Active Arrow Indicator
+    const reverseDbColumnMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name'
+    };
+    const activeFrontendSort = reverseDbColumnMap[actualSort] || actualSort;
+
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        const delayDebounceFn = setTimeout(() => {
+            if (isBackendReady) {
+                const params = { ...activeFilters, search: searchQuery, exam_period: examPeriod };
+                if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+                router.get(route('simulation.exam'), params, { preserveState: true, preserveScroll: true, replace: true });
+            } else {
+                mock.setSearch(searchQuery);
+            }
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    const handleSearch = (val) => {
+        const text = typeof val === 'string' ? val : val?.target?.value || "";
+        setSearchQuery(text);
+    };
+
+    const handlePageChange = isBackendReady ? (url) => {
+        if(url) {
+            const params = { ...activeFilters, search: searchQuery, exam_period: examPeriod };
+            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+            router.get(url, params, { preserveScroll: true, preserveState: true });
+        }
+    } : mock.setPage;
+
+    // 🧠 THE FIX: 3-State Sorting (Ascending -> Descending -> None) using actualSort
+    const handleSort = isBackendReady ? (key) => {
+        const dbColumnMap = { student_number: 'student_info.student_number', name: 'student_info.student_lname' };
+        const dbKey = dbColumnMap[key] || key; 
+        
+        let nextDir = 'asc';
+        let nextSort = dbKey;
+
+        // If clicking the currently active column...
+        if (actualSort === dbKey) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc'; // Switch to Descending
+            } else {
+                nextDir = null;   // Remove Sorting entirely
+                nextSort = null;
+            }
+        }
+
+        const params = { ...activeFilters, search: searchQuery, exam_period: examPeriod };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        }
+
+        router.get(route('simulation.exam'), params, { preserveState: true, preserveScroll: true });
+    } : mock.handleSort;
+
     const handleApplyFilter = (newFilters) => {
         setActiveFilters(newFilters);
         localStorage.setItem("academicFilterData", JSON.stringify(newFilters));
-        // Pass the exam period along with the filters!
-        router.get(route('simulation.exam'), { ...newFilters, exam_period: examPeriod }, { preserveState: false });
+        const params = { ...newFilters, search: searchQuery, exam_period: examPeriod };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('simulation.exam'), params, { preserveState: false });
     };
 
-    // Handler for changing the Exam Period
-    const handlePeriodChange = (e) => {
-        const newPeriod = e.target.value;
-        setExamPeriod(newPeriod);
-        router.get(route('simulation.exam'), { ...activeFilters, search, sort, direction, exam_period: newPeriod }, { preserveState: true, preserveScroll: true });
+    const handlePeriodChange = (newPeriod) => {
+        setIsPeriodDropdownOpen(false);
+        const backendValue = newPeriod === "Default Period" ? "Default" : newPeriod;
+        setExamPeriod(backendValue);
+        
+        const params = { ...activeFilters, search: searchQuery, exam_period: backendValue };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        
+        if (isBackendReady) {
+            router.get(route('simulation.exam'), params, { preserveState: true, preserveScroll: true });
+        }
     };
 
-    const simHeaders = isBackendReady ? students.simulations : MOCK_SIMULATION_EXAMS;
-    const visibleSims = selectedSim === "All" ? simHeaders : simHeaders.filter(s => s === selectedSim);
+    const displayPeriod = examPeriod === "Default" ? "Default Period" : examPeriod;
 
     return (
         <AuthenticatedLayout>
             <Head title="Simulation Exam Results" />
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
-                    title="Simulation Exam Results"
+                    title={`Simulation Exam Results (${displayPeriod})`}
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={paginator} onPageChange={handlePageChange}
-                    exportEndpoint={route('simulation-exam.export', { ...filter, exam_period: examPeriod })}
+                    exportEndpoint={route('simulation-exam.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: examPeriod })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}
                     headerActions={
                         <>
-                            {/* NEW: Exam Period Dropdown */}
-                            <select 
-                                value={examPeriod} 
-                                onChange={handlePeriodChange}
-                                className="px-4 h-[40px] border border-[#ffb736] text-[#ffb736] bg-white rounded-[5px] text-sm font-bold focus:ring-[#ffb736] outline-none shadow-sm cursor-pointer shrink-0"
-                            >
-                                <option value="Default">Default Period</option>
-                                <option value="Diagnostic">Diagnostic</option>
-                                <option value="Pre-Test">Pre-Test</option>
-                                <option value="Midterm">Midterm</option>
-                                <option value="Post-Test">Post-Test</option>
-                            </select>
-
-                            {simHeaders.length > 0 && (
-                                <select 
-                                    value={selectedSim} onChange={(e) => setSelectedSim(e.target.value)}
-                                    className="px-4 h-[40px] border border-[#5c297c] text-[#5c297c] bg-white rounded-[5px] text-sm font-bold focus:ring-[#5c297c] outline-none shadow-sm cursor-pointer shrink-0"
+                            {/* HYBRID DROPDOWN - EXAM PERIOD */}
+                            <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
+                                <button 
+                                    onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
+                                    className={`flex items-center justify-between gap-3 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm w-full md:w-[180px] ${
+                                        isPeriodDropdownOpen 
+                                            ? "bg-amber-50 text-[#ffb736] border-[#ffb736] ring-1 ring-[#ffb736]" 
+                                            : "bg-amber-50 text-[#ffb736] border-[#ffb736] hover:bg-[#ffb736] hover:text-white" 
+                                    }`}
                                 >
-                                    <option value="All">All Exams</option>
-                                    {simHeaders.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                                    <span className="truncate flex-1 text-left">{displayPeriod}</span>
+                                    <svg className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isPeriodDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                {/* PERIOD MENU */}
+                                <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isPeriodDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
+                                    <div className="overflow-hidden min-h-0">
+                                        <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
+                                            {PERIOD_OPTIONS.map(period => (
+                                                <li 
+                                                    key={period}
+                                                    onClick={() => handlePeriodChange(period)}
+                                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${displayPeriod === period ? "bg-[#5c297c] text-white font-bold" : "text-black hover:bg-[#ffb736]/20 font-medium"}`}
+                                                >
+                                                    {period}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* HYBRID DROPDOWN - SUBJECTS */}
+                            {simHeaders.length > 0 && (
+                                <div className="relative shrink-0 flex-1 md:flex-none" ref={subjectDropdownRef}>
+                                    <button 
+                                        onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
+                                        className={`flex items-center justify-between gap-3 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm w-full md:w-[200px] ${
+                                            isSubjectDropdownOpen 
+                                                ? "bg-white text-[#5c297c] border-[#ffb736] ring-1 ring-[#ffb736]" 
+                                                : "bg-white text-[#5c297c] border-[#5c297c] hover:bg-[#5c297c] hover:text-white" 
+                                        }`}
+                                    >
+                                        <span className="truncate flex-1 text-left">
+                                            {selectedSim === "All" ? "All Exams" : selectedSim}
+                                        </span>
+                                        <svg className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isSubjectDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    {/* SUBJECT MENU */}
+                                    <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isSubjectDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
+                                        <div className="overflow-hidden min-h-0">
+                                            <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
+                                                <li 
+                                                    onClick={() => { setSelectedSim("All"); setIsSubjectDropdownOpen(false); }}
+                                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${selectedSim === "All" ? "bg-[#5c297c] text-white font-bold" : "text-black hover:bg-[#ffb736]/20 font-medium"}`}
+                                                >
+                                                    All Exams
+                                                </li>
+                                                {simHeaders.map(sub => (
+                                                    <li
+                                                        key={sub}
+                                                        onClick={() => { setSelectedSim(sub); setIsSubjectDropdownOpen(false); }}
+                                                        className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${selectedSim === sub ? "bg-[#5c297c] text-white font-bold" : "text-black hover:bg-[#ffb736]/20 font-medium"}`}
+                                                    >
+                                                        {sub}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
+
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all shadow-sm shrink-0">
-                                <i className="bi bi-funnel-fill leading-none"></i><span className="leading-none">Filter Program</span>
+                                <i className="bi bi-funnel-fill leading-none"></i><span className="leading-none">Filter</span>
                             </button>
                             <button onClick={() => setIsMetricModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] transition-all shadow-sm shrink-0">
                                 <i className="bi bi-bar-chart-fill leading-none"></i><span className="leading-none">Change Metric</span>
@@ -132,10 +255,18 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-0 bg-[#5c297c] z-20 w-[150px]" />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="sticky left-[150px] bg-[#5c297c] z-20 w-[250px] shadow-md" />
                             {visibleSims.map((header, i) => (
-                                <th key={i} className="py-3 px-6 font-bold text-center whitespace-nowrap min-w-[150px]">{header}</th>
+                                <SortableHeader 
+                                    key={i} 
+                                    label={header} 
+                                    sortKey={header} 
+                                    currentSort={activeFrontendSort} 
+                                    currentDirection={actualDirection} 
+                                    onSort={handleSort} 
+                                    className={`bg-[#5c297c] whitespace-nowrap [&>div]:justify-center ${visibleSims.length === 1 ? 'w-full' : 'min-w-[150px]'}`} 
+                                />
                             ))}
                         </tr>
                     </thead>
@@ -148,7 +279,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                                     const value = student.results[header];
                                     return (
                                         <td key={idx} className="py-3 px-6 text-center">
-                                            {value ? <span className={`font-bold ${parseInt(value) < 75 ? "text-red-500" : "text-[#5c297c]"}`}>{value}</span> : <span className="text-gray-300">-</span>}
+                                            {value ? <span className={`font-bold ${parseInt(value) < 75 ? "text-red-500" : "text-[#5c297c]"}`}>{value}%</span> : <span className="text-gray-300">-</span>}
                                         </td>
                                     );
                                 })}
@@ -161,7 +292,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
 
                 <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={handleApplyFilter} />
                 <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Simulation Exam Results" filterData={filter} />
-                <SimAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={{...filter, exam_period: examPeriod}} subjectHeaders={simHeaders} />
+                <SimAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={{...activeFilters, exam_period: examPeriod}} subjectHeaders={simHeaders} />
             </div>
         </AuthenticatedLayout>
     );
