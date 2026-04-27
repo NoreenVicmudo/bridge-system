@@ -140,6 +140,7 @@ export default function GwaPage({ students: initialStudents, filter: initialFilt
                         }
                     }}
                     exportEndpoint={exportUrl}
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
                     headerActions={
                         <>

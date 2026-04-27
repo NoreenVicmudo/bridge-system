@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
+import { toast } from "react-toastify";
 
 export default function AddStudentModal({ isOpen, onClose, filterMode = 'section', currentFilters = {} }) {
     const [view, setView] = useState("options");
@@ -15,6 +16,7 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
 
+    // 🧠 FIXED: Lock background scrolling when modal is open
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -25,7 +27,15 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
             setImportFile(null);
             setImportProcessing(false);
             setImportError(null);
+            document.body.style.overflow = "hidden"; // Prevent body scroll
+        } else {
+            document.body.style.overflow = "unset"; // Restore body scroll
         }
+
+        // Cleanup function to ensure scroll is restored if component unmounts
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [isOpen]);
 
     // --- CLOSE LOGIC (Animation first, then unmount) ---
@@ -44,7 +54,7 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
             const response = await axios.get(`/api/check-student/${studentNumberInput}`);
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch (error) {
-            console.error("Error checking student ID:", error);
+            toast.error("Error checking student ID. Please try again.");
             setCheckStatus("idle");
         }
     };
@@ -54,14 +64,12 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
 
         if (checkStatus === 'exists') {
             if (isMasterlist) {
-                // 🧠 NEW: In Masterlist, if student exists, go straight to Edit page
                 closeModal();
-                // We need to fetch the internal DB ID first to use the edit route
                 try {
                     const idResponse = await axios.get(`/api/get-student-id/${studentNumberInput}`);
                     router.get(route('students.edit', idResponse.data.id));
                 } catch (e) {
-                    alert("Could not find internal ID for this student.");
+                    toast.error("Could not find internal ID for this student.");
                 }
             } else {
                 setEnrolling(true);
@@ -85,15 +93,14 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                     }
                     const response = await axios.post(route('students.direct-enroll'), payload);
                     if (response.data.success) {
-                        alert(response.data.message);
+                        toast.success(response.data.message);
                         closeModal();
                         window.location.reload();
                     } else {
-                        alert('Enrollment failed: ' + response.data.message);
+                        toast.error('Enrollment failed: ' + response.data.message);
                     }
                 } catch (error) {
-                    console.error('Enrollment error:', error);
-                    alert('Enrollment failed. Please try again.');
+                    toast.error('Enrollment failed. Please try again.');
                 } finally {
                     setEnrolling(false);
                 }
@@ -162,16 +169,15 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                 }
             });
             if (response.data.success) {
-                alert(response.data.message);
+                toast.success(response.data.message);
                 closeModal();
                 window.location.reload();
             } else {
-                alert('Import failed: ' + response.data.message);
+                toast.error('Import failed: ' + response.data.message);
             }
         } catch (error) {
-            console.error('Import error:', error);
             const message = error.response?.data?.message || 'Import failed. Please check the file format.';
-            alert(message);
+            toast.error(message);
             setImportError(message);
         } finally {
             setImportProcessing(false);
@@ -184,10 +190,10 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
         <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 p-4 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             
             {/* Modal Card */}
-            <div className={`bg-white rounded-2xl w-full max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            <div className={`bg-white rounded-2xl w-full max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"} max-h-screen`}>
                 
-                {/* Header */}
-                <div className="bg-[#5c297c] p-6 text-center relative">
+                {/* Header (Shrink-0 ensures it never squishes) */}
+                <div className="bg-[#5c297c] p-6 text-center relative shrink-0">
                     <h2 className="text-2xl font-bold text-white tracking-wide">Add New Student</h2>
                     <p className="text-purple-200 text-sm mt-1">Choose how you want to add records</p>
                     
@@ -200,8 +206,8 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                     </button>
                 </div>
 
-                {/* Content Area */}
-                <div className="p-6 md:p-8">
+                {/* 🧠 FIXED: Content Area now has overflow-y-auto and flex-1 */}
+                <div className="p-6 md:p-8 flex-1 overflow-y-auto max-h-[70vh]">
                     
                     {/* --- VIEW 1: INITIAL OPTIONS --- */}
                     {view === "options" && (
@@ -228,11 +234,10 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                         </div>
                     )}
 
-                    {/* --- VIEW 2: IMPORT FILE (Old Design + New Form Logic) --- */}
+                    {/* --- VIEW 2: IMPORT FILE --- */}
                     {view === "import" && (
                         <form onSubmit={handleImportSubmit} className="flex flex-col gap-4 animate-fade-in-up">
                             
-                            {/* Hidden file input wrapped in the gorgeous old design label */}
                             <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-8 md:p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
                                 <input 
                                     type="file" 
@@ -270,13 +275,12 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                         </form>
                     )}
 
-                    {/* --- VIEW 3: MANUAL ENTRY (Old Layout + New Logic) --- */}
+                    {/* --- VIEW 3: MANUAL ENTRY --- */}
                     {view === "manual" && (
                         <div className="flex flex-col gap-4 animate-fade-in-up">
                             
                             <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 overflow-hidden">
                                 <label className="block text-sm font-bold text-[#5c297c] mb-2">Check Student ID</label>
-                                {/* 🧠 FIXED: Added shrink-0 to button so it doesn't get squished out on mobile */}
                                 <div className="flex gap-2 w-full">
                                     <input 
                                         type="text" 
@@ -299,7 +303,7 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                 </div>
                             </div>
 
-                            {/* Status Messages based on Backend Logic */}
+                            {/* Status Messages */}
                             {checkStatus === "exists" && (
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
                                     <div className="flex items-start md:items-center gap-3 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100 shadow-sm text-sm">

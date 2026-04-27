@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Head, Link, router } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
 import { useMockInertia, MOCK_STUDENTS_SIMULATION, MOCK_SIMULATION_EXAMS } from "@/Hooks/useMockInertia";
 import AcademicFilterModal from "@/Components/Modals/Academic/AcademicFilterModal";
@@ -9,6 +9,11 @@ import FilterInfoCard from "@/Components/FilterInfoCard";
 import SimAddStudentModal from "@/Components/Modals/Academic/SimAddStudentModal";
 
 export default function SimulationExamPage({ students, filter, search: backendSearch = "", sort = "", direction = "" }) {
+    // 🧠 FIXED: Pulled auth state to securely control visibility
+    const { auth } = usePage().props;
+    const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
+    const canManageData = !isAcademicAffairs;
+
     const isBackendReady = !!students;
     const mock = useMockInertia(MOCK_STUDENTS_SIMULATION);
 
@@ -152,6 +157,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                     paginationData={paginator} onPageChange={handlePageChange}
                     exportEndpoint={route('simulation-exam.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: examPeriod, simulation: selectedSim })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
@@ -237,9 +243,12 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                         </>
                     }
                     footerActions={
-                        <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">
-                            Manage Records
-                        </button>
+                        // 🧠 FIXED: Protected Manage Records button
+                        canManageData ? (
+                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">
+                                Manage Records
+                            </button>
+                        ) : null
                     }
                 >
                     <thead>
@@ -262,7 +271,14 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                     <tbody className="text-gray-600 text-sm font-medium">
                         {records?.length > 0 ? records.map((student, i) => (
                             <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
-                                <td className="py-3 px-6 sticky left-0 bg-inherit z-10"><Link href={route('simulation.exam.entry', { student_id: student.id, exam_period: examPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all text-center">{student.student_number}</Link></td>
+                                <td className="py-3 px-6 sticky left-0 bg-inherit z-10">
+                                    {/* 🧠 FIXED: Protected ID link */}
+                                    {canManageData ? (
+                                        <Link href={route('simulation.exam.entry', { student_id: student.id, exam_period: examPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all text-center">{student.student_number}</Link>
+                                    ) : (
+                                        <span className="inline-block px-4 py-1.5 rounded-[6px] bg-gray-400 text-white font-bold text-center shadow-sm">{student.student_number}</span>
+                                    )}
+                                </td>
                                 <td className="py-3 px-6 text-gray-800 uppercase font-bold sticky left-[150px] bg-inherit z-10 shadow-md">{student.name}</td>
                                 {visibleSims.map((header, idx) => {
                                     const value = student.results[header];
@@ -281,7 +297,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
 
                 <AcademicFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={handleApplyFilter} />
                 <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Simulation Exam Results" filterData={filter} />
-                <SimAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={{...activeFilters, exam_period: examPeriod}} subjectHeaders={simHeaders} />
+                {canManageData && <SimAddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={{...activeFilters, exam_period: examPeriod}} subjectHeaders={simHeaders} />}
             </div>
         </AuthenticatedLayout>
     );

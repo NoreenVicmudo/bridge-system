@@ -93,6 +93,7 @@ export default function AcademicRecognitionPage({ students, filter, search = "",
                     paginationData={students}
                     exportEndpoint={route('academic.recognition.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all shadow-sm shrink-0">

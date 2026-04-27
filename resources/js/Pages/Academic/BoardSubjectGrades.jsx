@@ -131,6 +131,7 @@ export default function BoardGradesPage({ students, filter, search: backendSearc
                     paginationData={paginator} onPageChange={handlePageChange}
                     exportEndpoint={route('board-grades.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, subject: selectedSubject })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode={filterMode} />}
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             {subjectHeaders.length > 0 && (

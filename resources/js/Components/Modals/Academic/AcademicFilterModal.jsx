@@ -32,6 +32,18 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
         return s[(v - 20) % 10] || s[v] || s[0];
     };
 
+    // 🧠 FIXED: Lock background scrolling when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = "hidden";
+        } else {
+            document.body.style.overflow = "unset";
+        }
+        return () => {
+            document.body.style.overflow = "unset";
+        };
+    }, [isOpen]);
+
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -54,7 +66,7 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
         } else {
             setAnimate(false);
         }
-    }, [isOpen, currentFilters, isCollegeRestricted, isProgramRestricted, user]);
+    }, [isOpen, currentFilters, isCollegeRestricted, isProgramRestricted, user, academicYears.length]);
 
     useEffect(() => {
         if (academicYears.length === 0) return;
@@ -165,16 +177,17 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            <div className={`bg-white rounded-2xl w-[90%] max-w-[700px] shadow-2xl relative flex flex-col transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                <div className="bg-[#5c297c] p-6 text-center relative rounded-t-2xl">
+        // 🧠 FIXED: Increased z-index to 9999
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+            <div className={`bg-white rounded-2xl w-[90%] max-w-[700px] shadow-2xl relative flex flex-col transition-all duration-300 transform overflow-hidden max-h-[90vh] ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+                <div className="bg-[#5c297c] p-6 text-center relative rounded-t-2xl shrink-0">
                     <h2 className="text-2xl font-bold text-white">Filter Students (Academic)</h2>
                     <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
-                <div className="p-8">
+                <div className="p-8 overflow-y-auto flex-1">
                     {loading ? (
                         <div className="text-center py-8">Loading filter options...</div>
                     ) : (
@@ -191,7 +204,6 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
                                 value={values.college}
                                 onChange={(e) => handleChange("college", e.target.value)}
                                 options={collegeOptions}
-                                // 3. LOCK IF RESTRICTED OR A.Y. NOT SELECTED
                                 disabled={!values.academic_year || isCollegeRestricted}
                                 placeholder={!values.academic_year ? "Select Academic Year first" : "Select College"}
                             />
@@ -201,7 +213,6 @@ export default function AcademicFilterModal({ isOpen, onClose, currentFilters, o
                                 value={values.program}
                                 onChange={(e) => handleChange("program", e.target.value)}
                                 options={programOptions}
-                                // 3. LOCK IF RESTRICTED OR COLLEGE NOT SELECTED
                                 disabled={!values.college || isProgramRestricted}
                                 placeholder={!values.college ? "Select College first" : "Select Program"}
                             />

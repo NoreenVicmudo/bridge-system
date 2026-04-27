@@ -163,6 +163,7 @@ export default function StudentMasterlist({ students }) {
                         sort: activeSortColumn,
                         direction: activeSortDirection
                     })}
+                    showEditNote={canManageData} // 🧠 THE FIX: Bind the note to RBAC permissions
                     footerActions={
                         canManageData ? (
                             !isRemoveMode ? (

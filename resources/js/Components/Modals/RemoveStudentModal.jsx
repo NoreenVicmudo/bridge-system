@@ -103,7 +103,8 @@ export default function RemoveStudentModal({
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+        // 🧠 FIXED: Changed z-[1000] to z-[9999] so it renders above the Sidebar (which is z-1005)
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
                 .modal-scroll-area::-webkit-scrollbar { width: 6px; }
                 .modal-scroll-area::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 10px; }

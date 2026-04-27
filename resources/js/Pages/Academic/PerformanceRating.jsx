@@ -128,6 +128,7 @@ export default function PerformanceRatingPage({ students, filter, search: backen
                     paginationData={paginator} onPageChange={handlePageChange}
                     exportEndpoint={route('performance-rating.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, category: selectedCategory })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             {ratingHeaders.length > 0 && (

@@ -87,6 +87,20 @@ export default function FilterStudentModal({
             .map((p) => ({ value: p.program_id.toString(), label: p.name }));
     }, [values.batch_college, dbPrograms, mode]);
 
+    // 🧠 FIXED: Lock background scrolling when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = "hidden"; // Prevent body scroll
+        } else {
+            document.body.style.overflow = "unset"; // Restore body scroll
+        }
+
+        // Cleanup function to ensure scroll is restored if component unmounts
+        return () => {
+            document.body.style.overflow = "unset";
+        };
+    }, [isOpen]);
+
     useEffect(() => {
         if (!isOpen) {
             setAnimate(false);
@@ -167,7 +181,7 @@ export default function FilterStudentModal({
                     </button>
                 </div>
 
-                <div className="p-6 flex flex-col gap-1">
+                <div className="p-6 flex flex-col gap-1 max-h-[70vh] overflow-y-auto">
                     {mode === "section" && allowSection && (
                         <div key={modalKey} className="flex flex-col animate-fade-in relative z-20">
                             <CustomSelectGroup
@@ -257,7 +271,7 @@ export default function FilterStudentModal({
                     )}
                 </div>
 
-                <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl relative z-10">
+                <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl relative z-10 shrink-0">
                     <button onClick={closeModal} className="px-5 py-2 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all">Cancel</button>
                     <button
                         onClick={() => {

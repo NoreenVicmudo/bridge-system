@@ -35,9 +35,15 @@ export default function ChangeMetricModal({
         if (isOpen) {
             setAnimate(true);
             setSelectedMetric(currentMetric || "");
+            document.body.style.overflow = "hidden"; // 🧠 FIXED: Lock background scroll
         } else {
             setAnimate(false);
+            document.body.style.overflow = "unset"; // 🧠 FIXED: Restore background scroll
         }
+
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [isOpen, currentMetric]);
 
     const closeModal = () => {
@@ -65,7 +71,8 @@ export default function ChangeMetricModal({
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+        // 🧠 FIXED: Increased z-index to 9999 to guarantee it covers the Sidebar
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
                 .metric-modal-scroll ul::-webkit-scrollbar { width: 6px; }
                 .metric-modal-scroll ul::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; }

@@ -51,7 +51,7 @@ export default function UpdateGWAPage({ student, gwaRecords = [] }) {
                         className="flex items-center gap-2 px-5 py-2.5 bg-white text-gray-600 border border-gray-300 rounded-[6px] hover:bg-gray-50 hover:text-[#5c297c] hover:border-[#5c297c] transition-all duration-300 text-sm font-bold shadow-sm group"
                     >
                         <i className="bi bi-arrow-left transition-transform group-hover:-translate-x-1"></i> 
-                        Back to List
+                        Back
                     </button>
                 </div>
 

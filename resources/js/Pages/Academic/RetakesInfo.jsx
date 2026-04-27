@@ -106,6 +106,7 @@ export default function RetakesInfo({ students, subjects = [], filter, search = 
                     paginationData={students}
                     exportEndpoint={route('retakes.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, subject: selectedSubject })} 
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             {subjects.length > 0 && (

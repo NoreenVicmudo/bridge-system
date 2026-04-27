@@ -150,6 +150,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
                     onPageChange={handlePageChange}
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     exportEndpoint={route('students.export', { 
                         ...activeFilters, 
                         search: currentSearch,
@@ -189,7 +190,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                             <SortableHeader label="Program" sortKey="program" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
                             <SortableHeader label="Age" sortKey="age" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
                             <SortableHeader label="Sex" sortKey="sex" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} className="text-center" />
-                            <SortableHeader label="Socioeconomic" sortKey="socioeconomic" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
+                            <SortableHeader label="Socioeconomic Status" sortKey="socioeconomic" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
                             <th className="py-3 px-6 font-bold">Address</th>
                             <th className="py-3 px-6 font-bold">Living</th>
                             <th className="py-3 px-6 font-bold">Work Status</th>

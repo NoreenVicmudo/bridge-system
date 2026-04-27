@@ -25,6 +25,20 @@ export default function FilterTransactionModal({
         action: "ALL",
     });
 
+    // 🧠 FIXED: Lock background scrolling when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = "hidden"; // Prevent body scroll
+        } else {
+            document.body.style.overflow = "unset"; // Restore body scroll
+        }
+
+        // Cleanup function to ensure scroll is restored if component unmounts
+        return () => {
+            document.body.style.overflow = "unset";
+        };
+    }, [isOpen]);
+
     // Reset local state when modal opens, applying strict user fallbacks
     useEffect(() => {
         if (isOpen) {
