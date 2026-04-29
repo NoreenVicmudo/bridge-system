@@ -54,7 +54,7 @@ Route::middleware(['auth', 'verified', 'prevent-back-history'])->group(function 
     // ==========================================
     // 🔴 TIER 1: SYSTEM ADMINISTRATORS ONLY
     // ==========================================
-    Route::middleware(['role:Super Admin'])->group(function () {
+    Route::middleware(['role:Super Admin,Admin,Academic Affairs'])->group(function () {
         // --- USER MANAGEMENT ---
         Route::prefix('users')->group(function () {
             Route::get('/', [UserController::class, 'index'])->name('users.index');
