@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react"; // 🧠 FIXED: Added useRef
 import { router } from "@inertiajs/react";
 import axios from "axios";
-import { toast } from "react-toastify"; // 🧠 NEW: Imported toastify
+import { toast } from "react-toastify"; 
 
 export default function SimAddStudentModal({ isOpen, onClose, currentFilter, subjectHeaders = [], onImportSuccess }) {
     const [view, setView] = useState("options");
@@ -11,6 +11,9 @@ export default function SimAddStudentModal({ isOpen, onClose, currentFilter, sub
     const [importFile, setImportFile] = useState(null);
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
+
+    // 🧠 FIXED: Added ref for the file input
+    const fileInputRef = useRef(null); 
 
     // 🧠 FIXED: Added background scrolling lock
     useEffect(() => {
@@ -45,7 +48,7 @@ export default function SimAddStudentModal({ isOpen, onClose, currentFilter, sub
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch {
             setCheckStatus("error");
-            toast.error("Failed to communicate with server."); // 🧠 Added toast
+            toast.error("Failed to communicate with server."); 
         }
     };
 
@@ -55,7 +58,19 @@ export default function SimAddStudentModal({ isOpen, onClose, currentFilter, sub
             router.get(route('simulation.exam.entry'), { student_id: res.data.id });
             closeModal();
         } catch {
-            toast.error("Student not found."); // 🧠 FIXED: Replaced alert with toast
+            toast.error("Student not found."); 
+        }
+    };
+
+    // 🧠 FIXED: Handle File Input correctly so the same file can be selected again
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImportFile(file);
+        }
+        // Force the browser to forget this file selection so it can trigger onChange again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
         }
     };
 
@@ -74,17 +89,17 @@ export default function SimAddStudentModal({ isOpen, onClose, currentFilter, sub
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {
-                toast.success(response.data.message); // 🧠 FIXED: Replaced alert with toast
+                toast.success(response.data.message); 
                 if (onImportSuccess) onImportSuccess();
                 closeModal();
                 router.reload({ only: ['students'] });
             } else {
-                toast.error(response.data.message); // 🧠 Added internal error toast
+                toast.error(response.data.message); 
                 setImportError(response.data.message);
             }
         } catch (err) {
             const errorMsg = err.response?.data?.message || 'Import failed. Please check the file format.';
-            toast.error(errorMsg); // 🧠 FIXED: Replaced alert with toast
+            toast.error(errorMsg); 
             setImportError(errorMsg);
         } finally {
             setImportProcessing(false);
@@ -141,7 +156,8 @@ export default function SimAddStudentModal({ isOpen, onClose, currentFilter, sub
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    onChange={(e) => setImportFile(e.target.files[0])}
+                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
+                                    onChange={handleFileChange} // 🧠 FIXED: Uses handleFileChange
                                     className="hidden" 
                                     required 
                                 />
@@ -172,7 +188,12 @@ export default function SimAddStudentModal({ isOpen, onClose, currentFilter, sub
 
                             <button 
                                 type="button" 
-                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); }} 
+                                onClick={() => { 
+                                    setView("options"); 
+                                    setImportFile(null); 
+                                    setImportError(null); 
+                                    if (fileInputRef.current) fileInputRef.current.value = ""; // 🧠 FIXED: Clear ref
+                                }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >
                                 ← Back to Options

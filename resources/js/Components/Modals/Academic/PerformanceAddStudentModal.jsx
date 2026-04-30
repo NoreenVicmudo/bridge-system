@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react"; // 🧠 FIXED: Added useRef
 import { router } from "@inertiajs/react";
 import axios from "axios";
-import { toast } from "react-toastify"; // 🧠 NEW: Imported toastify
+import { toast } from "react-toastify"; 
 
 export default function PerformanceAddStudentModal({ isOpen, onClose, currentFilter, subjectHeaders = [], onImportSuccess }) {
     const [view, setView] = useState("options");
@@ -11,6 +11,9 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
     const [importFile, setImportFile] = useState(null);
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
+
+    // 🧠 FIXED: Added ref for the file input
+    const fileInputRef = useRef(null); 
 
     // 🧠 FIXED: Added background scrolling lock
     useEffect(() => {
@@ -45,7 +48,7 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch {
             setCheckStatus("error");
-            toast.error("Failed to communicate with server."); // 🧠 Added toast
+            toast.error("Failed to communicate with server."); 
         }
     };
 
@@ -55,7 +58,19 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
             router.get(route('performance.rating.entry'), { student_id: res.data.id });
             closeModal();
         } catch {
-            toast.error("Student not found."); // 🧠 FIXED: Replaced alert with toast
+            toast.error("Student not found."); 
+        }
+    };
+
+    // 🧠 FIXED: Handle File Input correctly so the same file can be selected again
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImportFile(file);
+        }
+        // Force the browser to forget this file selection so it can trigger onChange again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
         }
     };
 
@@ -74,17 +89,17 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {
-                toast.success(response.data.message); // 🧠 FIXED: Replaced alert with toast
+                toast.success(response.data.message); 
                 if (onImportSuccess) onImportSuccess();
                 closeModal();
                 router.reload({ only: ['students'] });
             } else {
-                toast.error(response.data.message); // 🧠 Added internal error toast
+                toast.error(response.data.message); 
                 setImportError(response.data.message);
             }
         } catch (err) {
             const errorMsg = err.response?.data?.message || 'Import failed. Please check the file format.';
-            toast.error(errorMsg); // 🧠 FIXED: Replaced alert with toast
+            toast.error(errorMsg); 
             setImportError(errorMsg);
         } finally {
             setImportProcessing(false);
@@ -94,11 +109,9 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
     if (!isOpen) return null;
 
     return (
-        // 🧠 FIXED: Increased z-index to z-[9999]
         <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 p-4 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-full max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
-                {/* Modal Header */}
                 <div className="bg-[#5c297c] p-6 text-center relative text-white shrink-0">
                     <h2 className="text-2xl font-bold tracking-wide">Manage Performance Ratings</h2>
                     <p className="text-purple-200 text-sm mt-1">Import CSV or edit a student's ratings</p>
@@ -108,7 +121,6 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                 </div>
 
                 <div className="p-6 md:p-8 overflow-y-auto max-h-[70vh] flex-1">
-                    {/* View 1: Selection Options */}
                     {view === "options" && (
                         <div className="grid grid-cols-2 gap-4">
                             <button onClick={() => setView("import")} className="flex flex-col items-center justify-center gap-3 p-4 md:p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
@@ -126,7 +138,6 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                         </div>
                     )}
 
-                    {/* View 2: CSV Import */}
                     {view === "import" && (
                         <form onSubmit={handleImportSubmit} className="flex flex-col gap-4 animate-fade-in-up">
                             <div className="text-center mb-1">
@@ -136,12 +147,12 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                                 </p>
                             </div>
 
-                            {/* Drag & Drop Label Design */}
                             <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-8 md:p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    onChange={(e) => setImportFile(e.target.files[0])}
+                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
+                                    onChange={handleFileChange} // 🧠 FIXED: Uses handleFileChange
                                     className="hidden" 
                                     required 
                                 />
@@ -172,7 +183,12 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
 
                             <button 
                                 type="button" 
-                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); }} 
+                                onClick={() => { 
+                                    setView("options"); 
+                                    setImportFile(null); 
+                                    setImportError(null); 
+                                    if (fileInputRef.current) fileInputRef.current.value = ""; // 🧠 FIXED: Clear ref
+                                }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >
                                 ← Back to Options
@@ -180,7 +196,6 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                         </form>
                     )}
 
-                    {/* View 3: Manual Search */}
                     {view === "manual" && (
                         <div className="flex flex-col gap-5 animate-fade-in-up">
                             <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 overflow-hidden">

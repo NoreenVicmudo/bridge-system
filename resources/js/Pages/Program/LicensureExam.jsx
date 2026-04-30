@@ -95,8 +95,15 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
                     title="Licensure Exam Results"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
-                    exportEndpoint={route('licensure.exam.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })}
+                    // 🧠 FIXED: Safely append export variables
+                    exportEndpoint={route('licensure.exam.export', { 
+                        ...filter, 
+                        search: searchQuery || "", 
+                        sort: actualSort || "", 
+                        direction: actualDirection || "" 
+                    })}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />}
+                    showEditNote={canManageData}
                     headerActions={
                         <>
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 shadow-sm"><i className="bi bi-funnel-fill"></i> Filter</button>

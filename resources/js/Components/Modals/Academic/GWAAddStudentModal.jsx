@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react"; // 🧠 FIXED: Added useRef
 import { router } from "@inertiajs/react";
 import axios from "axios";
-import { toast } from "react-toastify"; // 🧠 NEW: Imported toastify
+import { toast } from "react-toastify"; 
 
 export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, maxYears, onImportSuccess }) {
     const [view, setView] = useState("options");
@@ -11,6 +11,9 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
     const [importFile, setImportFile] = useState(null);
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
+
+    // 🧠 FIXED: Added ref for the file input
+    const fileInputRef = useRef(null); 
 
     // 🧠 FIXED: Added background scrolling lock
     useEffect(() => {
@@ -45,7 +48,7 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch {
             setCheckStatus("error");
-            toast.error("Failed to communicate with server."); // 🧠 Added toast
+            toast.error("Failed to communicate with server."); 
         }
     };
 
@@ -55,7 +58,19 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
             router.get(route('gwa.entry'), { student_id: res.data.id });
             closeModal();
         } catch {
-            toast.error("Student not found."); // 🧠 FIXED: Replaced alert with toast
+            toast.error("Student not found."); 
+        }
+    };
+
+    // 🧠 FIXED: Handle File Input correctly so the same file can be selected again after local edits
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImportFile(file);
+        }
+        // Force the browser to forget this file selection so it can trigger onChange again
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
         }
     };
 
@@ -67,7 +82,6 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
 
         const formData = new FormData();
         formData.append('file', importFile);
-        // Ensure filter is sent as a string if your backend expects it that way
         formData.append('filter', JSON.stringify(currentFilter));
         
         try {
@@ -75,16 +89,17 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {
-                toast.success(response.data.message); // 🧠 FIXED: Replaced alert with toast
+                toast.success(response.data.message); 
                 if (onImportSuccess) onImportSuccess();
                 closeModal();
+                router.reload({ only: ['students'] });
             } else {
-                toast.error(response.data.message); // 🧠 Added toast for internal errors
+                toast.error(response.data.message); 
                 setImportError(response.data.message);
             }
         } catch (err) {
             const errorMsg = err.response?.data?.message || 'Import failed. Please check the file format.';
-            toast.error(errorMsg); // 🧠 Added toast
+            toast.error(errorMsg); 
             setImportError(errorMsg);
         } finally {
             setImportProcessing(false);
@@ -94,7 +109,6 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
     if (!isOpen) return null;
 
     return (
-        // 🧠 FIXED: Increased z-index to z-[9999]
         <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 p-4 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-full max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
@@ -141,7 +155,8 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    onChange={(e) => setImportFile(e.target.files[0])}
+                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
+                                    onChange={handleFileChange} // 🧠 FIXED: Uses handleFileChange
                                     className="hidden" 
                                     required 
                                 />
@@ -172,7 +187,12 @@ export default function GWAAddStudentModal({ isOpen, onClose, currentFilter, max
 
                             <button 
                                 type="button" 
-                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); }} 
+                                onClick={() => { 
+                                    setView("options"); 
+                                    setImportFile(null); 
+                                    setImportError(null); 
+                                    if (fileInputRef.current) fileInputRef.current.value = ""; // 🧠 FIXED: Clear ref
+                                }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >
                                 ← Back to Options

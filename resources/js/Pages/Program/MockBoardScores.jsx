@@ -133,6 +133,7 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                     paginationData={students?.data} 
                     exportEndpoint={route('mock-scores.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: currentExamPeriod, subject: selectedSubject })}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />} 
+                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
@@ -214,6 +215,7 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                         </>
                     }
                     footerActions={
+                        // 🧠 FIXED: Protected Manage Records button with RBAC
                         canManageData ? (
                             <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm">Manage Scores</button>
                         ) : null
@@ -241,6 +243,7 @@ export default function MockExamScoresPage({ students, filter, search = "", sort
                         {records.map((student, i) => (
                             <tr key={student.batch_id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 <td className="py-3 px-6 sticky left-0 z-10 bg-inherit">
+                                    {/* 🧠 FIXED: Protected Link with RBAC */}
                                     {canManageData ? (
                                         <Link href={route('mock.scores.entry', { batch_id: student.batch_id, exam_period: currentExamPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold text-center hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all">{student.student_number}</Link>
                                     ) : (

@@ -28,6 +28,20 @@ export default function ProgramFilterModal({
     const [loading, setLoading] = useState(true);
     const [animate, setAnimate] = useState(false);
 
+    // 🧠 FIXED: Added background scrolling lock
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = "hidden"; // Prevent body scroll
+        } else {
+            document.body.style.overflow = "unset"; // Restore body scroll
+        }
+
+        // Cleanup
+        return () => {
+            document.body.style.overflow = "unset";
+        };
+    }, [isOpen]);
+
     // --- 1. FETCH DATABASE COMBINATIONS & SET INITIAL VALUES ---
     useEffect(() => {
         if (isOpen) {
@@ -155,16 +169,17 @@ export default function ProgramFilterModal({
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+        // 🧠 FIXED: Increased z-index to 9999
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-[90%] max-w-[700px] shadow-2xl relative flex flex-col transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                <div className="bg-[#5c297c] p-6 text-center relative rounded-t-2xl">
+                <div className="bg-[#5c297c] p-6 text-center relative rounded-t-2xl shrink-0">
                     <h2 className="text-2xl font-bold text-white">Filter Students (Program Batch)</h2>
                     <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors">
                         <i className="bi bi-x-lg text-xl"></i>
                     </button>
                 </div>
 
-                <div className="p-8">
+                <div className="p-8 overflow-y-auto max-h-[80vh] flex-1">
                     {loading ? (
                         <div className="text-center py-8 font-medium text-[#5c297c]">Loading batch data...</div>
                     ) : (

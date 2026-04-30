@@ -38,7 +38,17 @@ export default function RemoveStudentModal({
                 initMulti[s.id] = { reason: "", otherReason: "" };
             });
             setMultiReasons(initMulti);
+            
+            // 🧠 FIXED: Added background scrolling lock
+            document.body.style.overflow = "hidden"; 
+        } else {
+            document.body.style.overflow = "unset"; 
         }
+
+        // Cleanup
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [isOpen, selectedStudents]);
 
     const closeModal = () => {

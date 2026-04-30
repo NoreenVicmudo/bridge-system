@@ -36,7 +36,17 @@ export default function RemoveUserModal({
                 initMulti[user.id] = { reason: "", otherReason: "" };
             });
             setMultiReasons(initMulti);
+            
+            // 🧠 FIXED: Added background scrolling lock
+            document.body.style.overflow = "hidden"; 
+        } else {
+            document.body.style.overflow = "unset"; 
         }
+
+        // Cleanup
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [isOpen, selectedUsers]);
 
     const closeModal = () => {
@@ -88,7 +98,8 @@ export default function RemoveUserModal({
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+        // 🧠 FIXED: Changed z-[1000] to z-[9999] so it renders above the Sidebar (which is z-1005)
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
                 .modal-scroll-area::-webkit-scrollbar { width: 6px; }
                 .modal-scroll-area::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 10px; }
@@ -170,7 +181,7 @@ export default function RemoveUserModal({
                                 {selectedUsers.map((user, index) => (
                                     <div 
                                         key={user.id} 
-                                        // CRITICAL: Reverse Z-index so top items overlap bottom items
+                                        // 🧠 CRITICAL: Reverse Z-index so top items overlap bottom items
                                         style={{ zIndex: selectedUsers.length - index + 10 }} 
                                         className="flex flex-col p-4 border border-gray-200 rounded-lg bg-white transition-all relative"
                                     >

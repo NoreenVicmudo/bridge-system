@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
+import { toast } from "react-toastify";
 
 export default function MockAddStudentModal({ isOpen, onClose, currentFilter, subjectHeaders = [], onImportSuccess }) {
     const [view, setView] = useState("options");
@@ -11,6 +12,8 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
 
+    const fileInputRef = useRef(null); 
+
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -19,7 +22,14 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
             setCheckStatus("idle");
             setImportFile(null);
             setImportError(null);
+            document.body.style.overflow = "hidden"; 
+        } else {
+            document.body.style.overflow = "unset"; 
         }
+
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [isOpen]);
 
     const closeModal = () => {
@@ -27,7 +37,6 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
         setTimeout(onClose, 300);
     };
 
-    // Checks if the student exists in the masterlist
     const handleCheckStudent = async () => {
         if (!studentNumber.trim()) return;
         setCheckStatus("loading");
@@ -36,17 +45,27 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch {
             setCheckStatus("error");
+            toast.error("Failed to communicate with server."); 
         }
     };
 
     const handleProceedToEdit = () => {
-        // Pass the student_number AND the active batch filters to the entry route
         router.get(route('mock.scores.entry'), { 
             student_number: studentNumber,
             calendar_year: currentFilter.calendar_year,
             batch_number: currentFilter.batch_number
         });
         closeModal();
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImportFile(file);
+        }
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     };
 
     const handleImportSubmit = async (e) => {
@@ -64,15 +83,18 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {
-                alert(response.data.message);
+                toast.success(response.data.message); 
                 if (onImportSuccess) onImportSuccess();
                 closeModal();
                 router.reload({ only: ['students'] });
             } else {
+                toast.error(response.data.message); 
                 setImportError(response.data.message);
             }
         } catch (err) {
-            setImportError(err.response?.data?.message || 'Import failed. Please check the file format.');
+            const errorMsg = err.response?.data?.message || 'Import failed. Please check the file format.';
+            toast.error(errorMsg); 
+            setImportError(errorMsg);
         } finally {
             setImportProcessing(false);
         }
@@ -81,9 +103,9 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                <div className="bg-[#5c297c] p-6 text-center relative">
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 p-4 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+            <div className={`bg-white rounded-2xl w-full max-w-[500px] p-0 shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+                <div className="bg-[#5c297c] p-6 text-center relative shrink-0">
                     <h2 className="text-2xl font-bold text-white tracking-wide">Manage Mock Board Scores</h2>
                     <p className="text-purple-200 text-sm mt-1">Import CSV or edit a student's scores</p>
                     <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 rounded-full p-1 transition-all">
@@ -91,7 +113,7 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
                     </button>
                 </div>
 
-                <div className="p-8">
+                <div className="p-6 md:p-8 overflow-y-auto max-h-[70vh] flex-1">
                     {view === "options" && (
                         <div className="grid grid-cols-2 gap-4">
                             <button onClick={() => setView("import")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
@@ -118,12 +140,12 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
                                 </p>
                             </div>
 
-                            {/* Drag & Drop Label Design */}
                             <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    onChange={(e) => setImportFile(e.target.files[0])}
+                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
+                                    onChange={handleFileChange}
                                     className="hidden" 
                                     required 
                                 />
@@ -154,7 +176,7 @@ export default function MockAddStudentModal({ isOpen, onClose, currentFilter, su
 
                             <button 
                                 type="button" 
-                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); }} 
+                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >
                                 ← Back to Options

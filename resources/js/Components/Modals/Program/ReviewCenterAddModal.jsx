@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
+import { toast } from "react-toastify"; // 🧠 NEW: Imported toastify
 
 export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, onImportSuccess }) {
     const [view, setView] = useState("options");
@@ -10,7 +11,9 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
     const [importFile, setImportFile] = useState(null);
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
+    const fileInputRef = useRef(null); // 🧠 FIXED: Added ref for the file input
 
+    // 🧠 FIXED: Added background scrolling lock
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -19,7 +22,15 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
             setCheckStatus("idle");
             setImportFile(null);
             setImportError(null);
+            document.body.style.overflow = "hidden"; // Prevent body scroll
+        } else {
+            document.body.style.overflow = "unset"; // Restore body scroll
         }
+
+        // Cleanup
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [isOpen]);
 
     const closeModal = () => {
@@ -36,6 +47,7 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch {
             setCheckStatus("error");
+            toast.error("Failed to communicate with server."); // 🧠 Added toast
         }
     };
 
@@ -46,6 +58,17 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
             ...currentFilter
         });
         closeModal();
+    };
+
+    // 🧠 FIXED: Handle File Input correctly
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImportFile(file);
+        }
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
     };
 
     const handleImportSubmit = async (e) => {
@@ -63,13 +86,18 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {
-                alert(response.data.message);
+                toast.success(response.data.message); // 🧠 FIXED: Replaced alert with toast
                 if (onImportSuccess) onImportSuccess();
                 closeModal();
                 router.reload();
+            } else {
+                toast.error(response.data.message); // 🧠 Added internal error toast
+                setImportError(response.data.message);
             }
         } catch (err) {
-            setImportError(err.response?.data?.message || 'Import failed.');
+            const errorMsg = err.response?.data?.message || 'Import failed.';
+            toast.error(errorMsg); // 🧠 FIXED: Replaced alert with toast
+            setImportError(errorMsg);
         } finally {
             setImportProcessing(false);
         }
@@ -78,11 +106,12 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            <div className={`bg-white rounded-2xl w-[90%] max-w-[500px] shadow-2xl relative overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+        // 🧠 FIXED: Increased z-index to z-[9999]
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 p-4 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
+            <div className={`bg-white rounded-2xl w-full max-w-[500px] shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
                 {/* Modal Header */}
-                <div className="bg-[#5c297c] p-6 text-center text-white relative">
+                <div className="bg-[#5c297c] p-6 text-center text-white relative shrink-0">
                     <h2 className="text-2xl font-bold tracking-wide">Manage Review Centers</h2>
                     <p className="text-purple-200 text-sm mt-1">Import CSV or edit a student's review center</p>
                     <button onClick={closeModal} className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 rounded-full p-1 transition-all">
@@ -90,21 +119,21 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                     </button>
                 </div>
 
-                <div className="p-8">
+                <div className="p-6 md:p-8 overflow-y-auto max-h-[70vh] flex-1">
                     {/* View 1: Selection Options */}
                     {view === "options" && (
                         <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => setView("import")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
+                            <button onClick={() => setView("import")} className="flex flex-col items-center justify-center gap-3 p-4 md:p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-file-earmark-excel text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
                                 </div>
-                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Import CSV</span>
+                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c] text-center">Import CSV</span>
                             </button>
-                            <button onClick={() => setView("manual")} className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
+                            <button onClick={() => setView("manual")} className="flex flex-col items-center justify-center gap-3 p-4 md:p-6 border-2 border-gray-100 rounded-xl hover:border-[#5c297c] hover:bg-purple-50 group transition-all duration-300">
                                 <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-[#5c297c] transition-colors">
                                     <i className="bi bi-pencil-square text-2xl text-[#5c297c] group-hover:text-white transition-colors"></i>
                                 </div>
-                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c]">Find Student</span>
+                                <span className="text-gray-700 font-bold group-hover:text-[#5c297c] text-center">Find Student</span>
                             </button>
                         </div>
                     )}
@@ -120,15 +149,16 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                             </div>
 
                             {/* Drag & Drop Label Design */}
-                            <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
+                            <label className="border-2 border-dashed border-[#5c297c]/30 rounded-xl p-8 md:p-10 text-center bg-gray-50 hover:bg-[#5c297c]/5 transition-colors cursor-pointer group relative block">
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    onChange={(e) => setImportFile(e.target.files[0])}
+                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
+                                    onChange={handleFileChange} // 🧠 FIXED: Uses new handler
                                     className="hidden" 
                                     required 
                                 />
-                                <i className="bi bi-cloud-arrow-up text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
+                                <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 
                                 {importFile ? (
                                     <p className="text-[#5c297c] font-bold truncate px-4">{importFile.name}</p>
@@ -155,7 +185,12 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
 
                             <button 
                                 type="button" 
-                                onClick={() => { setView("options"); setImportFile(null); setImportError(null); }} 
+                                onClick={() => {
+                                    setView("options"); 
+                                    setImportFile(null); 
+                                    setImportError(null); 
+                                    if (fileInputRef.current) fileInputRef.current.value = ""; // 🧠 FIXED: Clear ref
+                                }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >
                                 ← Back to Options
@@ -166,21 +201,21 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                     {/* View 3: Manual Search */}
                     {view === "manual" && (
                         <div className="flex flex-col gap-5 animate-fade-in-up">
-                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 overflow-hidden">
                                 <label className="block text-sm font-bold text-[#5c297c] mb-2">Search Student ID</label>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 w-full">
                                     <input 
                                         type="text" 
                                         value={studentNumber} 
                                         onChange={(e) => setStudentNumber(e.target.value)} 
                                         onKeyDown={(e) => e.key === 'Enter' && handleCheckStudent()} 
                                         placeholder="e.g. 2025-0001" 
-                                        className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5c297c] outline-none transition-all" 
+                                        className="flex-1 w-full min-w-0 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5c297c] outline-none transition-all text-sm md:text-base" 
                                     />
                                     <button 
                                         onClick={handleCheckStudent} 
                                         disabled={!studentNumber.trim() || checkStatus === "loading"} 
-                                        className="px-6 py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] shadow-md transition-all disabled:opacity-60"
+                                        className="shrink-0 px-4 md:px-6 py-2.5 bg-[#5c297c] text-white font-bold rounded-lg hover:bg-[#4a1f63] shadow-md transition-all disabled:opacity-60 text-sm md:text-base"
                                     >
                                         {checkStatus === "loading" ? "..." : "Check"}
                                     </button>
@@ -189,9 +224,9 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
 
                             {checkStatus === "exists" && (
                                 <div className="flex flex-col gap-3 items-center animate-fade-in">
-                                    <div className="flex items-center gap-2 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100">
-                                        <i className="bi bi-info-circle-fill text-xl"></i>
-                                        <span className="text-sm font-medium">Student found! Proceed to update center.</span>
+                                    <div className="flex items-start md:items-center gap-3 p-3 bg-blue-50 text-blue-700 w-full justify-center rounded-lg border border-blue-100 text-sm">
+                                        <i className="bi bi-info-circle-fill text-lg mt-0.5 md:mt-0"></i>
+                                        <span className="font-medium leading-tight">Student found! Proceed to update center.</span>
                                     </div>
                                     <button 
                                         onClick={handleProceedToEdit} 
@@ -203,9 +238,15 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                             )}
 
                             {checkStatus === "not_exists" && (
-                                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 w-full justify-center rounded-lg border border-red-100 animate-fade-in">
+                                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 w-full justify-center rounded-lg border border-red-100 animate-fade-in text-sm">
                                     <i className="bi bi-exclamation-triangle-fill text-xl"></i>
-                                    <span className="text-sm font-medium">Student not found in masterlist.</span>
+                                    <span className="font-medium">Student not found in masterlist.</span>
+                                </div>
+                            )}
+
+                            {checkStatus === "error" && (
+                                <div className="p-3 bg-red-50 text-red-700 w-full text-center rounded-lg border border-red-100 text-sm font-medium">
+                                    Error communicating with server.
                                 </div>
                             )}
 

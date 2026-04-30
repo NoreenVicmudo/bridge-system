@@ -14,6 +14,7 @@ export default function UpdateUserForm({
     const labelClass = "block mb-0.5 font-bold text-sm text-[#5c297c]";
     const selectGroupOverride = "!flex-col !items-start !gap-0.5 mb-0 w-full !whitespace-nowrap";
     const selectLabelOverride = "!w-full !text-left !font-bold !text-[#5c297c] !mb-0 !whitespace-nowrap";
+    const errorClass = "text-[#ed1c24] text-[11px] font-bold mt-1";
 
     const positionOptions = [
         { value: "Super Admin", label: "Super Admin" },
@@ -75,86 +76,129 @@ export default function UpdateUserForm({
         if (isFormValid) setIsModalOpen(true);
     };
 
-    const handleBack = () => {
-        router.get(route('users.index')); 
-    };
-
     return (
-        <div className="flex justify-center w-full px-4 py-0 h-[calc(100vh-100px)] items-start overflow-hidden font-montserrat text-left text-[#5c297c]">
-            <div className="w-full max-w-2xl bg-white rounded-[10px] shadow-[0_6px_25px_rgba(0,0,0,0.1)] px-6 py-4 md:px-8 md:py-5 flex flex-col max-h-full my-2 relative">
-                <h2 className="text-center text-xl md:text-2xl font-bold mb-3 flex-shrink-0">User Information Overview</h2>
-                <div className="overflow-y-auto overflow-x-hidden pr-2 flex-1 custom-form-scrollbar">
-                    <style>{`.custom-form-scrollbar::-webkit-scrollbar { width: 4px; } .custom-form-scrollbar::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; } input:focus { box-shadow: 0 0 0 1px #ffb736 !important; border-color: #ffb736 !important; }`}</style>
-                    <form onSubmit={openConfirmModal} className="flex flex-col gap-3 p-1">
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="w-full"><label className={labelClass}>Username:</label><TextInput value={user?.user_username || ""} className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500 font-bold`} readOnly={true} /></div>
-                            <div className="w-full"><label className={labelClass}>Email:</label><TextInput value={user?.user_email || ""} className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500 font-bold`} readOnly={true} /></div>
-                        </div>
-                        <div className="border-t border-gray-100 pt-3 space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="w-full"><label className={labelClass}>Current College:</label><TextInput value={user?.college_name || "N/A"} className={`${inputClass} bg-gray-50 border-gray-200 uppercase`} readOnly={true} /></div>
-                                <div className="w-full"><label className={labelClass}>Current Position:</label><TextInput value={user?.position_name || "N/A"} className={`${inputClass} bg-gray-50 border-gray-200 uppercase`} readOnly={true} /></div>
-                            </div>
-                            {user?.program_name && (
-                                <div className="w-full"><label className={labelClass}>Current Program:</label><TextInput value={user?.program_name} className={`${inputClass} bg-gray-50 border-gray-200 uppercase`} readOnly={true} /></div>
-                            )}
-                        </div>
-
-                        <div className="border-t border-gray-100 pt-4 bg-purple-50/30 p-3 rounded-lg mt-2">
-                            <h3 className="text-[11px] font-bold mb-3 uppercase tracking-widest opacity-70">Update User Information</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                                <div className="w-full"><label className={labelClass}>First Name:</label><TextInput type="text" value={data.fname} onChange={(e) => setData("fname", e.target.value)} className={inputClass} required /></div>
-                                <div className="w-full"><label className={labelClass}>Last Name:</label><TextInput type="text" value={data.lname} onChange={(e) => setData("lname", e.target.value)} className={inputClass} required /></div>
-                            </div>
-                            <div className="space-y-3">
-                                <CustomSelectGroup
-                                    label="Position:" value={data.position}
-                                    onChange={handlePositionChange}
-                                    options={positionOptions} placeholder="Select Position" vertical={true} className={selectGroupOverride} labelClassName={selectLabelOverride}
-                                />
-                                
-                                {needsCollege && (
-                                    <div className="animate-fade-in-up">
-                                        <CustomSelectGroup
-                                            label="College:" value={data.college_id}
-                                            onChange={handleCollegeChange}
-                                            options={normalizedCollegeOptions} /* 🧠 Using normalized options */
-                                            placeholder="Select College" vertical={true} className={selectGroupOverride} labelClassName={selectLabelOverride}
-                                        />
-                                    </div>
-                                )}
-
-                                {needsProgram && (
-                                    <div className="animate-fade-in-up">
-                                        <CustomSelectGroup
-                                            label="Program:" value={data.program_id}
-                                            onChange={(e) => setData("program_id", e.target.value)}
-                                            options={filteredPrograms}
-                                            disabled={!data.college_id}
-                                            placeholder={!data.college_id ? "Select College First" : "Select Program"}
-                                            vertical={true} className={selectGroupOverride} labelClassName={selectLabelOverride}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                            <p className="text-[#ed1c24] text-xs font-bold italic mt-4 bg-red-50 p-2 rounded border border-red-100">
-                                <i className="bi bi-exclamation-triangle-fill mr-1"></i> WARNING: Editing user data will affect their access.
-                            </p>
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-4 mb-2 flex-shrink-0">
-                            <button type="button" onClick={handleBack} className="px-6 py-2.5 text-sm font-bold text-[#666] bg-white border border-[#ddd] rounded-[6px] hover:bg-[#ffb736] hover:text-white transition-all duration-300 shadow-sm font-montserrat">
-                                Back
-                            </button>
-                            <button type="submit" disabled={processing || !isFormValid} className={`px-6 py-2.5 text-sm font-bold text-white rounded-[6px] transition-all duration-300 shadow-md flex items-center gap-2 ${!isFormValid ? "bg-gray-400 cursor-not-allowed opacity-70" : "bg-[#5c297c] hover:bg-[#ffb736] cursor-pointer"}`}>
-                                {processing ? <><div className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Saving...</> : "Update User"}
-                            </button>
-                        </div>
-                    </form>
+        // 🧠 FIXED: Stripped outer wrappers. Just returns the form structure.
+        <div className="w-full font-montserrat text-left text-[#5c297c]">
+            <form onSubmit={openConfirmModal} className="flex flex-col gap-4">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                    <div className="w-full">
+                        <label className={labelClass}>Username:</label>
+                        <TextInput value={user?.user_username || ""} className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500 font-bold`} readOnly={true} />
+                    </div>
+                    <div className="w-full">
+                        <label className={labelClass}>Email:</label>
+                        <TextInput value={user?.user_email || ""} className={`${inputClass} bg-gray-100 cursor-not-allowed text-gray-500 font-bold`} readOnly={true} />
+                    </div>
                 </div>
-                <ConfirmSaveModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onConfirm={submit} message={<>Are you sure you want to update the information and access level for <br /><strong>{user?.user_username}</strong>?</>} />
-            </div>
+                
+                <div className="border-t border-gray-100 pt-3 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="w-full">
+                            <label className={labelClass}>Current College:</label>
+                            <TextInput value={user?.college_name || "N/A"} className={`${inputClass} bg-gray-50 border-gray-200 uppercase`} readOnly={true} />
+                        </div>
+                        <div className="w-full">
+                            <label className={labelClass}>Current Position:</label>
+                            <TextInput value={user?.position_name || "N/A"} className={`${inputClass} bg-gray-50 border-gray-200 uppercase`} readOnly={true} />
+                        </div>
+                    </div>
+                    {user?.program_name && (
+                        <div className="w-full">
+                            <label className={labelClass}>Current Program:</label>
+                            <TextInput value={user?.program_name} className={`${inputClass} bg-gray-50 border-gray-200 uppercase`} readOnly={true} />
+                        </div>
+                    )}
+                </div>
+
+                <div className="border-t border-gray-100 pt-4 bg-purple-50/30 p-4 rounded-lg mt-2">
+                    <h3 className="text-[11px] font-bold mb-4 uppercase tracking-widest opacity-70">Update User Information</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        <div className="w-full">
+                            <label className={labelClass}>First Name:</label>
+                            <TextInput type="text" value={data.fname} onChange={(e) => setData("fname", e.target.value)} className={inputClass} required />
+                        </div>
+                        <div className="w-full">
+                            <label className={labelClass}>Last Name:</label>
+                            <TextInput type="text" value={data.lname} onChange={(e) => setData("lname", e.target.value)} className={inputClass} required />
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-4 border-t border-purple-100/50 pt-4">
+                        <CustomSelectGroup
+                            label="Position:" 
+                            value={data.position}
+                            onChange={handlePositionChange}
+                            options={positionOptions} 
+                            placeholder="Select Position" 
+                            vertical={true} 
+                            className={selectGroupOverride} 
+                            labelClassName={selectLabelOverride}
+                        />
+                        
+                        {needsCollege && (
+                            <div className="animate-fade-in-up">
+                                <CustomSelectGroup
+                                    label="College:" 
+                                    value={data.college_id}
+                                    onChange={handleCollegeChange}
+                                    options={normalizedCollegeOptions}
+                                    placeholder="Select College" 
+                                    vertical={true} 
+                                    className={selectGroupOverride} 
+                                    labelClassName={selectLabelOverride}
+                                />
+                            </div>
+                        )}
+
+                        {needsProgram && (
+                            <div className="animate-fade-in-up">
+                                <CustomSelectGroup
+                                    label="Program:" 
+                                    value={data.program_id}
+                                    onChange={(e) => setData("program_id", e.target.value)}
+                                    options={filteredPrograms}
+                                    disabled={!data.college_id}
+                                    placeholder={!data.college_id ? "Select College First" : "Select Program"}
+                                    vertical={true} 
+                                    className={selectGroupOverride} 
+                                    labelClassName={selectLabelOverride}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    
+                    <p className="text-[#ed1c24] text-xs font-bold italic mt-5 bg-red-50 p-2.5 rounded border border-red-100 flex items-center gap-2">
+                        <i className="bi bi-exclamation-triangle-fill text-sm"></i> 
+                        WARNING: Editing user data will affect their access.
+                    </p>
+                </div>
+
+                <div className="flex justify-end mt-4">
+                    <button 
+                        type="submit" 
+                        disabled={processing || !isFormValid} 
+                        className={`px-10 py-3 text-sm font-bold text-white rounded-[6px] transition-all duration-300 shadow-md flex items-center justify-center gap-2 ${!isFormValid ? "bg-gray-400 cursor-not-allowed opacity-70" : "bg-[#5c297c] hover:bg-[#ffb736] cursor-pointer"}`}
+                    >
+                        {processing ? (
+                            <>
+                                <div className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> 
+                                Saving...
+                            </>
+                        ) : (
+                            "Update User"
+                        )}
+                    </button>
+                </div>
+            </form>
+
+            <ConfirmSaveModal 
+                isOpen={isModalOpen} 
+                onClose={() => setIsModalOpen(false)} 
+                onConfirm={submit} 
+                message={<>Are you sure you want to update the information and access level for <br /><strong>{user?.user_username}</strong>?</>} 
+            />
         </div>
     );
 }
