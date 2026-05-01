@@ -22,6 +22,12 @@ Route::get('/dev-login/{id}', function ($id) {
 });
 Route::redirect('/', '/login');
 
+// 👇 ADD THIS NEW ROUTE HERE 👇
+Route::get('/test-login', function () {
+    return Inertia::render('LoginPage'); // Assuming the file is named LoginPage.jsx
+})->name('test.login')->middleware('guest');
+// 👆 END NEW ROUTE 👆
+
 // ==========================================
 // AUTHENTICATED ROUTES
 // ==========================================
