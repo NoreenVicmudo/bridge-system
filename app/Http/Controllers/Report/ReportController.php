@@ -747,7 +747,7 @@ class ReportController extends Controller
                 break;
 
             case 'SimExam':
-                $query = DB::table('student_simulation_exams') 
+                $query = DB::table('student_simulation_exam') 
                     ->whereIn('student_number', $studentNumbers)
                     ->where('is_active', 1);
 

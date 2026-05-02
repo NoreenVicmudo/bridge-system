@@ -69,7 +69,10 @@ export default function StudentMasterlist({ students }) {
 
     const [searchQuery, setSearchQuery] = useState(currentSearch);
     const [isRemoveMode, setIsRemoveMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState(new Set());
+    
+    // 🧠 THE FIX: Use an Object Map to store full student data across pages!
+    const [selectedStudentsMap, setSelectedStudentsMap] = useState({});
+    
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
     const initialRender = useRef(true);
@@ -121,32 +124,40 @@ export default function StudentMasterlist({ students }) {
         router.get(route('student.masterlist'), params, { preserveState: true, preserveScroll: true });
     };
 
-    const toggleSelection = (id) => {
-        const newSelected = new Set(selectedIds);
-        newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id);
-        setSelectedIds(newSelected);
+    // 🧠 THE FIX: Persistent toggling logic
+    const toggleSelection = (student) => {
+        setSelectedStudentsMap(prev => {
+            const next = { ...prev };
+            if (next[student.id]) {
+                delete next[student.id];
+            } else {
+                next[student.id] = student;
+            }
+            return next;
+        });
     };
 
     const toggleSelectAll = (e) => {
-        if (e.target.checked) {
-            setSelectedIds(new Set([...selectedIds, ...studentList.map(s => s.id)]));
-        } else {
-            setSelectedIds(new Set());
-        }
-    };
-
-    const handleBulkDelete = (reasonData, stopLoading) => {
-        router.post(route('students.bulk-destroy'), reasonData, {
-            onSuccess: () => {
-                setIsRemoveModalOpen(false);
-                setIsRemoveMode(false);
-                setSelectedIds(new Set());
-            },
-            onFinish: () => {
-                if (stopLoading) stopLoading(); 
+        setSelectedStudentsMap(prev => {
+            const next = { ...prev };
+            if (e.target.checked) {
+                // Add all currently visible students
+                studentList.forEach(s => { next[s.id] = s; });
+            } else {
+                // Remove all currently visible students
+                studentList.forEach(s => { delete next[s.id]; });
             }
+            return next;
         });
     };
+
+    const onPageChange = (url) => {
+        if (!url) return;
+        router.get(url, {}, { preserveState: true, preserveScroll: true });
+    };
+
+    const selectedArray = Object.values(selectedStudentsMap);
+    const isAllVisibleSelected = studentList.length > 0 && studentList.every(s => !!selectedStudentsMap[s.id]);
 
     return (
         <AuthenticatedLayout>
@@ -157,13 +168,13 @@ export default function StudentMasterlist({ students }) {
                     search={searchQuery}
                     onSearch={handleSearch}
                     paginationData={data?.links ? data : { data: studentList, links: [] }}
-                    onPageChange={handlePageChange}
+                    onPageChange={isBackendReady ? onPageChange : handlePageChange}
                     exportEndpoint={route('students.export', { 
                         search: currentSearch,
                         sort: activeSortColumn,
                         direction: activeSortDirection
                     })}
-                    showEditNote={canManageData} // 🧠 THE FIX: Bind the note to RBAC permissions
+                    showEditNote={canManageData}
                     footerActions={
                         canManageData ? (
                             !isRemoveMode ? (
@@ -173,9 +184,9 @@ export default function StudentMasterlist({ students }) {
                                 </>
                             ) : (
                                 <>
-                                    <button onClick={() => { setIsRemoveMode(false); setSelectedIds(new Set()); }} className="px-6 h-[40px] bg-white text-gray-600 border border-gray-300 rounded-[5px] text-sm font-medium hover:bg-gray-100 transition-all shadow-sm">Cancel</button>
-                                    <button onClick={() => setIsRemoveModalOpen(true)} disabled={selectedIds.size === 0} className={`px-6 h-[40px] rounded-[5px] text-sm font-medium transition-all shadow-sm ${selectedIds.size > 0 ? "bg-[#ed1c24] text-white hover:bg-[#c4151c]" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
-                                        {selectedIds.size > 0 ? `Remove (${selectedIds.size})` : "Remove Student"}
+                                    <button onClick={() => { setIsRemoveMode(false); setSelectedStudentsMap({}); }} className="px-6 h-[40px] bg-white text-gray-600 border border-gray-300 rounded-[5px] text-sm font-medium hover:bg-gray-100 transition-all shadow-sm">Cancel</button>
+                                    <button onClick={() => setIsRemoveModalOpen(true)} disabled={selectedArray.length === 0} className={`px-6 h-[40px] rounded-[5px] text-sm font-medium transition-all shadow-sm ${selectedArray.length > 0 ? "bg-[#ed1c24] text-white hover:bg-[#c4151c]" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}>
+                                        {selectedArray.length > 0 ? `Remove (${selectedArray.length})` : "Remove Student"}
                                     </button>
                                 </>
                             )
@@ -184,7 +195,7 @@ export default function StudentMasterlist({ students }) {
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            {isRemoveMode && <th className="py-3 px-6 text-center w-[50px]"><input type="checkbox" onChange={toggleSelectAll} className="accent-[#5c297c] cursor-pointer w-4 h-4" /></th>}
+                            {isRemoveMode && <th className="py-3 px-6 text-center w-[50px]"><input type="checkbox" checked={isAllVisibleSelected} onChange={toggleSelectAll} className="accent-[#5c297c] cursor-pointer w-4 h-4" /></th>}
                             <SortableHeader label="Student ID" sortKey="student_number" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
                             <SortableHeader label="Student Name" sortKey="name" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
                             <SortableHeader label="College" sortKey="college" currentSort={currentFrontendSort} currentDirection={activeSortDirection} onSort={handleSort} />
@@ -203,7 +214,7 @@ export default function StudentMasterlist({ students }) {
                     <tbody className="text-gray-600 text-sm font-medium">
                         {studentList.length > 0 ? studentList.map((student, i) => (
                             <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
-                                {isRemoveMode && <td className="py-3 px-6 text-center"><input type="checkbox" checked={selectedIds.has(student.id)} onChange={() => toggleSelection(student.id)} className="accent-[#5c297c] cursor-pointer w-4 h-4" /></td>}
+                                {isRemoveMode && <td className="py-3 px-6 text-center"><input type="checkbox" checked={!!selectedStudentsMap[student.id]} onChange={() => toggleSelection(student)} className="accent-[#5c297c] cursor-pointer w-4 h-4" /></td>}
                                 
                                 <td className="py-3 px-6">
                                     {canManageData ? (
@@ -239,9 +250,10 @@ export default function StudentMasterlist({ students }) {
                 {canManageData && (
                     <>
                         <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode="masterlist" />
-                        <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={studentList.filter(s => selectedIds.has(s.id))} onSuccess={() => {
+                        {/* 🧠 THE FIX: Pass the Object.values array directly to the Modal */}
+                        <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={selectedArray} onSuccess={() => {
                             setIsRemoveMode(false);
-                            setSelectedIds(new Set());
+                            setSelectedStudentsMap({});
                         }}/>
                     </>
                 )}
