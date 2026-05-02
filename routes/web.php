@@ -22,6 +22,12 @@ Route::get('/dev-login/{id}', function ($id) {
 });
 Route::redirect('/', '/login');
 
+// 👇 UPDATED: Admin Fallback Route 👇
+Route::get('/admin-login', function () {
+    return Inertia::render('LoginAdjusted'); // Matches your LoginAdjusted.jsx filename
+})->name('admin.login')->middleware('guest');
+// 👆 END UPDATED ROUTE 👆
+
 // 👇 ADD THIS NEW ROUTE HERE 👇
 Route::get('/test-login', function () {
     return Inertia::render('LoginPage'); // Assuming the file is named LoginPage.jsx
@@ -216,6 +222,13 @@ Route::middleware(['auth', 'verified', 'prevent-back-history'])->group(function 
             Route::put('/licensure/{batchId}', [LicensureExamController::class, 'update'])->name('licensure.exams.update');
             Route::get('/licensure/export', [LicensureExamController::class, 'export'])->name('licensure.exam.export');
             Route::post('/licensure/import', [LicensureExamController::class, 'import'])->name('licensure.exam.import');
+        
+            Route::get('/board-scores', [\App\Http\Controllers\Program\BoardExamController::class, 'index'])->name('board.exam.scores');
+            Route::get('/board-scores-entry', [\App\Http\Controllers\Program\BoardExamController::class, 'edit'])->name('board.scores.entry');
+            Route::put('/board-scores/{batch}', [\App\Http\Controllers\Program\BoardExamController::class, 'update'])->name('board-scores.update');
+            Route::get('/board-scores-export', [\App\Http\Controllers\Program\BoardExamController::class, 'export'])->name('board-scores.export');
+            Route::post('/board-scores-import', [\App\Http\Controllers\Program\BoardExamController::class, 'import'])->name('board-scores.import');
+        
         });
     });
 });

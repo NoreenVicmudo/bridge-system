@@ -12,10 +12,8 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
 
-    // 🧠 FIXED: Added ref for the file input
     const fileInputRef = useRef(null); 
 
-    // 🧠 FIXED: Added background scrolling lock
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -24,12 +22,11 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
             setCheckStatus("idle");
             setImportFile(null);
             setImportError(null);
-            document.body.style.overflow = "hidden"; // Prevent body scroll
+            document.body.style.overflow = "hidden"; 
         } else {
-            document.body.style.overflow = "unset"; // Restore body scroll
+            document.body.style.overflow = "unset"; 
         }
 
-        // Cleanup
         return () => {
             document.body.style.overflow = "unset";
         };
@@ -53,8 +50,8 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
     };
 
     const handleProceedToEdit = () => {
-        // Change route name to match your actual entry route
-        router.get(route('board.grades.entry'), { 
+        // 🧠 FIXED: Pointing to actual board scores entry route!
+        router.get(route('board.scores.entry'), { 
             student_number: studentNumber,
             calendar_year: currentFilter.calendar_year,
             batch_number: currentFilter.batch_number
@@ -62,7 +59,6 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
         closeModal();
     };
 
-    // 🧠 FIXED: Handle File Input correctly so the same file can be selected again
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -84,8 +80,8 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
         formData.append('filter', JSON.stringify(currentFilter));
         
         try {
-            // Change route name to match your actual import route
-            const response = await axios.post(route('board-grades.import'), formData, { 
+            // 🧠 FIXED: Pointing to actual board scores import route!
+            const response = await axios.post(route('board-scores.import'), formData, { 
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {

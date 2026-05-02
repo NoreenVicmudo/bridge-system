@@ -706,6 +706,24 @@ class ReportController extends Controller
                 }
                 break;
 
+            case 'ActualBoardScores':
+                $query = DB::table('student_actual_board_scores')
+                    ->whereIn('batch_id', $batchIds)
+                    ->where('is_active', 1);
+
+                if ($subField !== 'overall') {
+                    $query->where('mock_subject_id', $subField); 
+                }
+
+                $raw = $query->groupBy('batch_id')
+                    ->selectRaw('batch_id, AVG(score) as value')
+                    ->pluck('value', 'batch_id')->toArray();
+                
+                foreach($raw as $bId => $val) {
+                    if(isset($batchToStudent[$bId])) $records[$batchToStudent[$bId]] = $val;
+                }
+                break;
+
             case 'Licensure':
                 $raw = DB::table('student_licensure_exam') 
                     ->whereIn('batch_id', $batchIds)

@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             StudentAttendanceReviewSeeder::class,
             StudentAcademicRecognitionSeeder::class,
             StudentLicensureAndReviewSeeder::class,
+            StudentActualBoardScoresSeeder::class,
         ]);
         /*
         // 1. Colleges & Programs
@@ -60,6 +61,7 @@ class DatabaseSeeder extends Seeder
         $this->call(StudentBoardSubjectGradesSeeder::class);
         $this->call(StudentPerformanceRatingSeeder::class);
         $this->call(StudentSimulationExamSeeder::class);
-        $this->call(StudentMockBoardScoresSeeder::class);*/
+        $this->call(StudentMockBoardScoresSeeder::class);
+        $this->call(StudentActualBoardScoresSeeder::class);*/
     } 
 }

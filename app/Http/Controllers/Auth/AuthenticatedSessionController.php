@@ -45,7 +45,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         \App\Services\AuditService::logUserAuth('Logged in via standard authentication');
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended(route('main', absolute: false));
     }
 
     public function destroy(Request $request)

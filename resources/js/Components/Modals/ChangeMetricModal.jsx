@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { router } from "@inertiajs/react"; // Make sure router is imported!
+import { router } from "@inertiajs/react"; 
 import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function ChangeMetricModal({
@@ -12,7 +12,6 @@ export default function ChangeMetricModal({
     const [selectedMetric, setSelectedMetric] = useState("");
     const [animate, setAnimate] = useState(false);
 
-    // 1. UPDATED URLs TO USE route() HELPER
     const ACADEMIC_METRICS = [
         { label: "GWA", value: "GWA", routeName: "gwa.info" },
         { label: "Grades in Board Subjects", value: "Grades in Board Subjects", routeName: "board.subject.grades" },
@@ -26,6 +25,7 @@ export default function ChangeMetricModal({
     const PROGRAM_METRICS = [
         { label: "Review Center", value: "Review Center", routeName: "review.center" },
         { label: "Mock Exam Scores", value: "Mock Exam Scores", routeName: "mock.board.scores" },
+        { label: "Board Exam Scores", value: "Board Exam Scores", routeName: "board.exam.scores" },
         { label: "Licensure Exam Results", value: "Licensure Exam Results", routeName: "licensure.exam" },
     ];
 
@@ -35,10 +35,10 @@ export default function ChangeMetricModal({
         if (isOpen) {
             setAnimate(true);
             setSelectedMetric(currentMetric || "");
-            document.body.style.overflow = "hidden"; // 🧠 FIXED: Lock background scroll
+            document.body.style.overflow = "hidden"; 
         } else {
             setAnimate(false);
-            document.body.style.overflow = "unset"; // 🧠 FIXED: Restore background scroll
+            document.body.style.overflow = "unset"; 
         }
 
         return () => {
@@ -51,7 +51,6 @@ export default function ChangeMetricModal({
         setTimeout(onClose, 300);
     };
 
-    // 2. UPDATED NAVIGATION TO USE INERTIA ROUTER
     const handleChange = () => {
         const target = activeOptions.find((m) => m.value === selectedMetric);
         if (target && target.routeName) {
@@ -59,9 +58,14 @@ export default function ChangeMetricModal({
             setTimeout(() => {
                 onClose();
                 
-                // Use Inertia's router.get! It automatically converts the filterData 
-                // object into query parameters seamlessly and prevents full page reloads.
-                router.get(route(target.routeName), filterData || {}, {
+                // 🧠 THE FIX: Clone the filterData and delete metric-specific fields
+                // This ensures we only carry over the College, Program, Year, and Batch
+                const cleanPayload = { ...(filterData || {}) };
+                delete cleanPayload.exam_period;
+                delete cleanPayload.subject;
+                
+                // Use Inertia's router.get with the cleaned payload
+                router.get(route(target.routeName), cleanPayload, {
                     preserveState: false, // We want to cleanly load the new metric page
                 });
             }, 300);
@@ -71,7 +75,6 @@ export default function ChangeMetricModal({
     if (!isOpen) return null;
 
     return (
-        // 🧠 FIXED: Increased z-index to 9999 to guarantee it covers the Sidebar
         <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
                 .metric-modal-scroll ul::-webkit-scrollbar { width: 6px; }
