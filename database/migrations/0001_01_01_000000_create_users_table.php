@@ -14,19 +14,41 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('username', 50)->unique(); 
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            
+            // SSO Support: Password is now nullable, and we store their Microsoft ID
+            $table->string('microsoft_id')->nullable()->unique();
+            $table->string('avatar')->nullable();
+            $table->string('password')->nullable();
+            
+            // System Security & Roles
+            $table->string('position', 50)->default('Admin'); // e.g., 'Assistant' or 'Dean'
+            $table->enum('status', ['PENDING', 'APPROVED', 'REJECTED'])->default('PENDING');
+            
+            // Academic Isolation (From your SQL structure)
+            $table->unsignedBigInteger('college_id')->nullable();
+            $table->unsignedBigInteger('program_id')->nullable();
+
             $table->rememberToken();
             $table->timestamps();
+
+            // NOTE: If your 'colleges' and 'programs' tables are migrated AFTER this users table, 
+            // you might get a foreign key error. If so, leave these commented out. 
+            // If they migrate BEFORE this table, you can uncomment them for strict database rules!
+            $table->foreign('college_id')->references('college_id')->on('colleges')->onDelete('set null');
+            $table->foreign('program_id')->references('program_id')->on('programs')->onDelete('set null');
         });
 
+        // The default Laravel token table (Keep this exactly as is)
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->string('token');
             $table->timestamp('created_at')->nullable();
         });
 
+        // The default Laravel sessions table (Keep this exactly as is)
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();
             $table->foreignId('user_id')->nullable()->index();

@@ -1,34 +1,91 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
-import { useMockInertia, MOCK_STUDENTS_LICENSURE } from "@/Hooks/useMockInertia";
-import FilterStudentModal from "@/Components/Modals/FilterStudentModal";
+import ProgramFilterModal from "@/Components/Modals/Program/ProgramFilterModal"; 
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
-import AddStudentModal from "@/Components/Modals/AddStudentModal";
+import LicensureAddModal from "@/Components/Modals/Program/LicensureAddModal"; 
 
-export default function LicensureExamPage({ students }) {
-    const isBackendReady = !!students;
-    const mock = useMockInertia(MOCK_STUDENTS_LICENSURE);
+export default function LicensureExamPage({ students, filter, search = "", sort = "", direction = "asc", dbColleges = [], dbPrograms = [] }) {
+    const { auth } = usePage().props;
+    const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
+    const canManageData = !isAcademicAffairs;
 
-    const data = isBackendReady ? students : mock.data;
-    const search = isBackendReady ? "" : mock.search;
-    const handleSearch = isBackendReady ? () => {} : mock.setSearch;
-    const handlePageChange = isBackendReady ? null : mock.setPage;
-    const sortColumn = isBackendReady ? null : mock.sortColumn;
-    const sortDirection = isBackendReady ? null : mock.sortDirection;
-    const handleSort = isBackendReady ? () => {} : mock.handleSort;
-
+    const records = students?.data || [];
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isMetricModalOpen, setIsMetricModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    const [activeFilters, setActiveFilters] = useState({
-        batch_college: "COLLEGE OF MEDICAL TECHNOLOGY", batch_program: "BS MEDICAL TECHNOLOGY",
-        batch_year: "2026", board_batch: "1",
-    });
-    const [filterMode, setFilterMode] = useState("batch");
+    const enrichedFilter = {
+        ...filter,
+        batch_year: filter?.calendar_year,
+        board_batch: filter?.batch_number,
+        batch_college_name: dbColleges.find(c => c.value == filter?.college || c.college_id == filter?.college)?.label || filter?.college,
+        batch_program_name: dbPrograms.find(p => p.program_id == filter?.program)?.name || filter?.program,
+    };
+
+    const [searchQuery, setSearchQuery] = useState(search);
+    const initialRender = useRef(true);
+
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const actualSort = sort || urlParams.get('sort') || "";
+    const actualDirection = direction || urlParams.get('direction') || "asc";
+
+    const reverseDbKeyMap = {
+        'student_info.student_number': 'student_number',
+        'student_info.student_lname': 'name',
+        'student_licensure_exam.exam_result': 'status'
+    };
+    const activeFrontendSort = reverseDbKeyMap[actualSort] || actualSort;
+
+    useEffect(() => {
+        if (initialRender.current) {
+            initialRender.current = false;
+            return;
+        }
+        const delayDebounceFn = setTimeout(() => {
+            const params = { ...filter, search: searchQuery };
+            if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+            router.get(route('licensure.exam'), params, { preserveState: true, preserveScroll: true, replace: true });
+        }, 300);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery]);
+
+    const handleSearch = (val) => {
+        const text = typeof val === 'string' ? val : val?.target?.value || "";
+        setSearchQuery(text);
+    };
+
+    const handleSort = (key) => {
+        const dbKeyMap = { 'student_number': 'student_info.student_number', 'name': 'student_info.student_lname', 'status': 'student_licensure_exam.exam_result' };
+        const dbKey = dbKeyMap[key] || key;
+        
+        let nextDir = 'asc';
+        let nextSort = dbKey;
+
+        if (actualSort === dbKey) {
+            if (actualDirection === 'asc') {
+                nextDir = 'desc';
+            } else {
+                nextDir = null;
+                nextSort = null;
+            }
+        }
+
+        const params = { ...filter, search: searchQuery };
+        if (nextSort) {
+            params.sort = nextSort;
+            params.direction = nextDir;
+        }
+        router.get(route('licensure.exam'), params, { preserveState: true, preserveScroll: true });
+    };
+
+    const handleApplyFilter = (newFilters) => {
+        const params = { ...newFilters, search: searchQuery };
+        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
+        router.get(route('licensure.exam'), params, { preserveState: true, preserveScroll: true });
+    };
 
     return (
         <AuthenticatedLayout>
@@ -36,55 +93,62 @@ export default function LicensureExamPage({ students }) {
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
                     title="Licensure Exam Results"
-                    search={search}
-                    onSearch={handleSearch}
-                    paginationData={data}
-                    onPageChange={handlePageChange}
-                    exportEndpoint="/program/export/csv"
-                    filterDisplay={<FilterInfoCard filters={activeFilters} mode={filterMode} />}
+                    search={searchQuery} onSearch={handleSearch}
+                    paginationData={students}
+                    // 🧠 FIXED: Safely append export variables
+                    exportEndpoint={route('licensure.exam.export', { 
+                        ...filter, 
+                        search: searchQuery || "", 
+                        sort: actualSort || "", 
+                        direction: actualDirection || "" 
+                    })}
+                    filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />}
+                    showEditNote={canManageData}
                     headerActions={
                         <>
-                            <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 ease-in-out shadow-sm shrink-0">
-                                <i className="bi bi-funnel-fill leading-none"></i><span className="leading-none">Filter</span>
-                            </button>
-                            <button onClick={() => setIsMetricModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm shrink-0">
-                                <i className="bi bi-bar-chart-fill leading-none"></i><span className="leading-none">Change Metric</span>
-                            </button>
+                            <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all duration-300 shadow-sm"><i className="bi bi-funnel-fill"></i> Filter</button>
+                            <button onClick={() => setIsMetricModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] transition-all duration-300 shadow-sm"><i className="bi bi-bar-chart-fill"></i> Change Metric</button>
                         </>
                     }
                     footerActions={
-                        <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all duration-300 ease-in-out shadow-sm">
-                            Add Student
-                        </button>
+                        canManageData ? (
+                            <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#ffb736] transition-all shadow-sm">Manage Records</button>
+                        ) : null
                     }
                 >
                     <thead>
                         <tr className="bg-[#5c297c] text-white text-sm uppercase leading-normal">
-                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Student Name" sortKey="name" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} />
-                            <SortableHeader label="Date" sortKey="exam_date" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="text-center" />
-                            <SortableHeader label="Status" sortKey="status" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="text-center" />
-                            <SortableHeader label="First Attempt" sortKey="first_attempt" currentSort={sortColumn} currentDirection={sortDirection} onSort={handleSort} className="text-center" />
+                            <SortableHeader label="Student ID" sortKey="student_number" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Student Name" sortKey="name" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c]" />
+                            <SortableHeader label="Status" sortKey="status" currentSort={activeFrontendSort} currentDirection={actualDirection} onSort={handleSort} className="bg-[#5c297c] text-center [&>div]:justify-center" />
+                            <th className="py-3 px-6 font-bold text-center bg-[#5c297c]">Exam Date</th>
                         </tr>
                     </thead>
                     <tbody className="text-gray-600 text-sm font-medium">
-                        {data.data.length > 0 ? data.data.map((student, i) => (
-                            <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
-                                <td className="py-3 px-6"><Link href={`#edit/${student.id}`} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all duration-300 ease-in-out text-center">{student.student_number}</Link></td>
+                        {records.length > 0 ? records.map((student, i) => (
+                            <tr key={student.batch_id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
+                                <td className="py-3 px-6">
+                                    {canManageData ? (
+                                        <Link href={route('licensure.exam.edit', student.batch_id)} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 transition-all text-center">{student.student_number}</Link>
+                                    ) : (
+                                        <span className="inline-block px-4 py-1.5 rounded-[6px] bg-gray-400 text-white font-bold text-center shadow-sm">{student.student_number}</span>
+                                    )}
+                                </td>
                                 <td className="py-3 px-6 text-gray-800 uppercase font-bold">{student.name}</td>
+                                <td className="py-3 px-6 text-center">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${student.status === "PASSED" ? "bg-green-100 text-green-700" : student.status === "FAILED" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"}`}>{student.status}</span>
+                                </td>
                                 <td className="py-3 px-6 text-center text-gray-600">{student.exam_date}</td>
-                                <td className="py-3 px-6 text-center"><span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${student.status === "Passed" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{student.status}</span></td>
-                                <td className="py-3 px-6 text-center text-gray-700 font-bold">{student.first_attempt}</td>
                             </tr>
                         )) : (
-                            <tr><td colSpan={5} className="py-8 text-center text-gray-500 italic">No records found.</td></tr>
+                            <tr><td colSpan={4} className="py-8 text-center text-gray-500 italic">No records found for the selected batch.</td></tr>
                         )}
                     </tbody>
                 </TableContainer>
 
-                <FilterStudentModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={activeFilters} onApply={(v, m) => { setActiveFilters(v); setFilterMode(m); }} allowSection={false} defaultMode="batch" />
-                <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Licensure Exam Results" type="program" />
-                <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+                <ProgramFilterModal isOpen={isFilterModalOpen} onClose={() => setIsFilterModalOpen(false)} currentFilters={filter} onApply={handleApplyFilter} dbColleges={dbColleges} dbPrograms={dbPrograms} />
+                <ChangeMetricModal isOpen={isMetricModalOpen} onClose={() => setIsMetricModalOpen(false)} currentMetric="Licensure Exam Results" type="program" filterData={filter} />
+                {canManageData && <LicensureAddModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} currentFilter={filter} />}
             </div>
         </AuthenticatedLayout>
     );

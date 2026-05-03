@@ -13,9 +13,6 @@ use Inertia\Response;
 
 class AuthenticatedSessionController extends Controller
 {
-    /**
-     * Display the login view.
-     */
     public function create(): Response
     {
         return Inertia::render('Login', [
@@ -25,28 +22,43 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
-     * Handle an incoming authentication request.
+     * Handle an incoming authentication request with Approval Check.
      */
     public function store(LoginRequest $request): RedirectResponse
     {
+        // 1. Standard Breeze Auth
         $request->authenticate();
 
+        // 2. Our Bouncer Check
+        $user = Auth::user();
+        if ($user->status !== 'APPROVED') {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')->withErrors([
+                'email' => 'Your account is currently ' . strtolower($user->status) . '.',
+            ]);
+        }
+
+        // 3. Let them in
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        \App\Services\AuditService::logUserAuth('Logged in via standard authentication');
+        return redirect()->intended(route('main', absolute: false));
     }
 
-    /**
-     * Destroy an authenticated session.
-     */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request)
     {
+        \App\Services\AuditService::logUserAuth('Logged out of the system');
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
-
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        // 🧠 THE FIX: Use Inertia::location to force a hard browser refresh.
+        // This instantly stops the nprogress bar and clears all React memory.
+        return Inertia::location(route('login'));
     }
 }

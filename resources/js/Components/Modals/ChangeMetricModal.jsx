@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { router } from "@inertiajs/react";
+import { router } from "@inertiajs/react"; 
 import CustomSelectGroup from "@/Components/SelectGroup";
 
 export default function ChangeMetricModal({
@@ -7,25 +7,26 @@ export default function ChangeMetricModal({
     onClose,
     currentMetric,
     type = "academic",
+    filterData = null,
 }) {
     const [selectedMetric, setSelectedMetric] = useState("");
     const [animate, setAnimate] = useState(false);
 
-    // --- 1. DEFINE METRIC GROUPS ---
     const ACADEMIC_METRICS = [
-        { label: "GWA", value: "GWA", url: "/gwa-info" },
-        { label: "Grades in Board Subjects", value: "Grades in Board Subjects", url: "/board-subject-grades" },
-        { label: "Back Subjects/Retakes", value: "Back Subjects/Retakes", url: "/retakes-info" },
-        { label: "Performance Rating", value: "Performance Rating", url: "/performance-rating" },
-        { label: "Simulation Exam Results", value: "Simulation Exam Results", url: "/simulation-exam" },
-        { label: "Attendance in Review Classes", value: "Attendance in Review Classes", url: "/review-attendance" },
-        { label: "Academic Recognition", value: "Academic Recognition", url: "/academic-recognition" },
+        { label: "GWA", value: "GWA", routeName: "gwa.info" },
+        { label: "Grades in Board Subjects", value: "Grades in Board Subjects", routeName: "board.subject.grades" },
+        { label: "Back Subjects/Retakes", value: "Back Subjects/Retakes", routeName: "retakes.info" },
+        { label: "Performance Rating", value: "Performance Rating", routeName: "performance.rating" },
+        { label: "Simulation Exam Results", value: "Simulation Exam Results", routeName: "simulation.exam" },
+        { label: "Attendance in Review Classes", value: "Attendance in Review Classes", routeName: "review.attendance" },
+        { label: "Academic Recognition", value: "Academic Recognition", routeName: "academic.recognition" },
     ];
 
     const PROGRAM_METRICS = [
-        { label: "Review Center", value: "Review Center", url: "/review-center" },
-        { label: "Mock Exam Scores", value: "Mock Exam Scores", url: "/mock-board-scores" },
-        { label: "Licensure Exam Results", value: "Licensure Exam Results", url: "/licensure-exam" },
+        { label: "Review Center", value: "Review Center", routeName: "review.center" },
+        { label: "Mock Exam Scores", value: "Mock Exam Scores", routeName: "mock.board.scores" },
+        { label: "Board Exam Scores", value: "Board Exam Scores", routeName: "board.exam.scores" },
+        { label: "Licensure Exam Results", value: "Licensure Exam Results", routeName: "licensure.exam" },
     ];
 
     const activeOptions = type === "program" ? PROGRAM_METRICS : ACADEMIC_METRICS;
@@ -34,9 +35,15 @@ export default function ChangeMetricModal({
         if (isOpen) {
             setAnimate(true);
             setSelectedMetric(currentMetric || "");
+            document.body.style.overflow = "hidden"; 
         } else {
             setAnimate(false);
+            document.body.style.overflow = "unset"; 
         }
+
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [isOpen, currentMetric]);
 
     const closeModal = () => {
@@ -46,18 +53,29 @@ export default function ChangeMetricModal({
 
     const handleChange = () => {
         const target = activeOptions.find((m) => m.value === selectedMetric);
-        if (target) {
-            router.visit(target.url);
-            closeModal();
+        if (target && target.routeName) {
+            setAnimate(false);
+            setTimeout(() => {
+                onClose();
+                
+                // 🧠 THE FIX: Clone the filterData and delete metric-specific fields
+                // This ensures we only carry over the College, Program, Year, and Batch
+                const cleanPayload = { ...(filterData || {}) };
+                delete cleanPayload.exam_period;
+                delete cleanPayload.subject;
+                
+                // Use Inertia's router.get with the cleaned payload
+                router.get(route(target.routeName), cleanPayload, {
+                    preserveState: false, // We want to cleanly load the new metric page
+                });
+            }, 300);
         }
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
-            
-            {/* PURPLE SCROLLBAR INJECTION */}
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
                 .metric-modal-scroll ul::-webkit-scrollbar { width: 6px; }
                 .metric-modal-scroll ul::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 6px; }
@@ -65,15 +83,12 @@ export default function ChangeMetricModal({
             `}</style>
 
             <div className={`bg-white rounded-2xl w-[90%] max-w-[550px] shadow-2xl relative flex flex-col transition-all duration-300 transform overflow-visible ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-                
-                {/* Header */}
                 <div className="p-8 pb-4 text-center">
                     <h2 className="text-[26px] font-bold text-[#5c297c] tracking-wide">
                         {type === "program" ? "Change Program Metric" : "Change Academic Metric"}
                     </h2>
                 </div>
 
-                {/* Content Area */}
                 <div className="px-10 pb-10 pt-2">
                     <div className="w-full relative z-50">
                         <CustomSelectGroup
@@ -82,12 +97,11 @@ export default function ChangeMetricModal({
                             onChange={(e) => setSelectedMetric(e.target.value)}
                             options={activeOptions}
                             placeholder="Select Metric"
-                            className="mb-0 w-full metric-modal-scroll" // Class added here
+                            className="mb-0 w-full metric-modal-scroll"
                             vertical={true}
                         />
                     </div>
 
-                    {/* Footer Buttons */}
                     <div className="flex justify-center gap-4 mt-8 relative z-0">
                         <button
                             onClick={closeModal}
@@ -95,7 +109,6 @@ export default function ChangeMetricModal({
                         >
                             Cancel
                         </button>
-
                         <button
                             onClick={handleChange}
                             disabled={!selectedMetric}

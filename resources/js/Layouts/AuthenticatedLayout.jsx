@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react"; // <-- Added usePage
 import Sidebar from "@/Components/Sidebar";
 import BackgroundLayout from "@/Components/BackgroundLayout";
 import NProgress from "nprogress";
+import { toast } from "react-toastify"; // <-- Added toastify
 
 export default function AuthenticatedLayout({
     children,
     defaultCollapsed = false,
 }) {
+    // 1. Grab any flash messages sent from the Laravel backend
+    const { flash } = usePage().props;
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
         if (defaultCollapsed) return false;
         if (typeof window !== "undefined") {
@@ -15,6 +19,16 @@ export default function AuthenticatedLayout({
         }
         return false;
     });
+
+    // 2. Global Toast Listener: Watches for backend messages and pops the toast!
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -38,20 +52,15 @@ export default function AuthenticatedLayout({
 
         let finishTimeout;
 
-        // --- THE FIX: NProgress Logic with Path Exception ---
         const start = router.on("start", (event) => {
-            // Check if the destination is the Home page (/main)
-            // If it is, return early and do not start NProgress
             if (event.detail.visit.url.pathname === "/main") {
                 return;
             }
-
             clearTimeout(finishTimeout);
             NProgress.start();
         });
 
         const finish = router.on("finish", () => {
-            // Use debounce to prevent "double-jump" on redirects
             finishTimeout = setTimeout(() => {
                 NProgress.done();
             }, 250);
@@ -67,8 +76,6 @@ export default function AuthenticatedLayout({
 
     return (
         <BackgroundLayout>
-            {/* Custom MCU Styling for NProgress moved to global CSS if possible, 
-                otherwise keep the style block here */}
             <style>{`
                 #nprogress .bar { background: #ffb736 !important; height: 4px !important; }
                 #nprogress .peg { box-shadow: 0 0 10px #ffb736, 0 0 5px #ffb736 !important; }

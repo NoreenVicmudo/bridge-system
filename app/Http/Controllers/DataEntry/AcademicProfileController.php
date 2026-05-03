@@ -1,0 +1,146 @@
+<?php
+
+namespace App\Http\Controllers\DataEntry;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB; // 🧠 ADDED DB FACADE
+use App\Models\Academic\BoardSubject;
+use App\Models\Academic\GeneralSubject;
+use App\Models\Academic\RatingCategory;
+use App\Models\Academic\SimulationExam;
+use App\Models\College;
+use App\Models\Program;
+use App\Services\AuditService;
+use Inertia\Inertia;
+
+class AcademicProfileController extends Controller
+{
+    public function index()
+    {
+        $user = auth()->user();
+
+        $queryBoard = BoardSubject::query();
+        $queryGeneral = GeneralSubject::query();
+        $queryRating = RatingCategory::query();
+        $querySim = SimulationExam::query();
+
+        if ($user->program_id) {
+            $queryBoard->where('program_id', $user->program_id);
+            $queryGeneral->where('program_id', $user->program_id);
+            $queryRating->where('program_id', $user->program_id);
+            $querySim->where('program_id', $user->program_id);
+        } elseif ($user->college_id) {
+            $programIds = Program::where('college_id', $user->college_id)->pluck('program_id');
+            $queryBoard->whereIn('program_id', $programIds);
+            $queryGeneral->whereIn('program_id', $programIds);
+            $queryRating->whereIn('program_id', $programIds);
+            $querySim->whereIn('program_id', $programIds);
+        }
+
+        return Inertia::render('Entry/AcademicProfileEntry', [
+            'initialData' => [
+                'Colleges' => College::where('is_active', true)->get(),
+                'Programs' => Program::where('is_active', true)->get(),
+                'BoardSubjects' => $queryBoard->get(),
+                'GeneralSubjects' => $queryGeneral->get(),
+                'TypeOfRating' => $queryRating->get(),
+                'TypeOfSimulation' => $querySim->get(),
+            ]
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $user = auth()->user();
+
+        $validated = $request->validate([
+            'metric' => 'required|string',
+            'sub_metric' => 'required',
+            'detail_name' => 'required|string',
+            'is_hidden' => 'boolean',
+            'program_id' => 'nullable|integer|exists:programs,program_id'
+        ]);
+
+        $isNew = $validated['sub_metric'] === 'add';
+        $isActive = !$validated['is_hidden'];
+
+        if (!$isNew) {
+            $this->authorizeAccess($validated['metric'], $validated['sub_metric'], $user);
+        }
+
+        $targetProgramId = $user->program_id ?? $validated['program_id'];
+
+        if (!$targetProgramId) {
+            return redirect()->back()->withErrors(['program_id' => 'A specific program must be selected.']);
+        }
+
+        // ==========================================
+        // 🧠 THE SAFEGUARD BOUNCER
+        // ==========================================
+        if (!$isNew && !$isActive) {
+            $inUse = false;
+            switch ($validated['metric']) {
+                case 'BoardSubjects':
+                    $inUse = DB::table('student_board_grades')->where('subject_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+                case 'GeneralSubjects':
+                    $inUse = DB::table('student_back_subjects')->where('general_subject_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+                case 'TypeOfRating':
+                    $inUse = DB::table('student_performance_rating')->where('category_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+                case 'TypeOfSimulation':
+                    $inUse = DB::table('student_simulation_exams')->where('simulation_id', $validated['sub_metric'])->where('is_active', 1)->exists();
+                    break;
+            }
+
+            if ($inUse) {
+                return redirect()->back()->withErrors([
+                    'is_hidden' => 'Cannot hide this metric. It is currently associated with active student records.'
+                ]);
+            }
+        }
+        // ==========================================
+
+        switch ($validated['metric']) {
+            case 'BoardSubjects':
+                BoardSubject::updateOrCreate(['subject_id' => $isNew ? null : $validated['sub_metric']], ['subject_name' => $validated['detail_name'], 'is_active' => $isActive, 'program_id' => $targetProgramId]);
+                break;
+            case 'GeneralSubjects':
+                GeneralSubject::updateOrCreate(['general_subject_id' => $isNew ? null : $validated['sub_metric']], ['general_subject_name' => $validated['detail_name'], 'is_active' => $isActive, 'program_id' => $targetProgramId]);
+                break;
+            case 'TypeOfRating':
+                RatingCategory::updateOrCreate(['category_id' => $isNew ? null : $validated['sub_metric']], ['category_name' => $validated['detail_name'], 'is_active' => $isActive, 'program_id' => $targetProgramId]);
+                break;
+            case 'TypeOfSimulation':
+                SimulationExam::updateOrCreate(['simulation_id' => $isNew ? null : $validated['sub_metric']], ['simulation_name' => $validated['detail_name'], 'is_active' => $isActive, 'program_id' => $targetProgramId]);
+                break;
+        }
+
+        $action = $isNew ? 'Added' : 'Updated';
+        AuditService::logAdditionalEntry($validated['metric'], "{$action} '{$validated['detail_name']}' (Program ID: {$targetProgramId})");
+
+        return redirect()->back()->with('success', 'Academic profile configuration saved successfully.');
+    }
+
+    private function authorizeAccess($metric, $id, $user)
+    {
+        if (!$user->college_id && !$user->program_id) return;
+
+        $modelMap = [
+            'BoardSubjects' => BoardSubject::class, 'GeneralSubjects' => GeneralSubject::class,
+            'TypeOfRating' => RatingCategory::class, 'TypeOfSimulation' => SimulationExam::class,
+        ];
+
+        $modelClass = $modelMap[$metric] ?? null;
+        if (!$modelClass) return;
+
+        $item = $modelClass::find($id);
+        if (!$item) return;
+
+        if ($user->program_id && $item->program_id != $user->program_id) abort(403, 'Unauthorized.');
+        if ($user->college_id && $item->program?->college_id != $user->college_id) abort(403, 'Unauthorized.');
+    }
+}

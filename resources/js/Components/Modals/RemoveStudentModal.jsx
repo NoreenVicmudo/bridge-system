@@ -1,70 +1,130 @@
 import React, { useState, useEffect } from "react";
+import { router } from "@inertiajs/react";
 import CustomSelectGroup from "@/Components/SelectGroup";
+import TextInput from "@/Components/TextInput";
 
 export default function RemoveStudentModal({
     isOpen,
     onClose,
     selectedStudents,
+    onSuccess, 
 }) {
     const [mode, setMode] = useState("single");
     const [animate, setAnimate] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
     const [singleReason, setSingleReason] = useState("");
-    const [individualReasons, setIndividualReasons] = useState({});
+    const [singleOtherReason, setSingleOtherReason] = useState("");
+    const [multiReasons, setMultiReasons] = useState({});
 
     const REASON_OPTIONS = [
         { value: "Transferred", label: "Transferred out" },
         { value: "Dropped", label: "Dropped / Withdrawn" },
         { value: "Error", label: "Entry Error" },
         { value: "Graduated", label: "Graduated" },
+        { value: "Other", label: "Other (please specify)" },
     ];
 
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
+            setMode("single");
             setSingleReason("");
-            setIndividualReasons({});
+            setSingleOtherReason("");
+            setDeleting(false);
+
+            const initMulti = {};
+            selectedStudents.forEach((s) => {
+                initMulti[s.id] = { reason: "", otherReason: "" };
+            });
+            setMultiReasons(initMulti);
+            
+            // 🧠 FIXED: Added background scrolling lock
+            document.body.style.overflow = "hidden"; 
+        } else {
+            document.body.style.overflow = "unset"; 
         }
-    }, [isOpen]);
+
+        // Cleanup
+        return () => {
+            document.body.style.overflow = "unset";
+        };
+    }, [isOpen, selectedStudents]);
 
     const closeModal = () => {
         setAnimate(false);
         setTimeout(onClose, 300);
     };
 
+    const handleMultiReasonChange = (studentId, field, value) => {
+        setMultiReasons((prev) => ({
+            ...prev,
+            [studentId]: { ...prev[studentId], [field]: value },
+        }));
+    };
+
     const isReadyToRemove = () => {
-        if (mode === "single") return singleReason !== "";
+        if (mode === "single") {
+            if (singleReason === "") return false;
+            if (singleReason === "Other" && singleOtherReason.trim() === "") return false;
+            return true;
+        }
         return (
             selectedStudents.length > 0 &&
-            selectedStudents.every(s => individualReasons[s.id] && individualReasons[s.id] !== "")
+            selectedStudents.every(s => {
+                const r = multiReasons[s.id];
+                if (!r || r.reason === "") return false;
+                if (r.reason === "Other" && r.otherReason.trim() === "") return false;
+                return true;
+            })
         );
+    };
+
+    const handleConfirm = () => {
+        if (!isReadyToRemove()) return;
+        setDeleting(true);
+
+        const payload = {
+            students: selectedStudents.map(s => s.id),
+            reason_mode: mode,
+            location: window.location.pathname.includes("masterlist") ? "MASTERLIST" : "STUDENT_INFO",
+        };
+
+        if (mode === "single") {
+            payload.reason = singleReason === "Other" ? singleOtherReason : singleReason;
+        } else {
+            const compiledReasons = {};
+            selectedStudents.forEach(s => {
+                const r = multiReasons[s.id];
+                compiledReasons[s.id] = r.reason === "Other" ? r.otherReason : r.reason;
+            });
+            payload.per_reasons = compiledReasons;
+        }
+
+        router.post(route('students.bulk-destroy'), payload, {
+            onSuccess: () => {
+                if (onSuccess) onSuccess();
+                closeModal();
+            },
+            onFinish: () => setDeleting(false)
+        });
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className={`fixed inset-0 z-[1000] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent pointer-events-none"}`}>
-            
-            {/* STYLES: Purple scrollbars for ALL scrollable areas inside this modal */}
+        // 🧠 FIXED: Changed z-[1000] to z-[9999] so it renders above the Sidebar (which is z-1005)
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
-                .modal-scroll-area::-webkit-scrollbar, 
-                .modal-scroll-area ul::-webkit-scrollbar { 
-                    width: 6px; 
-                }
-                .modal-scroll-area::-webkit-scrollbar-thumb, 
-                .modal-scroll-area ul::-webkit-scrollbar-thumb { 
-                    background-color: #5c297c; 
-                    border-radius: 10px; 
-                }
-                .modal-scroll-area::-webkit-scrollbar-track, 
-                .modal-scroll-area ul::-webkit-scrollbar-track { 
-                    background: transparent; 
-                }
+                .modal-scroll-area::-webkit-scrollbar { width: 6px; }
+                .modal-scroll-area::-webkit-scrollbar-thumb { background-color: #5c297c; border-radius: 10px; }
+                .modal-scroll-area::-webkit-scrollbar-track { background: transparent; }
             `}</style>
 
-            <div className={`bg-white rounded-2xl w-[95%] max-w-[600px] shadow-2xl relative flex flex-col transition-all duration-300 transform overflow-visible ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            <div className={`bg-white rounded-2xl w-[95%] max-w-[600px] shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
-                {/* Header */}
-                <div className="bg-red-50 p-6 border-b border-red-100 flex items-start gap-4 rounded-t-2xl relative z-[100]">
+                {/* STICKY HEADER */}
+                <div className="bg-red-50 p-6 border-b border-red-100 flex items-start gap-4 rounded-t-2xl relative z-[100] flex-shrink-0">
                     <div className="bg-red-100 p-3 rounded-full shrink-0">
                         <i className="bi bi-exclamation-triangle-fill text-2xl text-red-500"></i>
                     </div>
@@ -74,27 +134,27 @@ export default function RemoveStudentModal({
                             Removing <strong className="text-red-600">{selectedStudents.length}</strong> record(s).
                         </p>
                     </div>
-                    <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                    <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 transition-colors">
                         <i className="bi bi-x-lg text-lg"></i>
                     </button>
                 </div>
 
-                <div className="p-6 overflow-visible">
-                    {/* Mode Toggle */}
-                    <div className="flex bg-gray-100 p-1 rounded-lg mb-6 relative z-[100]">
-                        <button onClick={() => setMode("single")} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === "single" ? "bg-white text-[#5c297c] shadow-sm" : "text-gray-500"}`}>
-                            Single Reason
-                        </button>
-                        <button onClick={() => setMode("multiple")} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === "multiple" ? "bg-white text-[#5c297c] shadow-sm" : "text-gray-500"}`}>
-                            Specific Reasons
-                        </button>
-                    </div>
+                {/* UNIFIED SCROLL AREA */}
+                <div className="flex-1 overflow-y-auto modal-scroll-area overflow-x-visible flex flex-col relative">
+                    <div className="p-6 pb-2">
+                        {/* Mode Toggle */}
+                        <div className="flex bg-gray-100 p-1 rounded-lg mb-6 relative z-[90]">
+                            <button onClick={() => setMode("single")} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === "single" ? "bg-white text-[#5c297c] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                                Single Reason
+                            </button>
+                            <button onClick={() => setMode("multiple")} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${mode === "multiple" ? "bg-white text-[#5c297c] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                                Specific Reasons
+                            </button>
+                        </div>
 
-                    {/* SCROLLABLE AREA: handles student list, but NOT the dropdowns */}
-                    <div className="modal-scroll-area max-h-[350px] overflow-y-auto overflow-x-visible pr-2">
-                        
+                        {/* MODE CONTENT */}
                         {mode === "single" ? (
-                            <div className="flex flex-col gap-4 animate-fade-in relative z-[90]">
+                            <div className="flex flex-col gap-4 animate-fade-in relative z-[80]">
                                 <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                                     <p className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Target Students:</p>
                                     <div className="flex flex-wrap gap-2">
@@ -105,57 +165,88 @@ export default function RemoveStudentModal({
                                         ))}
                                     </div>
                                 </div>
-                                <CustomSelectGroup
-                                    label="Reason"
-                                    value={singleReason}
-                                    onChange={(e) => setSingleReason(e.target.value)}
-                                    options={REASON_OPTIONS}
-                                    vertical={true}
-                                    className="!mb-0"
-                                />
-                                {/* Bottom padding to allow dropdown to open without triggering container scroll */}
-                                <div className="h-32"></div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-3 animate-fade-in pb-40">
-                                {selectedStudents.map((student) => (
-                                    <div 
-                                        key={student.id} 
-                                        /* hover:z-50 is key: it brings the row to the front only when needed */
-                                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg relative z-10 hover:z-[60] bg-white transition-all"
-                                    >
-                                        <div className="flex flex-col max-w-[50%]">
-                                            <span className="text-sm font-bold text-gray-800 truncate">{student.name}</span>
-                                            <span className="text-xs text-gray-500">{student.student_number}</span>
-                                        </div>
-                                        <div className="w-[180px]">
-                                            <CustomSelectGroup
-                                                value={individualReasons[student.id] || ""}
-                                                onChange={(e) => setIndividualReasons(prev => ({ ...prev, [student.id]: e.target.value }))}
-                                                options={REASON_OPTIONS}
-                                                placeholder="Reason..."
-                                                vertical={true}
-                                                className="!mb-0 !gap-0"
+
+                                <div className="relative z-[110]">
+                                    <CustomSelectGroup
+                                        label="Reason for removal"
+                                        value={singleReason}
+                                        onChange={(e) => setSingleReason(e.target.value)}
+                                        options={REASON_OPTIONS}
+                                        vertical={true}
+                                        className="!mb-0"
+                                    />
+                                    {singleReason === "Other" && (
+                                        <div className="mt-2 animate-fade-in-up">
+                                            <TextInput
+                                                type="text"
+                                                placeholder="Please specify the reason"
+                                                value={singleOtherReason}
+                                                onChange={(e) => setSingleOtherReason(e.target.value)}
+                                                className="w-full border-gray-300 focus:border-[#ed1c24] focus:ring-[#ed1c24] text-sm"
                                             />
                                         </div>
+                                    )}
+                                </div>
+                                <div className="h-4"></div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-3 animate-fade-in pb-4">
+                                {selectedStudents.map((student, index) => (
+                                    <div 
+                                        key={student.id} 
+                                        style={{ zIndex: selectedStudents.length - index + 10 }} 
+                                        className="flex flex-col p-4 border border-gray-200 rounded-lg bg-white transition-all relative"
+                                    >
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex flex-col max-w-[50%]">
+                                                <span className="text-sm font-bold text-gray-800 truncate">{student.name}</span>
+                                                <span className="text-xs text-gray-500">{student.student_number}</span>
+                                            </div>
+                                            <div className="w-[200px] relative z-[120]">
+                                                <CustomSelectGroup
+                                                    value={multiReasons[student.id]?.reason || ""}
+                                                    onChange={(e) => handleMultiReasonChange(student.id, "reason", e.target.value)}
+                                                    options={REASON_OPTIONS}
+                                                    placeholder="Select reason..."
+                                                    vertical={true}
+                                                    className="!mb-0 !gap-0"
+                                                />
+                                            </div>
+                                        </div>
+                                        {multiReasons[student.id]?.reason === "Other" && (
+                                            <div className="animate-fade-in-up w-full flex justify-end">
+                                                <TextInput
+                                                    type="text"
+                                                    placeholder="Specify reason"
+                                                    value={multiReasons[student.id]?.otherReason || ""}
+                                                    onChange={(e) => handleMultiReasonChange(student.id, "otherReason", e.target.value)}
+                                                    className="w-[200px] border-gray-300 focus:border-[#ed1c24] focus:ring-[#ed1c24] text-sm py-1.5"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
-                </div>
 
-                {/* Footer */}
-                <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-2xl relative z-[100]">
-                    <button onClick={closeModal} className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
-                        Cancel
-                    </button>
-                    <button
-                        disabled={!isReadyToRemove()}
-                        className={`px-5 py-2.5 text-sm font-bold text-white rounded-lg shadow-md transition-all flex items-center gap-2 ${isReadyToRemove() ? "bg-red-500 hover:bg-red-600" : "bg-gray-400 cursor-not-allowed opacity-70"}`}
-                    >
-                        <i className="bi bi-trash"></i> Confirm Removal
-                    </button>
+                    {/* STICKY FOOTER */}
+                    <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 mt-auto relative z-10 rounded-b-2xl">
+                        <button onClick={closeModal} className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            disabled={!isReadyToRemove() || deleting}
+                            className={`px-5 py-2.5 text-sm font-bold text-white rounded-lg shadow-md transition-all flex items-center gap-2 ${isReadyToRemove() && !deleting ? "bg-[#ed1c24] hover:bg-[#c4151c]" : "bg-gray-400 cursor-not-allowed opacity-70"}`}
+                        >
+                            {deleting ? (
+                                <div className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <><i className="bi bi-trash"></i> Confirm Removal</>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
