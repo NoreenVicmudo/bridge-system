@@ -118,6 +118,8 @@ export default function StatToolModal({
         { value: "GWA", label: "General Weighted Average (GWA)", type: "numerical", hasSub: true },
         { value: "BoardGrades", label: "Grades in Board Subjects", type: "numerical", hasSub: true },
         { value: "MockScores", label: "Mock Board Exam Scores", type: "numerical", hasSub: true },
+        // 🧠 ADDED: Actual Board Scores
+        { value: "ActualBoardScores", label: "Actual Board Exam Scores", type: "numerical", hasSub: true },
         { value: "PerformanceRating", label: "Performance Rating", type: "numerical", hasSub: true },
         { value: "SimExam", label: "Simulation Exam Results", type: "numerical", hasSub: true },
         { value: "Attendance", label: "Review Attendance", type: "numerical", hasSub: false },
@@ -154,7 +156,12 @@ export default function StatToolModal({
         if (!metricKey) return [];
         const metricLabel = METRIC_OPTIONS.find(m => m.value === metricKey)?.label || metricKey;
         const overallOption = { value: "overall", label: `Overall ${metricLabel}` };
-        if (subMetricMap[metricKey] && subMetricMap[metricKey].length > 0) return [overallOption, ...subMetricMap[metricKey]];
+        // 🧠 FIXED: Map Both Mock and Actual Board scores to use the same SubMetric Map!
+        const mapKey = metricKey === "ActualBoardScores" ? "MockScores" : metricKey;
+        
+        if (subMetricMap[mapKey] && subMetricMap[mapKey].length > 0) {
+            return [overallOption, ...subMetricMap[mapKey]];
+        }
         return [overallOption];
     };
 
@@ -297,7 +304,6 @@ export default function StatToolModal({
                     </button>
                 </div>
 
-                {/* 🧠 FIX: SCROLLABLE BODY NOW INCLUDES THE FOOTER */}
                 <div className="flex-1 overflow-y-auto stat-modal-scroll flex flex-col relative z-[60]">
                     <div className="px-8 pt-6 pb-6 flex flex-col gap-6 relative z-[50]">
                         
@@ -558,7 +564,6 @@ export default function StatToolModal({
                             </div>
                         )}
 
-                        {/* 🧠 FIX: FOOTER NOW INSIDE THE SCROLLABLE AREA */}
                         <div className="flex justify-center gap-4 pt-6 mt-4 border-t border-gray-200">
                             <button
                                 onClick={closeModal}

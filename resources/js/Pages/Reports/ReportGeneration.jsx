@@ -8,7 +8,7 @@ import ReportLoadingAnimation from "@/Components/Reports/ReportLoadingAnimation"
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import axios from "axios";
-import { toast } from "react-toastify"; // 🧠 NEW: Import toastify directly
+import { toast } from "react-toastify"; 
 
 export default function GenerateReport(props) {
     const { auth = {} } = usePage().props;
@@ -136,7 +136,6 @@ export default function GenerateReport(props) {
             }, 60000);
         } catch (error) {
             console.error("Error preparing print:", error);
-            // 🧠 FIXED: Replaced alert with global toast
             toast.error("An error occurred while preparing the print document.");
         } finally {
             setIsProcessing(false);
@@ -185,7 +184,6 @@ export default function GenerateReport(props) {
             pdf.save(`report_${formattedDate}.pdf`);
         } catch (error) {
             console.error("Error generating PDF:", error);
-            // 🧠 FIXED: Replaced alert with global toast
             toast.error("An error occurred while generating the PDF.");
         } finally {
             setIsProcessing(false);
@@ -212,39 +210,37 @@ export default function GenerateReport(props) {
 
                     // 2. Determine Chart Type and Data Structure
                     if (res.chart_type === 'regression' || res.chart_type === 'scatter') {
-                        // --- PEARSON R & REGRESSION LOGIC (Scatter + Trendline) ---
+                        
+                        // ==========================================
+                        // 🧠 RESTORED: Detailed Data Table
+                        // We put the individual student scores back into the table
+                        // ==========================================
                         datasetArray = res.raw_data.map((pt, i) => ({ 
                             label: `Student ${i + 1}`, val: `X: ${pt.x}, Y: ${pt.y}` 
                         }));
 
                         const datasets = [];
 
-                        // If Regression Line data is provided, draw the purple trendline
+                        // ==========================================
+                        // 🧠 RETAINED: Clean Visual Graph
+                        // We keep the graph clean by ONLY drawing the Regression Line
+                        // and leaving out the scatter dots.
+                        // ==========================================
                         if (res.regression_line) {
                             const { m, b, minX, maxX } = res.regression_line;
                             datasets.push({
-                                label: "Trendline",
+                                label: "Overall Trend (Regression Line)",
                                 data: [ { x: minX, y: m * minX + b }, { x: maxX, y: m * maxX + b } ],
                                 type: 'line', 
                                 borderColor: '#5c297c',
-                                borderWidth: 3,
+                                borderWidth: 4,
                                 fill: false,
                                 pointRadius: 0, 
                                 showLine: true
                             });
                         }
 
-                        // Add the raw scatter dots
-                        datasets.push({
-                            label: "Student Data",
-                            data: res.raw_data,
-                            type: 'scatter',
-                            backgroundColor: "#ffb736",
-                            borderColor: "#d97706",
-                            borderWidth: 1,
-                            pointRadius: 5,
-                            pointHoverRadius: 7
-                        });
+                        const varNames = res.variable_name.split(' vs ');
 
                         chartConfig = {
                             chartType: "scatter", 
@@ -256,12 +252,12 @@ export default function GenerateReport(props) {
                                     x: { 
                                         type: 'linear', 
                                         position: 'bottom', 
-                                        title: { display: true, text: res.variable_name.split(' vs ')[0] },
+                                        title: { display: true, text: varNames[0]?.replace('(X)', '')?.trim() || "X" },
                                         ticks: { beginAtZero: false }
                                     },
                                     y: { 
                                         type: 'linear', 
-                                        title: { display: true, text: res.variable_name.split(' vs ')[1] },
+                                        title: { display: true, text: varNames[1]?.replace('(Y)', '')?.trim() || "Y" },
                                         ticks: { beginAtZero: false }
                                     }
                                 },
@@ -289,9 +285,8 @@ export default function GenerateReport(props) {
 
                         // 2. Overlay individual student scores as jittered dots
                         if (res.raw_data && res.raw_data.group1 && res.raw_data.group2) {
-                            const jitter = () => (Math.random() - 0.5) * 0.3; // Spread dots horizontally
+                            const jitter = () => (Math.random() - 0.5) * 0.15; // Spread dots horizontally
                             
-                            // X axis is categorical (Index 0 = Group 1, Index 1 = Group 2)
                             const scatter1 = res.raw_data.group1.map(val => ({ x: 0 + jitter(), y: parseFloat(val) }));
                             const scatter2 = res.raw_data.group2.map(val => ({ x: 1 + jitter(), y: parseFloat(val) }));
 
@@ -478,14 +473,10 @@ export default function GenerateReport(props) {
                 });
 
                 setIsStatModalOpen(false);
-                
-                // 🧠 FIXED: Success Toast
                 toast.success("Report generated successfully!");
             }
         } catch (error) {
             console.error("Report Error:", error);
-            
-            // 🧠 FIXED: Replaced alert with global toast
             const errorMessage = error.response?.data?.error || error.response?.data?.message || "An error occurred during calculation. Please check your data selection.";
             toast.error(errorMessage);
 

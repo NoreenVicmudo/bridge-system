@@ -12,8 +12,8 @@ export default function UpdateBoardScoresForm({
     const inputClass = "w-full border-gray-300 rounded-[5px] shadow-sm text-sm p-2 focus:border-[#ffb736] focus:ring-[#ffb736] focus:ring-1 focus:outline-none transition-colors duration-200";
     const labelClass = "block mb-0.5 font-bold text-sm text-[#5c297c]";
 
-    // 🧠 Form is only valid if Exam Period is also provided!
-    const isFormValid = data.mock_subject_id && data.score !== "" && data.exam_period;
+    // 🧠 FIXED: Form is valid without an Exam Period!
+    const isFormValid = data.mock_subject_id && data.score !== "";
 
     useEffect(() => {
         if (data.mock_subject_id) {
@@ -41,7 +41,7 @@ export default function UpdateBoardScoresForm({
                 </div>
 
                 <div className="border-t border-gray-100 pt-4 mt-2">
-                    <label className={labelClass}>Previous {data.exam_period || 'Exam'} Results:</label>
+                    <label className={labelClass}>Previous Board Exam Results:</label>
                     <div className="space-y-2 mt-2">
                         {subjectOptions.map((sub) => (
                             <div key={sub.value} className="flex items-center gap-2">
@@ -55,35 +55,16 @@ export default function UpdateBoardScoresForm({
                 <div className="border-t border-gray-100 pt-5 bg-purple-50/30 p-4 rounded-lg mt-3">
                     <h3 className="text-[11px] font-bold mb-4 uppercase tracking-widest opacity-70">Update Board Exam Score</h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        {/* 🧠 NEW: EXAM PERIOD DROPDOWN */}
-                        <div>
-                            <CustomSelectGroup 
-                                label="Exam Period / Attempt:" 
-                                value={data.exam_period} 
-                                onChange={(e) => setData("exam_period", e.target.value)} 
-                                options={[
-                                    { value: "Default", label: "Default Period" },
-                                    { value: "Diagnostic", label: "Diagnostic" },
-                                    { value: "Pre-Test", label: "Pre-Test" },
-                                    { value: "Midterm", label: "Midterm" },
-                                    { value: "Post-Test", label: "Post-Test" },
-                                ]} 
-                                className="w-full mb-0" 
-                                vertical={true} 
-                            />
-                        </div>
-                        
-                        <div>
-                            <CustomSelectGroup 
-                                label="Select Subject:" 
-                                value={data.mock_subject_id} 
-                                onChange={(e) => setData("mock_subject_id", e.target.value)} 
-                                options={subjectOptions} 
-                                className="w-full mb-0" 
-                                vertical={true} 
-                            />
-                        </div>
+                    <div className="mb-4">
+                        {/* 🧠 FIXED: Exam Period Dropdown Removed. Kept Subject Dropdown full width. */}
+                        <CustomSelectGroup 
+                            label="Select Subject:" 
+                            value={data.mock_subject_id} 
+                            onChange={(e) => setData("mock_subject_id", e.target.value)} 
+                            options={subjectOptions} 
+                            className="w-full mb-0" 
+                            vertical={true} 
+                        />
                     </div>
 
                     <div>
@@ -118,7 +99,7 @@ export default function UpdateBoardScoresForm({
                 isOpen={isModalOpen} 
                 onClose={() => setIsModalOpen(false)} 
                 onConfirm={handleConfirm} 
-                message={<>Update <strong>{data.exam_period}</strong> board exam scores for <br/><strong>{studentName}</strong>?</>} 
+                message={<>Update actual board exam scores for <br/><strong>{studentName}</strong>?</>} 
             />
         </div>
     );

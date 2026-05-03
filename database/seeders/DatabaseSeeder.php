@@ -13,6 +13,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            // ... your other seeders ...
+            StudentGwaSeeder::class,
+            StudentBackSubjectSeeder::class,
+            StudentSimulationExamSeeder::class,
+            StudentAttendanceReviewSeeder::class,
+            StudentAcademicRecognitionSeeder::class,
+            StudentLicensureAndReviewSeeder::class,
+            StudentActualBoardScoresSeeder::class,
+        ]);
+        /*
         // 1. Colleges & Programs
         $this->call(AcademicStructureSeeder::class);
 
@@ -51,5 +62,6 @@ class DatabaseSeeder extends Seeder
         $this->call(StudentPerformanceRatingSeeder::class);
         $this->call(StudentSimulationExamSeeder::class);
         $this->call(StudentMockBoardScoresSeeder::class);
-    }
+        $this->call(StudentActualBoardScoresSeeder::class);*/
+    } 
 }

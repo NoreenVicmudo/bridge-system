@@ -4,7 +4,7 @@ import { Head, Link, router, usePage } from "@inertiajs/react";
 import { TableContainer, SortableHeader } from "@/Components/ReusableTable";
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 import FilterInfoCard from "@/Components/FilterInfoCard";
-import BoardsAddStudentModal from "@/Components/Modals/Program/BoardsAddStudentModal"; // 🧠 CORRECT IMPORT
+import BoardsAddStudentModal from "@/Components/Modals/Program/BoardsAddStudentModal"; 
 import ProgramFilterModal from "@/Components/Modals/Program/ProgramFilterModal";
 
 export default function BoardExamScoresPage({ students, filter, search = "", sort = "", direction = "asc", dbColleges = [], dbPrograms = [] }) {
@@ -20,20 +20,11 @@ export default function BoardExamScoresPage({ students, filter, search = "", sor
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false); 
 
-    const currentExamPeriod = filter?.exam_period || "Default";
-
-    const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
     const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
-    const periodDropdownRef = useRef(null);
     const subjectDropdownRef = useRef(null);
-
-    const PERIOD_OPTIONS = ["Default Period", "Diagnostic", "Pre-Test", "Midterm", "Post-Test"];
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (periodDropdownRef.current && !periodDropdownRef.current.contains(event.target)) {
-                setIsPeriodDropdownOpen(false);
-            }
             if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(event.target)) {
                 setIsSubjectDropdownOpen(false);
             }
@@ -69,7 +60,7 @@ export default function BoardExamScoresPage({ students, filter, search = "", sor
             return;
         }
         const delayDebounceFn = setTimeout(() => {
-            const params = { ...filter, search: searchQuery, exam_period: currentExamPeriod };
+            const params = { ...filter, search: searchQuery };
             if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
             router.get(route('board.exam.scores'), params, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
@@ -97,7 +88,7 @@ export default function BoardExamScoresPage({ students, filter, search = "", sor
             }
         }
 
-        const params = { ...filter, search: searchQuery, exam_period: currentExamPeriod };
+        const params = { ...filter, search: searchQuery };
         if (nextSort) {
             params.sort = nextSort;
             params.direction = nextDir;
@@ -107,67 +98,26 @@ export default function BoardExamScoresPage({ students, filter, search = "", sor
     };
 
     const handleApplyFilter = (newFilters) => {
-        const params = { ...newFilters, search: searchQuery, exam_period: currentExamPeriod };
-        if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
-        router.get(route('board.exam.scores'), params, { preserveState: true, preserveScroll: true });
-    };
-
-    const handlePeriodChange = (newPeriod) => {
-        setIsPeriodDropdownOpen(false);
-        const backendValue = newPeriod === "Default Period" ? "Default" : newPeriod;
-        const params = { ...filter, search: searchQuery, exam_period: backendValue };
+        const params = { ...newFilters, search: searchQuery };
         if (actualSort) { params.sort = actualSort; params.direction = actualDirection; }
         router.get(route('board.exam.scores'), params, { preserveState: true, preserveScroll: true });
     };
 
     const visibleSubjects = selectedSubject === "All" ? subjectHeaders : subjectHeaders.filter(s => s === selectedSubject);
-    const displayPeriod = currentExamPeriod === "Default" ? "Default Period" : currentExamPeriod;
 
     return (
         <AuthenticatedLayout>
             <Head title="Board Exam Scores" />
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
-                    title={`Board Exam Scores (${displayPeriod})`}
+                    title="Actual Board Exam Scores"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students?.data} 
-                    exportEndpoint={route('board-scores.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: currentExamPeriod, subject: selectedSubject })}
+                    exportEndpoint={route('board-scores.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, subject: selectedSubject })}
                     filterDisplay={<FilterInfoCard filters={enrichedFilter} mode="batch" />} 
                     showEditNote={canManageData}
                     headerActions={
                         <>
-                            <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
-                                <button 
-                                    onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
-                                    className={`flex items-center justify-between gap-3 px-5 h-[40px] border rounded-[5px] text-sm font-bold transition-all duration-300 ease-in-out shadow-sm w-full md:w-[180px] ${
-                                        isPeriodDropdownOpen 
-                                            ? "bg-amber-50 text-[#ffb736] border-[#ffb736] ring-1 ring-[#ffb736]" 
-                                            : "bg-amber-50 text-[#ffb736] border-[#ffb736] hover:bg-[#ffb736] hover:text-white" 
-                                    }`}
-                                >
-                                    <span className="truncate flex-1 text-left">{displayPeriod}</span>
-                                    <svg className={`w-4 h-4 shrink-0 transition-transform duration-300 ${isPeriodDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-
-                                <div className={`absolute top-full left-0 z-[100] w-full min-w-max mt-1 bg-white rounded-[5px] shadow-lg grid transition-all duration-300 ease-in-out ${isPeriodDropdownOpen ? "grid-rows-[1fr] opacity-100 border border-[#ffb736]" : "grid-rows-[0fr] opacity-0 border-none pointer-events-none"}`}>
-                                    <div className="overflow-hidden min-h-0">
-                                        <ul className="max-h-60 overflow-y-auto custom-scrollbar py-1">
-                                            {PERIOD_OPTIONS.map(period => (
-                                                <li 
-                                                    key={period}
-                                                    onClick={() => handlePeriodChange(period)}
-                                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${displayPeriod === period ? "bg-[#5c297c] text-white font-bold" : "text-black hover:bg-[#ffb736]/20 font-medium"}`}
-                                                >
-                                                    {period}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-
                             {subjectHeaders.length > 0 && (
                                 <div className="relative shrink-0 flex-1 md:flex-none" ref={subjectDropdownRef}>
                                     <button 
@@ -243,7 +193,7 @@ export default function BoardExamScoresPage({ students, filter, search = "", sor
                             <tr key={student.batch_id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all duration-300 ease-in-out ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 <td className="py-3 px-6 sticky left-0 z-10 bg-inherit">
                                     {canManageData ? (
-                                        <Link href={route('mock.scores.entry', { batch_id: student.batch_id, exam_period: currentExamPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold text-center hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all">{student.student_number}</Link>
+                                        <Link href={route('board.scores.entry', { batch_id: student.batch_id })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold text-center hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all">{student.student_number}</Link>
                                     ) : (
                                         <span className="inline-block px-4 py-1.5 rounded-[6px] bg-gray-400 text-white font-bold text-center shadow-sm">{student.student_number}</span>
                                     )}
