@@ -59,7 +59,7 @@ export default function LoginPage() {
                                 href="/admin-login" 
                                 className="text-sm text-gray-400 hover:text-[#5c297c] font-medium transition-colors flex items-center justify-center gap-2"
                             >
-                                <i className="bi bi-arrow-right"></i> System Administrator Login
+                                <i className="bi bi-arrow-right"></i> Manual Login
                             </Link>
                         </div>
 

@@ -12,7 +12,7 @@ export default function BoardScoresEntry({ student, subjectOptions, currentScore
 
     // 🧠 Notice: No exam_period needed here since it's the Actual Board Exam
     const { data, setData, put, processing, errors, reset } = useForm({
-        mock_subject_id: "", // This maps to the PRC Subject Master List
+        subject_id: "", // 🧠 CHANGED from mock_subject_id to subject_id
         score: "",
     });
 
@@ -27,7 +27,7 @@ export default function BoardScoresEntry({ student, subjectOptions, currentScore
 
     const handleSubmit = () => {
         if (rawStudent.batch_id) {
-            // Pointing to the newly created update route for Actual Boards
+            // Pointing to the newly created update route for Boards
             put(route("board-scores.update", rawStudent.batch_id), {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -43,7 +43,7 @@ export default function BoardScoresEntry({ student, subjectOptions, currentScore
             <div className="w-full max-w-4xl mx-auto px-4 py-8 animate-fade-in-up">
                 <div className="flex items-center justify-between mb-6 bg-white p-5 rounded-[10px] shadow-[0_4px_15px_rgba(0,0,0,0.05)] border border-gray-100">
                     <div>
-                        <h2 className="text-2xl md:text-[26px] font-bold text-[#5c297c]">Actual Board Scores Entry</h2>
+                        <h2 className="text-2xl md:text-[26px] font-bold text-[#5c297c]">Board Scores Entry</h2>
                         <p className="text-sm text-gray-500 mt-1">
                             Recording official scores for <span className="font-bold text-gray-800">{safeStudentId}</span>
                         </p>

@@ -146,7 +146,11 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
     // --- IMPORT LOGIC ---
     const handleImportSubmit = async (e) => {
         e.preventDefault();
-        if (!importFile) return;
+
+        if (!importFile) {
+            toast.warning("Please select a CSV file first.");
+            return;
+        }
         
         setImportProcessing(true);
         setImportError(null);
@@ -190,7 +194,6 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
         } catch (error) {
             const message = error.response?.data?.message || 'Import failed. Please check the file format.';
             toast.error(message);
-            setImportError(message);
         } finally {
             setImportProcessing(false);
         }
@@ -258,7 +261,7 @@ export default function AddStudentModal({ isOpen, onClose, filterMode = 'section
                                     ref={fileInputRef} // 🧠 FIXED: Attached ref
                                     onChange={handleFileChange} // 🧠 FIXED: Uses new handler
                                     className="hidden" 
-                                    required 
+                                     
                                 />
                                 <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 

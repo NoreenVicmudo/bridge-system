@@ -151,8 +151,7 @@ export default function RecognitionAddStudentModal({ isOpen, onClose, currentFil
                                     accept=".csv"
                                     ref={fileInputRef} 
                                     onChange={handleFileChange} 
-                                    className="hidden" 
-                                    required 
+                                    className="hidden"                                   
                                 />
                                 <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 

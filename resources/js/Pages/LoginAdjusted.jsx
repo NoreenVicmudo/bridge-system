@@ -35,11 +35,7 @@ export default function LoginPage() {
 
                     {/* Right Column: Form */}
                     <div className="w-full md:w-1/2 flex-1 p-8 md:p-12 flex flex-col justify-center items-center bg-white relative">
-                        <form onSubmit={submit} className="w-full max-w-[350px] flex flex-col">
-                            
-                            <h2 className="text-xl font-bold text-[#5c297c] mb-6 text-center">
-                                System Administrator
-                            </h2>
+                        <form onSubmit={submit} className="w-full max-w-[350px] flex flex-col">                        
 
                             <div className="relative mb-6">
                                 <input id="username" type="text" name="username" className="peer w-full p-3 border-2 border-[#5c297c] rounded-lg text-gray-800 outline-none focus:border-[#ffb736] focus:shadow-[0_4px_10px_rgba(255,183,54,0.2)] transition-all bg-transparent placeholder-transparent" placeholder=" " value={data.username} onChange={(e) => setData('username', e.target.value)} required />
@@ -61,7 +57,7 @@ export default function LoginPage() {
                             {/* 🧠 ADDED: Back to SSO Link */}
                             <div className="text-center mt-6">
                                 <Link href="/login" className="text-sm text-gray-400 hover:text-[#5c297c] font-medium transition-colors flex items-center justify-center gap-2">
-                                    <i className="bi bi-arrow-left"></i> Back to SSO Login
+                                    <i className="bi bi-arrow-left"></i> Back to Teams Login
                                 </Link>
                             </div>
 
