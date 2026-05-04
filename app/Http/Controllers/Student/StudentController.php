@@ -47,11 +47,16 @@ class StudentController extends Controller
             'program_id' => 'required|integer|exists:programs,program_id',
             'year' => 'required|integer', 'batch_number' => 'required|integer',
         ]);
-        $message = $action->execute($request->file('file'), $request->except('file'));
-        return response()->json(['success' => true, 'message' => $message]);
-    }
+        $result = $action->execute($request->file('file'), $request->except('file'));
+        
+        $message = "Imported {$result['imported']} students to the batch.";
+        if ($result['errors'] > 0) {
+            $message .= " Skipped {$result['errors']} rows due to errors.";
+        }
 
-    // 🧠 THE FIX: Removed program_id requirement entirely!
+        return response()->json(['success' => $result['success'], 'message' => $message]);
+    }
+    
     public function importMasterlist(Request $request, ImportMasterlistAction $action)
     {
         $request->validate([
@@ -59,8 +64,15 @@ class StudentController extends Controller
         ]);
 
         try {
-            $message = $action->execute($request->file('file'));
-            return response()->json(['success' => true, 'message' => $message]);
+            // 🧠 THE FIX: Handle the rich array for the Masterlist
+            $result = $action->execute($request->file('file'));
+            
+            $message = "Imported {$result['inserted']} new profiles and updated {$result['updated']}.";
+            if ($result['errors'] > 0) {
+                $message .= " Skipped {$result['errors']} rows due to errors.";
+            }
+
+            return response()->json(['success' => $result['success'], 'message' => $message]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Import failed: ' . $e->getMessage()], 500);
         }

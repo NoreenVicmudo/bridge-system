@@ -2,84 +2,109 @@
 
 namespace App\Actions\Student;
 
-use App\Models\ProgramMetric\BoardBatch;
-use App\Models\Student\StudentInfo;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Services\AuditService;
 
 class ImportBatchAction
 {
-    public function execute($file, array $context): string
+    public function execute($file, array $data): array
     {
-        $now = Carbon::now();
-        $successCount = 0;
+        $csvData = array_map('str_getcsv', file($file->getRealPath()));
+        if (empty($csvData)) throw new \Exception('The uploaded file is empty.');
+
+        // Normalize headers to snake_case
+        $headers = array_map(function($header) {
+            return strtolower(trim(str_replace(' ', '_', $header)));
+        }, array_shift($csvData));
+
+        $importedCount = 0;
         $errorCount = 0;
-        $errors = [];
+        $rowNumber = 1;
 
-        $handle = fopen($file->getRealPath(), 'r');
-        fgetcsv($handle); // skip header
+        foreach ($csvData as $row) {
+            $rowNumber++;
 
-        DB::beginTransaction();
-        try {
-            while (($row = fgetcsv($handle, 4000, ',')) !== false) {
-                $studentNumber = trim($row[0] ?? '');
-                if (!$studentNumber) continue;
+            try {
+                if (empty(array_filter($row))) continue; 
 
-                $student = StudentInfo::where('student_number', $studentNumber)->first();
-                if (!$student) {
-                    $errorCount++;
-                    $errors[] = "Student $studentNumber not found";
-                    continue;
+                // Map row data to header keys safely
+                $rowData = [];
+                foreach ($headers as $index => $key) {
+                    $rowData[$key] = $row[$index] ?? null;
                 }
 
-                // 🧠 RESTORE DELETED STUDENT
-                $student->update(['is_active' => 1]);
+                // Look for common ID header variations
+                $studentNumber = trim($rowData['student_number'] ?? $rowData['studentid'] ?? $rowData['id'] ?? '');
+                if (empty($studentNumber)) {
+                    throw new \Exception("Missing Student Number");
+                }
 
-                // NEW: Sync the program to the pivot table just in case they are a shifter
-                $student->programs()->syncWithoutDetaching([
-                    $context['program_id'] => ['status' => 'Active', 'updated_at' => $now]
-                ]);
+                // 🧠 THE FIX: Check if the student exists in the masterlist
+                $studentExists = DB::table('student_info')->where('student_number', $studentNumber)->exists();
 
-                $exists = BoardBatch::where('student_number', $studentNumber)
-                    ->where('year', $context['year'])
-                    ->where('program_id', $context['program_id'])
-                    ->where('batch_number', $context['batch_number'])
+                if (!$studentExists) {
+                    // Extract name from either split columns or a single name column
+                    $lastName = trim($rowData['last_name'] ?? $rowData['lastname'] ?? '');
+                    $firstName = trim($rowData['first_name'] ?? $rowData['firstname'] ?? '');
+                    
+                    if (empty($lastName) && empty($firstName)) {
+                        $fullName = trim($rowData['student_name'] ?? $rowData['name'] ?? 'Unknown');
+                        $nameParts = explode(',', $fullName);
+                        $lastName = trim($nameParts[0]);
+                        $firstName = isset($nameParts[1]) ? trim($nameParts[1]) : '';
+                    }
+
+                    // Create basic shell profile
+                    DB::table('student_info')->insert([
+                        'student_number' => $studentNumber,
+                        'student_lname'  => $lastName ?: 'Unknown',
+                        'student_fname'  => $firstName,
+                        'is_active'      => 1,
+                        'date_created'   => now(),
+                    ]);
+
+                    // Assign historically to the program
+                    DB::table('student_programs')->insert([
+                        'student_number' => $studentNumber,
+                        'program_id'     => $data['program_id'],
+                        'status'         => 'Active',
+                        'created_at'     => now(),
+                        'updated_at'     => now(),
+                    ]);
+                }
+
+                // Now safely assign to the Board Batch
+                $batchExists = DB::table('board_batch')
+                    ->where('student_number', $studentNumber)
+                    ->where('program_id', $data['program_id'])
+                    ->where('year', $data['year'])
+                    ->where('batch_number', $data['batch_number'])
                     ->exists();
 
-                if ($exists) {
-                    $errorCount++;
-                    $errors[] = "Student $studentNumber already enrolled in this batch";
-                    continue;
+                if (!$batchExists) {
+                    DB::table('board_batch')->insert([
+                        'student_number' => $studentNumber,
+                        'program_id'     => $data['program_id'],
+                        'year'           => $data['year'],
+                        'batch_number'   => $data['batch_number'],
+                        'is_active'      => 1,
+                        'date_created'   => now(),
+                    ]);
+                    $importedCount++;
                 }
 
-                BoardBatch::updateOrCreate(
-                    [
-                        'student_number' => $studentNumber,
-                        'year'           => $context['year'],
-                        'program_id'     => $context['program_id'],
-                        'batch_number'   => $context['batch_number'],
-                    ],
-                    [
-                        'date_created'   => $now,
-                        'is_active'      => 1, // 🧠 Force batch enrollment to active
-                    ]
-                );
-
-                \App\Services\AuditService::logStudentUpdate($studentNumber, "Imported via CSV into Batch {$context['batch_number']}");
-                $successCount++;
+            } catch (\Exception $e) {
+                // If this row fails, skip it and continue
+                $errorCount++;
             }
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        } finally {
-            fclose($handle);
         }
 
-        $message = "Successfully enrolled {$successCount} students in batch.";
-        if ($errorCount > 0) {
-            $message .= " Errors: " . implode('; ', $errors);
-        }
-        return $message;
+        AuditService::logStudentUpdate('BATCH', "Imported {$importedCount} students into Program ID {$data['program_id']}, Year {$data['year']}, Batch {$data['batch_number']}");
+
+        return [
+            'success' => true,
+            'imported' => $importedCount,
+            'errors' => $errorCount
+        ];
     }
 }

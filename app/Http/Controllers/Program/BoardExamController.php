@@ -142,8 +142,8 @@ class BoardExamController extends Controller
             ['score' => $validated['score'], 'date_created' => now(), 'is_active' => 1]
         );
 
-        AuditService::logStudentAcademic($student->student_number, "Updated Actual Board Score for PRC Subject {$subject->mock_subject_name} to {$validated['score']}%");
-        return redirect()->back()->with('success', 'Actual board exam score updated.');
+        AuditService::logStudentAcademic($student->student_number, "Updated Board Score for PRC Subject {$subject->mock_subject_name} to {$validated['score']}%");
+        return redirect()->back()->with('success', 'Board exam score updated.');
     }
 
     public function export(Request $request)
@@ -222,7 +222,7 @@ class BoardExamController extends Controller
 
         $timestamp = now()->format('Y-m-d_H-i');
         $fileNameSub = $cleanSubject !== 'All' ? str_replace(' ', '', $cleanSubject) . '_' : '';
-        $fileName = "ActualBoardScores_{$fileNameSub}Export_{$timestamp}.csv";
+        $fileName = "BoardScores_{$fileNameSub}Export_{$timestamp}.csv";
 
         return response()->stream($callback, 200, [
             "Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=\"{$fileName}\"",
@@ -276,7 +276,7 @@ class BoardExamController extends Controller
                         ['batch_id' => $batch->batch_id, 'mock_subject_id' => $col['mock_subject_id']],
                         ['score' => (float)$scoreValue, 'date_created' => $now, 'is_active' => 1]
                     );
-                    AuditService::logStudentAcademic($studentNumber, "Imported CSV Actual Board Score for PRC Subject ID: {$col['mock_subject_id']}");
+                    AuditService::logStudentAcademic($studentNumber, "Imported CSV Board Score for PRC Subject ID: {$col['mock_subject_id']}");
                     $recordsProcessed++;
                 }
             }
