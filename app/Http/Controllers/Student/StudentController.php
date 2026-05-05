@@ -150,6 +150,16 @@ class StudentController extends Controller
     public function filteredInfo(Request $request)
     {
         $user = $request->user();
+        if ($user->college_id) {
+            if ($request->filled('college') && $request->college != $user->college_id) abort(403, 'Unauthorized access to this College.');
+            if ($request->filled('batch_college') && $request->batch_college != $user->college_id) abort(403, 'Unauthorized access to this College.');
+        }
+        
+        if ($user->program_id) {
+            if ($request->filled('program') && $request->program != $user->program_id) abort(403, 'Unauthorized access to this Program.');
+            if ($request->filled('batch_program') && $request->batch_program != $user->program_id) abort(403, 'Unauthorized access to this Program.');
+        }
+
         $isBatchMode = $request->filled('batch_college') && $request->filled('batch_program') && 
                        $request->filled('batch_year') && $request->filled('board_batch');
 

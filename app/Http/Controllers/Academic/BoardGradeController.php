@@ -26,6 +26,14 @@ class BoardGradeController extends Controller
             'section'       => 'required|string',
         ]);
 
+        $user = $request->user();
+        if ($user->college_id && $filter['college'] != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $filter['program'] != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
+
         $college = College::where('college_id', $filter['college'])->first();
         $program = Program::where('program_id', $filter['program'])->first();
         $filter['college_name'] = $college ? $college->name : 'N/A';
@@ -166,6 +174,14 @@ class BoardGradeController extends Controller
             'academic_year' => 'required|string', 'college' => 'required|integer', 'program' => 'required|integer',
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
+
+        $user = $request->user();
+        if ($user->college_id && $filter['college'] != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $filter['program'] != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
 
         $cleanSubject = $request->filled('subject') ? explode('?', $request->subject)[0] : 'All';
 

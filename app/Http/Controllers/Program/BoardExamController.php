@@ -20,6 +20,16 @@ class BoardExamController extends Controller
     {
         $college = $request->input('college') ?? $request->input('batch_college');
         $program = $request->input('program') ?? $request->input('batch_program');
+
+        $user = $request->user();
+
+        if ($user->college_id && $college != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $program != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
+
         $year = $request->input('calendar_year') ?? $request->input('batch_year');
         $batchNumber = $request->input('batch_number') ?? $request->input('board_batch');
 
@@ -150,6 +160,16 @@ class BoardExamController extends Controller
     {
         $college = $request->input('college') ?? $request->input('batch_college');
         $program = $request->input('program') ?? $request->input('batch_program');
+
+        $user = $request->user();
+
+        if ($user->college_id && $college != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $program != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
+
         $year = $request->input('calendar_year') ?? $request->input('batch_year');
         $batchNumber = $request->input('batch_number') ?? $request->input('board_batch');
 

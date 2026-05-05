@@ -16,6 +16,15 @@ class ReportController extends Controller
     {
         $filters = $request->only(['college', 'program', 'year_start', 'year_end', 'college_name', 'program_name']);
 
+        $user = $request->user();
+
+        if ($user->college_id && $filters['college'] != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot generate reports outside your assigned College.');
+        }
+        if ($user->program_id && $filters['program'] != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot generate reports outside your assigned Program.');
+        }
+
         if (!$filters['program']) {
             return redirect()->route('report.filter');
         }
@@ -75,6 +84,16 @@ class ReportController extends Controller
             // 🧠 FIXED: Grab the pretty names too so they render nicely on the PDF
             $filters = $request->only(['college', 'program', 'year_start', 'year_end', 'college_name', 'program_name']);
             $config = $request->except(['college', 'program', 'year_start', 'year_end', 'college_name', 'program_name']);
+
+            $user = $request->user();
+
+            if ($user->college_id && $filters['college'] != $user->college_id) {
+                abort(403, 'Unauthorized: You cannot generate reports outside your assigned College.');
+            }
+            if ($user->program_id && $filters['program'] != $user->program_id) {
+                abort(403, 'Unauthorized: You cannot generate reports outside your assigned Program.');
+            }
+        
 
             $studentQuery = StudentInfo::query()
                 ->join('board_batch', 'student_info.student_number', '=', 'board_batch.student_number')
@@ -798,6 +817,13 @@ class ReportController extends Controller
     {
         $collegeId = $request->input('college');
         $programId = $request->input('program');
+        $user = $request->user();
+        if ($user->college_id && $collegeId != $user->college_id) {
+            return response()->json(['error' => 'Unauthorized access'], 403);
+        }
+        if ($user->program_id && $programId != $user->program_id) {
+            return response()->json(['error' => 'Unauthorized access'], 403);
+        }
         $yearStart = $request->input('year_start') ?? $request->input('startYear');
         $yearEnd   = $request->input('year_end') ?? $request->input('endYear');
         $field     = $request->input('field');
