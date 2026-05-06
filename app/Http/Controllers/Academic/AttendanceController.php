@@ -21,6 +21,14 @@ class AttendanceController extends Controller
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
+        $user = $request->user();
+        if ($user->college_id && $filter['college'] != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $filter['program'] != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
+
         $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
               ->where('year_level', $filter['year_level'])->where('semester', $filter['semester'])
@@ -130,6 +138,14 @@ class AttendanceController extends Controller
 
     public function export(Request $request)
     {
+        $user = $request->user();
+        if ($user->college_id && $request->college != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $request->program != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
+
         $query = StudentInfo::whereHas('sections', function ($q) use ($request) {
             $q->where('academic_year', $request->academic_year)->where('program_id', $request->program)
               ->where('year_level', $request->year_level)->where('semester', $request->semester)

@@ -20,6 +20,14 @@ class GwaController extends Controller
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
 
+        $user = $request->user();
+        if ($user->college_id && $filter['college'] != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $filter['program'] != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
+
         $semesterMap = ['1st' => '1', '2nd' => '2', 'summer' => 'summer'];
         $dbSemester = $semesterMap[$filter['semester']] ?? $filter['semester'];
 
@@ -196,6 +204,14 @@ class GwaController extends Controller
             'academic_year' => 'required|string', 'college' => 'required|integer', 'program' => 'required|integer',
             'year_level' => 'required|integer', 'semester' => 'required|string', 'section' => 'required|string',
         ]);
+
+        $user = $request->user();
+        if ($user->college_id && $filter['college'] != $user->college_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned College.');
+        }
+        if ($user->program_id && $filter['program'] != $user->program_id) {
+            abort(403, 'Unauthorized: You cannot view data outside your assigned Program.');
+        }
 
         $query = StudentInfo::whereHas('sections', function ($q) use ($filter) {
             $q->where('academic_year', $filter['academic_year'])->where('program_id', $filter['program'])
