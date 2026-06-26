@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import BackgroundLayout from "@/Components/BackgroundLayout";
 import { toast } from "react-toastify";
-import { usePage, Link } from "@inertiajs/react"; // 🧠 ADDED: Link
+import { usePage, Link } from "@inertiajs/react"; //  ADDED: Link
 
 export default function LoginPage() {
     const { errors, flash } = usePage().props;
@@ -53,13 +53,13 @@ export default function LoginPage() {
                             MCU Account Required
                         </p>
 
-                        {/* 🧠 ADDED: Link to Admin Page */}
+                        {/*  ADDED: Link to Admin Page */}
                         <div className="absolute bottom-6 w-full text-center">
                             <Link 
                                 href="/admin-login" 
                                 className="text-sm text-gray-400 hover:text-[#5c297c] font-medium transition-colors flex items-center justify-center gap-2"
                             >
-                                <i className="bi bi-arrow-right"></i> System Administrator Login
+                                <i className="bi bi-arrow-right"></i> Manual Login
                             </Link>
                         </div>
 

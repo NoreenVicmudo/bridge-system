@@ -15,10 +15,6 @@ class MockSubjectSeeder extends Seeder
             ['program_id' => 7, 'mock_subject_name' => 'Abnormal Psychology'],
             ['program_id' => 7, 'mock_subject_name' => 'Psychological Assessment'],
             ['program_id' => 7, 'mock_subject_name' => 'Experimental Psychology'],
-            // Biology (12)
-            ['program_id' => 12, 'mock_subject_name' => 'Microbiology'],
-            ['program_id' => 12, 'mock_subject_name' => 'Genetics'],
-            ['program_id' => 12, 'mock_subject_name' => 'Cell and Molecular Bio'],
         ];
 
         foreach ($subjects as $subject) {

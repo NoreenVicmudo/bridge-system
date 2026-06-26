@@ -15,7 +15,7 @@ class TransactionController extends Controller
         $programFilter = $request->query('program', 'ALL'); 
         $actionFilter = $request->query('action', 'ALL');
         
-        // 🧠 FIXED: URL Sanitizer and Empty State Handling
+        //  FIXED: URL Sanitizer and Empty State Handling
         $rawSort = $request->query('sort', '');
         $cleanSortColumn = explode('?', $rawSort)[0];
         $direction = $request->query('direction', 'desc');
@@ -93,7 +93,7 @@ class TransactionController extends Controller
             $query->where('action', $actionFilter);
         }
 
-        // 🧠 FIXED: Dynamic sorting with fallback
+        //  FIXED: Dynamic sorting with fallback
         $allowedSorts = ['log_id', 'user', 'college', 'role', 'action', 'target_entity', 'created_at'];
         
         if (!empty($cleanSortColumn) && in_array($cleanSortColumn, $allowedSorts)) {

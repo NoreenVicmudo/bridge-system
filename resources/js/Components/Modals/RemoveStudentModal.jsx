@@ -39,7 +39,7 @@ export default function RemoveStudentModal({
             });
             setMultiReasons(initMulti);
             
-            // 🧠 FIXED: Added background scrolling lock
+            //  FIXED: Added background scrolling lock
             document.body.style.overflow = "hidden"; 
         } else {
             document.body.style.overflow = "unset"; 
@@ -113,7 +113,7 @@ export default function RemoveStudentModal({
     if (!isOpen) return null;
 
     return (
-        // 🧠 FIXED: Changed z-[1000] to z-[9999] so it renders above the Sidebar (which is z-1005)
+        //  FIXED: Changed z-[1000] to z-[9999] so it renders above the Sidebar (which is z-1005)
         <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <style>{`
                 .modal-scroll-area::-webkit-scrollbar { width: 6px; }

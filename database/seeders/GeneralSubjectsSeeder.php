@@ -25,18 +25,6 @@ class GeneralSubjectsSeeder extends Seeder
             ['general_subject_name' => 'Experimental Psychology', 'program_id' => $psychologyId],
             ['general_subject_name' => 'Statistics for Psychology', 'program_id' => $psychologyId],
             ['general_subject_name' => 'Theories of Personality', 'program_id' => $psychologyId],
-
-            // Biology subjects (program_id = 12)
-            ['general_subject_name' => 'General Biology I', 'program_id' => $biologyId],
-            ['general_subject_name' => 'General Biology II', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Cell Biology', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Genetics', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Ecology', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Microbiology', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Molecular Biology', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Biochemistry', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Evolutionary Biology', 'program_id' => $biologyId],
-            ['general_subject_name' => 'Plant Physiology', 'program_id' => $biologyId],
         ];
 
         foreach ($subjects as $subject) {

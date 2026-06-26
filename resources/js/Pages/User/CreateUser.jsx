@@ -23,7 +23,7 @@ export default function CreateUser({ colleges, programs }) {
         <AuthenticatedLayout>
             <Head title="Create New User" />
             
-            {/* 🧠 FIXED: Uses identical wrapper styling as StudentEntryPage and AttendanceEntry */}
+            {/*  FIXED: Uses identical wrapper styling as StudentEntryPage and AttendanceEntry */}
             <div className="w-full max-w-4xl mx-auto px-4 py-8 animate-fade-in-up">
                 
                 {/* Unified Header */}

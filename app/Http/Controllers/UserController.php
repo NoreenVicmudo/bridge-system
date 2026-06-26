@@ -56,7 +56,7 @@ class UserController extends Controller
     public function create()
     {
         $colleges = DB::table('colleges')->select('college_id as value', 'name as label')->get();
-        // 🧠 FIXED: Added college_id to the query so React can filter the dropdown!
+        //  FIXED: Added college_id to the query so React can filter the dropdown!
         $programs = DB::table('programs')->select('program_id as value', 'name as label', 'college_id')->get();
 
         return Inertia::render('User/CreateUser', ['colleges' => $colleges, 'programs' => $programs]);
@@ -75,7 +75,7 @@ class UserController extends Controller
             'program_id' => 'nullable|integer',
         ]);
 
-        // 🧠 SECURITY: Strictly enforce what IDs get saved based on the role
+        //  SECURITY: Strictly enforce what IDs get saved based on the role
         $needsCollege = in_array($validated['position'], ['Dean', 'Administrative Assistant', 'Program Head']);
         $needsProgram = $validated['position'] === 'Program Head';
 
@@ -111,7 +111,7 @@ class UserController extends Controller
             'user_lastname' => $nameParts[1] ?? '',
             'user_college' => $user->college_id ?? '',
             'user_program' => $user->program_id ?? '',
-            'user_position' => $user->position, // 🧠 FIXED: Using explicit string
+            'user_position' => $user->position, //  FIXED: Using explicit string
             'user_email' => $user->email,
             'college_name' => $college ? $college->name : 'SYSTEM',
             'position_name' => $user->position,
@@ -134,7 +134,7 @@ class UserController extends Controller
             'program_id' => 'nullable|integer',
         ]);
 
-        // 🧠 SECURITY: Strictly enforce what IDs get saved based on the role
+        //  SECURITY: Strictly enforce what IDs get saved based on the role
         $needsCollege = in_array($validated['position'], ['Dean', 'Administrative Assistant', 'Program Head']);
         $needsProgram = $validated['position'] === 'Program Head';
 
@@ -172,7 +172,7 @@ class UserController extends Controller
                     ? $request->reason 
                     : ($request->per_reasons[$u->id] ?? 'No reason provided');
                 
-                // 🧠 NEW: Log the deletion WITH the specific reason!
+                //  NEW: Log the deletion WITH the specific reason!
                 AuditService::logUserManagement($u->username, "Removed user account. Reason: {$reason}");
             }
 

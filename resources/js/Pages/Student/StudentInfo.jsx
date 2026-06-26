@@ -60,7 +60,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
     const [searchQuery, setSearchQuery] = useState(currentSearch);
     const [isRemoveMode, setIsRemoveMode] = useState(false);
     
-    // 🧠 THE FIX: Use an Object Map to store full student data across pages!
+    //  THE FIX: Use an Object Map to store full student data across pages!
     const [selectedStudentsMap, setSelectedStudentsMap] = useState({});
     
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -128,7 +128,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
         router.get(route('student.info'), params, { preserveState: true, preserveScroll: true });
     };
 
-    // 🧠 THE FIX: Persistent toggling logic
+    //  THE FIX: Persistent toggling logic
     const toggleSelection = (student) => {
         setSelectedStudentsMap(prev => {
             const next = { ...prev };
@@ -261,7 +261,7 @@ export default function StudentInformation({ students, filters = {}, dbColleges 
                 {canManageData && (
                     <>
                         <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode={filterMode} currentFilters={activeFilters} />
-                        {/* 🧠 THE FIX: Pass the Object.values array directly to the Modal */}
+                        {/*  THE FIX: Pass the Object.values array directly to the Modal */}
                         <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={selectedArray} onSuccess={() => {
                             setIsRemoveMode(false);
                             setSelectedStudentsMap({});

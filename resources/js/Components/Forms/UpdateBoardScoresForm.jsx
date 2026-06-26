@@ -12,14 +12,14 @@ export default function UpdateBoardScoresForm({
     const inputClass = "w-full border-gray-300 rounded-[5px] shadow-sm text-sm p-2 focus:border-[#ffb736] focus:ring-[#ffb736] focus:ring-1 focus:outline-none transition-colors duration-200";
     const labelClass = "block mb-0.5 font-bold text-sm text-[#5c297c]";
 
-    // 🧠 FIXED: Form is valid without an Exam Period!
-    const isFormValid = data.mock_subject_id && data.score !== "";
+    //  FIXED: Form is valid without an Exam Period!
+    const isFormValid = data.subject_id && data.score !== "";
 
     useEffect(() => {
-        if (data.mock_subject_id) {
-            setData("score", currentScores[data.mock_subject_id] ?? "");
+        if (data.subject_id) {
+            setData("score", currentScores[data.subject_id] ?? "");
         }
-    }, [data.mock_subject_id]);
+    }, [data.subject_id]);
 
     const handleConfirm = () => {
         setIsModalOpen(false);
@@ -56,11 +56,11 @@ export default function UpdateBoardScoresForm({
                     <h3 className="text-[11px] font-bold mb-4 uppercase tracking-widest opacity-70">Update Board Exam Score</h3>
                     
                     <div className="mb-4">
-                        {/* 🧠 FIXED: Exam Period Dropdown Removed. Kept Subject Dropdown full width. */}
+                        {/*  FIXED: Exam Period Dropdown Removed. Kept Subject Dropdown full width. */}
                         <CustomSelectGroup 
                             label="Select Subject:" 
-                            value={data.mock_subject_id} 
-                            onChange={(e) => setData("mock_subject_id", e.target.value)} 
+                            value={data.subject_id} 
+                            onChange={(e) => setData("subject_id", e.target.value)} 
                             options={subjectOptions} 
                             className="w-full mb-0" 
                             vertical={true} 
@@ -99,7 +99,7 @@ export default function UpdateBoardScoresForm({
                 isOpen={isModalOpen} 
                 onClose={() => setIsModalOpen(false)} 
                 onConfirm={handleConfirm} 
-                message={<>Update actual board exam scores for <br/><strong>{studentName}</strong>?</>} 
+                message={<>Update board exam scores for <br/><strong>{studentName}</strong>?</>} 
             />
         </div>
     );

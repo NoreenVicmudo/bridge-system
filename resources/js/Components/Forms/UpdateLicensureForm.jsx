@@ -88,8 +88,8 @@ export default function UpdateLicensureForm({
                                 type="date"
                                 value={data.exam_date_taken}
                                 onChange={(e) => setData("exam_date_taken", e.target.value)}
-                                onClick={(e) => e.target.showPicker && e.target.showPicker()} // 🧠 ADDED: Click anywhere to open calendar
-                                className={`${inputClass} cursor-pointer`} // 🧠 ADDED: Cursor pointer
+                                onClick={(e) => e.target.showPicker && e.target.showPicker()} //  ADDED: Click anywhere to open calendar
+                                className={`${inputClass} cursor-pointer`} //  ADDED: Cursor pointer
                                 required
                             />
                         </div>

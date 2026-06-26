@@ -4,7 +4,7 @@ namespace App\Http\Controllers\DataEntry;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB; // 🧠 ADDED DB FACADE
+use Illuminate\Support\Facades\DB; //  ADDED DB FACADE
 use App\Models\ProgramMetric\MockSubject;
 use App\Models\College;
 use App\Models\Program;
@@ -63,7 +63,7 @@ class ProgramMetricsController extends Controller
         }
 
         // ==========================================
-        // 🧠 THE SAFEGUARD BOUNCER
+        //  THE SAFEGUARD BOUNCER
         // ==========================================
         if (!$isNew && !$isActive) {
             if ($validated['metric'] === 'MockSubjects') {

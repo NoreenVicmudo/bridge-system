@@ -212,7 +212,7 @@ export default function GenerateReport(props) {
                     if (res.chart_type === 'regression' || res.chart_type === 'scatter') {
                         
                         // ==========================================
-                        // 🧠 RESTORED: Detailed Data Table
+                        //  RESTORED: Detailed Data Table
                         // We put the individual student scores back into the table
                         // ==========================================
                         datasetArray = res.raw_data.map((pt, i) => ({ 
@@ -222,7 +222,7 @@ export default function GenerateReport(props) {
                         const datasets = [];
 
                         // ==========================================
-                        // 🧠 RETAINED: Clean Visual Graph
+                        //  RETAINED: Clean Visual Graph
                         // We keep the graph clean by ONLY drawing the Regression Line
                         // and leaving out the scatter dots.
                         // ==========================================

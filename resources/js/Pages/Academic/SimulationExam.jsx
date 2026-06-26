@@ -9,7 +9,7 @@ import FilterInfoCard from "@/Components/FilterInfoCard";
 import SimAddStudentModal from "@/Components/Modals/Academic/SimAddStudentModal";
 
 export default function SimulationExamPage({ students, filter, search: backendSearch = "", sort = "", direction = "" }) {
-    // 🧠 FIXED: Pulled auth state to securely control visibility
+    //  FIXED: Pulled auth state to securely control visibility
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
     const canManageData = !isAcademicAffairs;
@@ -157,7 +157,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                     paginationData={paginator} onPageChange={handlePageChange}
                     exportEndpoint={route('simulation-exam.export', { ...activeFilters, search: searchQuery, sort: actualSort, direction: actualDirection, exam_period: examPeriod, simulation: selectedSim })}
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="academic" />}
-                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
+                    showEditNote={canManageData} //  FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             <div className="relative shrink-0 flex-1 md:flex-none" ref={periodDropdownRef}>
@@ -243,7 +243,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                         </>
                     }
                     footerActions={
-                        // 🧠 FIXED: Protected Manage Records button
+                        //  FIXED: Protected Manage Records button
                         canManageData ? (
                             <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all shadow-sm">
                                 Manage Records
@@ -272,7 +272,7 @@ export default function SimulationExamPage({ students, filter, search: backendSe
                         {records?.length > 0 ? records.map((student, i) => (
                             <tr key={student.id} className={`border-b border-gray-100 hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 <td className="py-3 px-6 sticky left-0 bg-inherit z-10">
-                                    {/* 🧠 FIXED: Protected ID link */}
+                                    {/*  FIXED: Protected ID link */}
                                     {canManageData ? (
                                         <Link href={route('simulation.exam.entry', { student_id: student.id, exam_period: examPeriod })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] hover:scale-105 hover:shadow-md transition-all text-center">{student.student_number}</Link>
                                     ) : (

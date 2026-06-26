@@ -8,7 +8,7 @@ import FilterInfoCard from "@/Components/FilterInfoCard";
 import AttendanceAddStudentModal from "@/Components/Modals/Academic/AttendanceAddStudentModal";
 
 export default function ReviewAttendance({ students, filter, search = "", sort = "", direction = "" }) {
-    // 🧠 FIXED: Pulled auth state to securely control visibility
+    //  FIXED: Pulled auth state to securely control visibility
     const { auth } = usePage().props;
     const isAcademicAffairs = ["Admin", "Academic Affairs"].includes(auth.user?.position);
     const canManageData = !isAcademicAffairs;
@@ -98,7 +98,7 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
                     paginationData={students}
                     exportEndpoint={route('review.attendance.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection })}
                     filterDisplay={<FilterInfoCard filters={filter} mode="academic" />}
-                    showEditNote={canManageData} // 🧠 FIXED: Linked note visibility to RBAC
+                    showEditNote={canManageData} //  FIXED: Linked note visibility to RBAC
                     headerActions={
                         <>
                             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-white text-[#5c297c] border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#5c297c] hover:text-white transition-all shadow-sm">
@@ -110,7 +110,7 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
                         </>
                     }
                     footerActions={
-                        // 🧠 FIXED: Protected Add Student modal with RBAC
+                        //  FIXED: Protected Add Student modal with RBAC
                         canManageData ? (
                             <button onClick={() => setIsAddModalOpen(true)} className="px-6 h-[40px] bg-[#5c297c] text-white rounded-[5px] text-sm font-medium hover:bg-[#4a1f63] transition-all">
                                 Manage Records
@@ -131,7 +131,7 @@ export default function ReviewAttendance({ students, filter, search = "", sort =
                         {records.length > 0 ? records.map((student, i) => (
                             <tr key={student.id} className={`border-b hover:bg-purple-50 transition-all ${i % 2 === 0 ? "bg-white" : "bg-[#efeded]"}`}>
                                 <td className="py-3 px-6 sticky left-0 bg-inherit z-10">
-                                    {/* 🧠 FIXED: Protected Student Link with RBAC */}
+                                    {/*  FIXED: Protected Student Link with RBAC */}
                                     {canManageData ? (
                                         <Link href={route('review.attendance.entry', { student_id: student.id })} className="inline-block px-4 py-1.5 rounded-[6px] bg-[#ffb736] text-white font-bold hover:bg-[#e0a800] transition-all text-center">{student.student_number}</Link>
                                     ) : (

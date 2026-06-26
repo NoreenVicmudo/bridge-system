@@ -8,7 +8,7 @@ class Program extends Model
     protected $primaryKey = 'program_id';
     public $timestamps = false;
 
-    // 🧠 ADDED: Mass Assignment Protection
+    //  ADDED: Mass Assignment Protection
     protected $fillable = [
         'name',
         'college_id',

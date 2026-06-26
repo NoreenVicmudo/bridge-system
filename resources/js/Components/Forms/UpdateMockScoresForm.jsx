@@ -12,7 +12,7 @@ export default function UpdateMockScoresForm({
     const inputClass = "w-full border-gray-300 rounded-[5px] shadow-sm text-sm p-2 focus:border-[#ffb736] focus:ring-[#ffb736] focus:ring-1 focus:outline-none transition-colors duration-200";
     const labelClass = "block mb-0.5 font-bold text-sm text-[#5c297c]";
 
-    // 🧠 Form is only valid if Exam Period is also provided!
+    //  Form is only valid if Exam Period is also provided!
     const isFormValid = data.mock_subject_id && data.score !== "" && data.exam_period;
 
     useEffect(() => {
@@ -56,7 +56,7 @@ export default function UpdateMockScoresForm({
                     <h3 className="text-[11px] font-bold mb-4 uppercase tracking-widest opacity-70">Update Mock Exam Score</h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        {/* 🧠 NEW: EXAM PERIOD DROPDOWN */}
+                        {/*  NEW: EXAM PERIOD DROPDOWN */}
                         <div>
                             <CustomSelectGroup 
                                 label="Exam Period / Attempt:" 

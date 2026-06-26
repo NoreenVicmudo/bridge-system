@@ -50,7 +50,7 @@ export default function UpdateUserForm({
         }));
     };
 
-    // 🧠 THE FIX: Force all college option values to be strings to match the form state
+    //  THE FIX: Force all college option values to be strings to match the form state
     const normalizedCollegeOptions = useMemo(() => {
         return collegeOptions.map(c => ({
             ...c,
@@ -77,7 +77,7 @@ export default function UpdateUserForm({
     };
 
     return (
-        // 🧠 FIXED: Stripped outer wrappers. Just returns the form structure.
+        //  FIXED: Stripped outer wrappers. Just returns the form structure.
         <div className="w-full font-montserrat text-left text-[#5c297c]">
             <form onSubmit={openConfirmModal} className="flex flex-col gap-4">
                 

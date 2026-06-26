@@ -87,7 +87,7 @@ export default function FilterStudentModal({
             .map((p) => ({ value: p.program_id.toString(), label: p.name }));
     }, [values.batch_college, dbPrograms, mode]);
 
-    // 🧠 FIXED: Lock background scrolling when modal is open
+    //  FIXED: Lock background scrolling when modal is open
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = "hidden"; // Prevent body scroll

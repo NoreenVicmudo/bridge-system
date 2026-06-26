@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"; // 🧠 FIXED: Added useRef
+import React, { useState, useEffect, useRef } from "react"; //  FIXED: Added useRef
 import { router } from "@inertiajs/react";
 import axios from "axios";
 import { toast } from "react-toastify"; 
@@ -12,7 +12,7 @@ export default function AttendanceAddStudentModal({ isOpen, onClose, currentFilt
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
     
-    // 🧠 FIXED: Added ref for the file input
+    //  FIXED: Added ref for the file input
     const fileInputRef = useRef(null); 
 
     useEffect(() => {
@@ -60,7 +60,7 @@ export default function AttendanceAddStudentModal({ isOpen, onClose, currentFilt
         }
     };
 
-    // 🧠 FIXED: Handle File Input correctly
+    //  FIXED: Handle File Input correctly
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -149,10 +149,9 @@ export default function AttendanceAddStudentModal({ isOpen, onClose, currentFilt
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
-                                    onChange={handleFileChange} // 🧠 FIXED: Uses handleFileChange
-                                    className="hidden" 
-                                    required 
+                                    ref={fileInputRef} //  FIXED: Attached ref
+                                    onChange={handleFileChange} //  FIXED: Uses handleFileChange
+                                    className="hidden"                                    
                                 />
                                 <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 
@@ -185,7 +184,7 @@ export default function AttendanceAddStudentModal({ isOpen, onClose, currentFilt
                                     setView("options"); 
                                     setImportFile(null); 
                                     setImportError(null); 
-                                    if (fileInputRef.current) fileInputRef.current.value = ""; // 🧠 FIXED: Clear ref on view switch
+                                    if (fileInputRef.current) fileInputRef.current.value = ""; //  FIXED: Clear ref on view switch
                                 }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >

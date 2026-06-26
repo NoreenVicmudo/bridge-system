@@ -28,7 +28,7 @@ export default function ProgramFilterModal({
     const [loading, setLoading] = useState(true);
     const [animate, setAnimate] = useState(false);
 
-    // 🧠 FIXED: Added background scrolling lock
+    //  FIXED: Added background scrolling lock
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = "hidden"; // Prevent body scroll
@@ -169,7 +169,7 @@ export default function ProgramFilterModal({
     if (!isOpen) return null;
 
     return (
-        // 🧠 FIXED: Increased z-index to 9999
+        //  FIXED: Increased z-index to 9999
         <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-[90%] max-w-[700px] shadow-2xl relative flex flex-col transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 <div className="bg-[#5c297c] p-6 text-center relative rounded-t-2xl shrink-0">

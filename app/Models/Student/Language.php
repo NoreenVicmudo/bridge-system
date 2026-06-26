@@ -10,7 +10,7 @@ class Language extends Model
     protected $primaryKey = 'id';
     public $timestamps = false;
 
-    // 🧠 FIXED: Added is_active
+    //  FIXED: Added is_active
     protected $fillable = ['name', 'is_active'];
 
     protected $casts = [

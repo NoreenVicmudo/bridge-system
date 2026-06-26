@@ -74,7 +74,7 @@ class ImportStudentsAction
                         'student_language'         => $languageId, 
                         'student_last_school'      => trim($row[18] ?? null),
                         'date_created'             => $existingStudent ? $existingStudent->date_created : $now,
-                        'is_active'                => 1, // 🧠 Forces restoration!
+                        'is_active'                => 1, //  Forces restoration!
                     ]
                 );
 
@@ -100,7 +100,7 @@ class ImportStudentsAction
                         'section'        => $context['section'],
                         'year_level'     => $context['year_level'],
                         'program_id'     => $context['program'],
-                        'is_active'      => 1, // 🧠 Forces restoration of enrollment!
+                        'is_active'      => 1, //  Forces restoration of enrollment!
                     ]
                 );
 

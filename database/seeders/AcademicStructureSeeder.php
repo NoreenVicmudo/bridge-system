@@ -37,7 +37,6 @@ class AcademicStructureSeeder extends Seeder
             ['program_id' => 9, 'college_id' => 8, 'years' => 4, 'name' => 'BS SECONDARY EDUCATION', 'date_created' => '2025-07-11', 'is_active' => 1],
             ['program_id' => 10, 'college_id' => 9, 'years' => 4, 'name' => 'BS PHYSICAL THERAPY', 'date_created' => '2025-07-11', 'is_active' => 1],
             ['program_id' => 11, 'college_id' => 10, 'years' => 5, 'name' => 'DOCTOR OF MEDICINE', 'date_created' => '2025-11-03', 'is_active' => 1],
-            ['program_id' => 12, 'college_id' => 6, 'years' => 4, 'name' => 'BS BIOLOGY', 'date_created' => '2025-11-03', 'is_active' => 1],
         ]);
     }
 }

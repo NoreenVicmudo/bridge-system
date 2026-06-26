@@ -37,7 +37,7 @@ Route::get('/test-login', function () {
 // ==========================================
 // AUTHENTICATED ROUTES
 // ==========================================
-// 🧠 Added 'prevent-back-history' to keep the Bfcache secure!
+//  Added 'prevent-back-history' to keep the Bfcache secure!
 Route::middleware(['auth', 'verified', 'prevent-back-history'])->group(function () {
     
     // ==========================================

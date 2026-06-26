@@ -92,7 +92,7 @@ const ReportDocument = forwardRef(
             </footer>
         );
 
-        // 🧠 FIXED: Ensure filters show college, program, and year ranges correctly
+        //  FIXED: Ensure filters show college, program, and year ranges correctly
         const renderFilters = () => {
             if (!reportData.filters || Object.keys(reportData.filters).length === 0) return "None";
             

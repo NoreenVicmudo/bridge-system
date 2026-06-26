@@ -173,7 +173,7 @@ export function TableContainer({
                         </div>
                     )}
 
-                    {/* 🧠 FIXED: Header actions container layout */}
+                    {/*  FIXED: Header actions container layout */}
                     <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-4 w-full">
                         <div className="w-full md:w-auto">
                             <input

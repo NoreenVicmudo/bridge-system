@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"; // 🧠 FIXED: Added useRef
+import React, { useState, useEffect, useRef } from "react"; //  FIXED: Added useRef
 import { router } from "@inertiajs/react";
 import axios from "axios";
 import { toast } from "react-toastify"; 
@@ -12,10 +12,10 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
 
-    // 🧠 FIXED: Added ref for the file input
+    //  FIXED: Added ref for the file input
     const fileInputRef = useRef(null); 
 
-    // 🧠 FIXED: Added background scrolling lock
+    //  FIXED: Added background scrolling lock
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -62,7 +62,7 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
         }
     };
 
-    // 🧠 FIXED: Handle File Input correctly so the same file can be selected again
+    //  FIXED: Handle File Input correctly so the same file can be selected again
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -151,10 +151,9 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
-                                    onChange={handleFileChange} // 🧠 FIXED: Uses handleFileChange
-                                    className="hidden" 
-                                    required 
+                                    ref={fileInputRef} //  FIXED: Attached ref
+                                    onChange={handleFileChange} //  FIXED: Uses handleFileChange
+                                    className="hidden"                                    
                                 />
                                 <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 
@@ -187,7 +186,7 @@ export default function PerformanceAddStudentModal({ isOpen, onClose, currentFil
                                     setView("options"); 
                                     setImportFile(null); 
                                     setImportError(null); 
-                                    if (fileInputRef.current) fileInputRef.current.value = ""; // 🧠 FIXED: Clear ref
+                                    if (fileInputRef.current) fileInputRef.current.value = ""; //  FIXED: Clear ref
                                 }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >

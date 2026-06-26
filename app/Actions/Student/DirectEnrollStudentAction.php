@@ -21,7 +21,7 @@ class DirectEnrollStudentAction
                 return 'Student not found.';
             }
 
-            // 🧠 RESTORE THE PROFILE: If they were removed, bring them back!
+            //  RESTORE THE PROFILE: If they were removed, bring them back!
             $student->update(['is_active' => 1]);
 
             // Ensure the pivot table knows this student is now Active in this program
@@ -32,7 +32,7 @@ class DirectEnrollStudentAction
             ]);
 
             if ($data['mode'] === 'section') {
-                // 🧠 RESTORE ENROLLMENT: Use updateOrCreate instead of checking exists() and create()
+                //  RESTORE ENROLLMENT: Use updateOrCreate instead of checking exists() and create()
                 StudentSection::updateOrCreate(
                     [
                         'student_number' => $studentNumber,
@@ -44,12 +44,12 @@ class DirectEnrollStudentAction
                         'year_level'     => $data['year_level'],
                         'program_id'     => $data['program'],
                         'date_created'   => $now,
-                        'is_active'      => 1, // 🧠 Forces it to be active!
+                        'is_active'      => 1, //  Forces it to be active!
                     ]
                 );
                 return 'Student enrolled in section successfully.';
             } else {
-                // 🧠 RESTORE ENROLLMENT: Use updateOrCreate for batches too
+                //  RESTORE ENROLLMENT: Use updateOrCreate for batches too
                 BoardBatch::updateOrCreate(
                     [
                         'student_number' => $studentNumber,
@@ -59,7 +59,7 @@ class DirectEnrollStudentAction
                     ],
                     [
                         'date_created'   => $now,
-                        'is_active'      => 1, // 🧠 Forces it to be active!
+                        'is_active'      => 1, //  Forces it to be active!
                     ]
                 );
                 return 'Student enrolled in batch successfully.';

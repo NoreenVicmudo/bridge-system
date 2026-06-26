@@ -15,12 +15,12 @@ class StudentSeeder extends Seeder
 
         // Income ranges based on 2025 PSA data
         $incomeRanges = [
-            ['status' => 'Poor', 'min' => null, 'max' => 14560],
-            ['status' => 'Low Income', 'min' => 14560, 'max' => 29120],
-            ['status' => 'Lower Middle Class', 'min' => 29120, 'max' => 58240],
-            ['status' => 'Middle Class', 'min' => 58240, 'max' => 116480],
-            ['status' => 'Upper Middle Class', 'min' => 116480, 'max' => 232960],
-            ['status' => 'Upper Income', 'min' => 232960, 'max' => 465920],
+            ['status' => 'Poor', 'min' => null, 'max' => 14559],
+            ['status' => 'Low Income', 'min' => 14560, 'max' => 29119],
+            ['status' => 'Lower Middle Class', 'min' => 29120, 'max' => 58239],
+            ['status' => 'Middle Class', 'min' => 58240, 'max' => 116479],
+            ['status' => 'Upper Middle Class', 'min' => 116480, 'max' => 232959],
+            ['status' => 'Upper Income', 'min' => 232960, 'max' => 465919],
             ['status' => 'Rich', 'min' => 465920, 'max' => null],
         ];
 

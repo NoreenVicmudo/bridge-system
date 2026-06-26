@@ -110,7 +110,7 @@ export default function BoardExamScoresPage({ students, filter, search = "", sor
             <Head title="Board Exam Scores" />
             <div className="py-8 px-4 sm:px-6 lg:px-8 bg-gray-50 min-h-screen">
                 <TableContainer
-                    title="Actual Board Exam Scores"
+                    title="Board Exam Scores"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students?.data} 
                     exportEndpoint={route('board-scores.export', { ...filter, search: searchQuery, sort: actualSort, direction: actualDirection, subject: selectedSubject })}

@@ -5,7 +5,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import CustomSelectGroup from "@/Components/SelectGroup";
 import ChangeMetricModal from "@/Components/Modals/ChangeMetricModal";
 
-// 🧠 FIX 1: Add dbColleges and dbPrograms to the props
+//  FIX 1: Add dbColleges and dbPrograms to the props
 export default function AcademicProfileFilter({ dbColleges = [], dbPrograms = [] }) {
     const { auth } = usePage().props;
     const user = auth.user;
@@ -94,7 +94,7 @@ export default function AcademicProfileFilter({ dbColleges = [], dbPrograms = []
         return optionsCache[values.academic_year] || null;
     }, [values.academic_year, optionsCache]);
 
-    // 🧠 FIX 2: Fallback to global DB lists if academic year isn't selected yet
+    //  FIX 2: Fallback to global DB lists if academic year isn't selected yet
     const collegeOptions = useMemo(() => {
         if (currentOptions?.colleges?.length > 0) return currentOptions.colleges;
         

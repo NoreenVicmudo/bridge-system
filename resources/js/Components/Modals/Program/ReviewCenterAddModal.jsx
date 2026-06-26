@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
 import axios from "axios";
-import { toast } from "react-toastify"; // 🧠 NEW: Imported toastify
+import { toast } from "react-toastify"; //  NEW: Imported toastify
 
 export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, onImportSuccess }) {
     const [view, setView] = useState("options");
@@ -11,9 +11,9 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
     const [importFile, setImportFile] = useState(null);
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
-    const fileInputRef = useRef(null); // 🧠 FIXED: Added ref for the file input
+    const fileInputRef = useRef(null); //  FIXED: Added ref for the file input
 
-    // 🧠 FIXED: Added background scrolling lock
+    //  FIXED: Added background scrolling lock
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -47,7 +47,7 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
             setCheckStatus(response.data.exists ? "exists" : "not_exists");
         } catch {
             setCheckStatus("error");
-            toast.error("Failed to communicate with server."); // 🧠 Added toast
+            toast.error("Failed to communicate with server."); //  Added toast
         }
     };
 
@@ -60,7 +60,7 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
         closeModal();
     };
 
-    // 🧠 FIXED: Handle File Input correctly
+    //  FIXED: Handle File Input correctly
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -86,17 +86,17 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
             if (response.data.success) {
-                toast.success(response.data.message); // 🧠 FIXED: Replaced alert with toast
+                toast.success(response.data.message); //  FIXED: Replaced alert with toast
                 if (onImportSuccess) onImportSuccess();
                 closeModal();
                 router.reload();
             } else {
-                toast.error(response.data.message); // 🧠 Added internal error toast
+                toast.error(response.data.message); //  Added internal error toast
                 setImportError(response.data.message);
             }
         } catch (err) {
             const errorMsg = err.response?.data?.message || 'Import failed.';
-            toast.error(errorMsg); // 🧠 FIXED: Replaced alert with toast
+            toast.error(errorMsg); //  FIXED: Replaced alert with toast
             setImportError(errorMsg);
         } finally {
             setImportProcessing(false);
@@ -106,7 +106,7 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
     if (!isOpen) return null;
 
     return (
-        // 🧠 FIXED: Increased z-index to z-[9999]
+        //  FIXED: Increased z-index to z-[9999]
         <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 p-4 ${animate ? "bg-gray-900/60 backdrop-blur-sm" : "bg-transparent backdrop-blur-none pointer-events-none"}`}>
             <div className={`bg-white rounded-2xl w-full max-w-[500px] shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 transform ${animate ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
                 
@@ -153,10 +153,9 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                                 <input 
                                     type="file" 
                                     accept=".csv"
-                                    ref={fileInputRef} // 🧠 FIXED: Attached ref
-                                    onChange={handleFileChange} // 🧠 FIXED: Uses new handler
-                                    className="hidden" 
-                                    required 
+                                    ref={fileInputRef} //  FIXED: Attached ref
+                                    onChange={handleFileChange} //  FIXED: Uses new handler
+                                    className="hidden"                                 
                                 />
                                 <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 
@@ -189,7 +188,7 @@ export default function ReviewCenterAddModal({ isOpen, onClose, currentFilter, o
                                     setView("options"); 
                                     setImportFile(null); 
                                     setImportError(null); 
-                                    if (fileInputRef.current) fileInputRef.current.value = ""; // 🧠 FIXED: Clear ref
+                                    if (fileInputRef.current) fileInputRef.current.value = ""; //  FIXED: Clear ref
                                 }} 
                                 className="text-gray-400 hover:text-gray-600 text-sm font-medium self-center mt-1"
                             >

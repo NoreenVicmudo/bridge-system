@@ -14,7 +14,6 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            // ... your other seeders ...
             StudentGwaSeeder::class,
             StudentBackSubjectSeeder::class,
             StudentSimulationExamSeeder::class,
@@ -23,7 +22,7 @@ class DatabaseSeeder extends Seeder
             StudentLicensureAndReviewSeeder::class,
             StudentActualBoardScoresSeeder::class,
         ]);
-        /*
+        
         // 1. Colleges & Programs
         $this->call(AcademicStructureSeeder::class);
 
@@ -32,7 +31,7 @@ class DatabaseSeeder extends Seeder
             ['id' => 1, 'name' => 'Living with Parents'],
             ['id' => 2, 'name' => 'Living with Relatives'],
             ['id' => 3, 'name' => 'Boarding House / Dormitory'],
-            ['id' => 4, 'name' => 'Own House / Apartment'],
+            ['id' => 4, 'name' => 'Own House'],
         ]);
 
         DB::table('languages')->insert([
@@ -54,14 +53,14 @@ class DatabaseSeeder extends Seeder
         // 4. Users
         $this->call(UserSeeders::class);
 
-        // 5. Students (basic info + sections)
+        // 5. Dummy Students (basic info + sections)
         $this->call(StudentSeeder::class);
 
-        // 6. Student academic data (grades, ratings, scores)
+        // 6. Dummy Student academic data (grades, ratings, scores)
         $this->call(StudentBoardSubjectGradesSeeder::class);
         $this->call(StudentPerformanceRatingSeeder::class);
         $this->call(StudentSimulationExamSeeder::class);
         $this->call(StudentMockBoardScoresSeeder::class);
-        $this->call(StudentActualBoardScoresSeeder::class);*/
+        $this->call(StudentActualBoardScoresSeeder::class);
     } 
 }

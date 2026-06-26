@@ -50,7 +50,7 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
     };
 
     const handleProceedToEdit = () => {
-        // 🧠 FIXED: Pointing to actual board scores entry route!
+        //  FIXED: Pointing to actual board scores entry route!
         router.get(route('board.scores.entry'), { 
             student_number: studentNumber,
             calendar_year: currentFilter.calendar_year,
@@ -80,7 +80,7 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
         formData.append('filter', JSON.stringify(currentFilter));
         
         try {
-            // 🧠 FIXED: Pointing to actual board scores import route!
+            //  FIXED: Pointing to actual board scores import route!
             const response = await axios.post(route('board-scores.import'), formData, { 
                 headers: { 'Content-Type': 'multipart/form-data' } 
             });
@@ -148,8 +148,7 @@ export default function BoardsAddStudentModal({ isOpen, onClose, currentFilter, 
                                     accept=".csv"
                                     ref={fileInputRef} 
                                     onChange={handleFileChange}
-                                    className="hidden" 
-                                    required 
+                                    className="hidden"                                    
                                 />
                                 <i className="bi bi-cloud-arrow-up text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 

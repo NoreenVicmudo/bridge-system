@@ -107,7 +107,7 @@ export default function StudentEntryPage({ student = null, prefilledId = null, o
         <AuthenticatedLayout>
             <Head title={isEdit ? "Edit Student" : "Add Student"} />
             
-            {/* 🧠 FIXED: Uses identical wrapper styling as AttendanceEntry.jsx */}
+            {/*  FIXED: Uses identical wrapper styling as AttendanceEntry.jsx */}
             <div className="w-full max-w-4xl mx-auto px-4 py-8 animate-fade-in-up">
                 
                 {/* Unified Header */}

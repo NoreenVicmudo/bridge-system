@@ -57,7 +57,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // 🧠 THE FIX: Use Inertia::location to force a hard browser refresh.
+        //  THE FIX: Use Inertia::location to force a hard browser refresh.
         // This instantly stops the nprogress bar and clears all React memory.
         return Inertia::location(route('login'));
     }

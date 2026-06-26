@@ -13,7 +13,7 @@ export default function StudentInformationEntry({ initialData }) {
     const isDean = !!user.college_id && !user.program_id;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [rangeError, setRangeError] = useState(""); // 🧠 ADDED: State for validation errors
+    const [rangeError, setRangeError] = useState(""); //  ADDED: State for validation errors
 
     const activeMetricOptions = useMemo(() => {
         const options = [];
@@ -64,7 +64,7 @@ export default function StudentInformationEntry({ initialData }) {
         },
     });
 
-    // 🧠 ADDED: Live Overlap Validation
+    //  ADDED: Live Overlap Validation
     useEffect(() => {
         if (data.metric === "SocioeconomicStatus") {
             const r = data.ranges;
@@ -99,7 +99,7 @@ export default function StudentInformationEntry({ initialData }) {
     const isFormValid = () => {
         if (!data.metric) return false;
         
-        // 🧠 FIXED: Only allow save if the range error is clear
+        //  FIXED: Only allow save if the range error is clear
         if (data.metric === "SocioeconomicStatus") return rangeError === "";
         
         if (data.metric === "Program" && data.sub_metric === "add" && isSuperAdmin) {
@@ -156,7 +156,7 @@ export default function StudentInformationEntry({ initialData }) {
                 initialData.SocioeconomicStatus.forEach(item => {
                     const status = item.status?.trim(); 
                     
-                    // 🧠 FIXED: Exactly matches your backend array map!
+                    //  FIXED: Exactly matches your backend array map!
                     if (status === 'Rich') {
                         newRanges.rich_min = item.minimum ?? "";
                     } else if (status === 'High Income') {
@@ -262,7 +262,7 @@ export default function StudentInformationEntry({ initialData }) {
                                 Update Income Ranges
                             </h3>
                             
-                            {/* 🧠 ADDED: Error Message Display */}
+                            {/*  ADDED: Error Message Display */}
                             {rangeError && (
                                 <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-bold">
                                     <i className="bi bi-exclamation-triangle-fill mr-2"></i>

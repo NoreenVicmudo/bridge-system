@@ -16,16 +16,16 @@ export default function TransactionLogs({ transactions, queryParams = {}, dbColl
     
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
-    // 🧠 1. Read directly from URL to prevent arrows from getting stuck
+    //  1. Read directly from URL to prevent arrows from getting stuck
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const actualSort = urlParams.get('sort') || sort || ""; 
     const actualDirection = urlParams.get('direction') || direction || "desc";
 
-    // 🧠 2. Setup local state and debounce ref for the search bar
+    //  2. Setup local state and debounce ref for the search bar
     const [searchQuery, setSearchQuery] = useState(params.search || "");
     const initialRender = useRef(true);
 
-    // 🧠 3. The Debounce Effect
+    //  3. The Debounce Effect
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
@@ -39,13 +39,13 @@ export default function TransactionLogs({ transactions, queryParams = {}, dbColl
         return () => clearTimeout(delayDebounceFn);
     }, [searchQuery]);
 
-    // 🧠 4. Handlers using searchQuery
+    //  4. Handlers using searchQuery
     const handleSearch = (e) => {
         const val = typeof e === 'string' ? e : e.target.value;
         setSearchQuery(val);
     };
 
-    // 🧠 5. Handle 3-State Sorting (Asc -> Desc -> None)
+    //  5. Handle 3-State Sorting (Asc -> Desc -> None)
     const handleSort = (column) => {
         let nextDir = 'asc';
         let nextSort = column;
@@ -94,7 +94,7 @@ export default function TransactionLogs({ transactions, queryParams = {}, dbColl
                     paginationData={transactions}
                     onPageChange={handlePageChange}
                     showEditNote={false}
-                    // 🧠 FIXED: Removed exportEndpoint to hide the Export button
+                    //  FIXED: Removed exportEndpoint to hide the Export button
                     filterDisplay={<FilterInfoCard filters={activeFilters} mode="transaction" />}
                     headerActions={
                         <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-5 h-[40px] bg-[#5c297c] text-white border border-[#5c297c] rounded-[5px] text-sm font-bold hover:bg-[#4a1f63] shadow-sm shrink-0">

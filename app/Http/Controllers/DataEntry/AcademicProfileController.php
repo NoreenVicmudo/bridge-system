@@ -5,7 +5,7 @@ namespace App\Http\Controllers\DataEntry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB; // 🧠 ADDED DB FACADE
+use Illuminate\Support\Facades\DB; //  ADDED DB FACADE
 use App\Models\Academic\BoardSubject;
 use App\Models\Academic\GeneralSubject;
 use App\Models\Academic\RatingCategory;
@@ -77,7 +77,7 @@ class AcademicProfileController extends Controller
         }
 
         // ==========================================
-        // 🧠 THE SAFEGUARD BOUNCER
+        //  THE SAFEGUARD BOUNCER
         // ==========================================
         if (!$isNew && !$isActive) {
             $inUse = false;

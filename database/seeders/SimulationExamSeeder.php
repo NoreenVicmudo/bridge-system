@@ -14,11 +14,6 @@ class SimulationExamSeeder extends Seeder
             ['program_id' => 7, 'simulation_name' => 'Psychometrician Mock 1'],
             ['program_id' => 7, 'simulation_name' => 'Psychometrician Mock 2'],
             ['program_id' => 7, 'simulation_name' => 'Clinical Case Sim'],
-
-            // Biology (Program 12)
-            ['program_id' => 12, 'simulation_name' => 'Microbiology Lab Sim'],
-            ['program_id' => 12, 'simulation_name' => 'Genetics Practical'],
-            ['program_id' => 12, 'simulation_name' => 'Comprehensive Bio Exam'],
         ];
 
         foreach ($exams as $exam) {

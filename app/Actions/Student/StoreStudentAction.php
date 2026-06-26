@@ -3,7 +3,7 @@
 namespace App\Actions\Student;
 
 use App\Models\Student\StudentInfo;
-use App\Services\AuditService; // 🧠 ADD THIS
+use App\Services\AuditService; //  ADD THIS
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +15,7 @@ class StoreStudentAction
             $now = Carbon::now();
             $studentNumber = $data['student_number'];
 
-            // 🧠 FIXED: Changed from create() to updateOrCreate() to catch soft-deleted students
+            //  FIXED: Changed from create() to updateOrCreate() to catch soft-deleted students
             $student = StudentInfo::updateOrCreate(
                 ['student_number' => $studentNumber],
                 [
@@ -38,7 +38,7 @@ class StoreStudentAction
                     'student_language'   => $data['language'] ?? null,
                     'student_last_school'=> $data['last_school_type'] ?? null,
                     'date_created'       => clone $now,
-                    'is_active'          => 1, // 🧠 Forces them to become active!
+                    'is_active'          => 1, //  Forces them to become active!
                 ]
             );
 

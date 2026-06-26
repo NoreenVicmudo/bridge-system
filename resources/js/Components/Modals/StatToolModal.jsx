@@ -118,7 +118,7 @@ export default function StatToolModal({
         { value: "GWA", label: "General Weighted Average (GWA)", type: "numerical", hasSub: true },
         { value: "BoardGrades", label: "Grades in Board Subjects", type: "numerical", hasSub: true },
         { value: "MockScores", label: "Mock Board Exam Scores", type: "numerical", hasSub: true },
-        // 🧠 ADDED: Actual Board Scores
+        //  ADDED: Actual Board Scores
         { value: "ActualBoardScores", label: "Actual Board Exam Scores", type: "numerical", hasSub: true },
         { value: "PerformanceRating", label: "Performance Rating", type: "numerical", hasSub: true },
         { value: "SimExam", label: "Simulation Exam Results", type: "numerical", hasSub: true },
@@ -156,7 +156,7 @@ export default function StatToolModal({
         if (!metricKey) return [];
         const metricLabel = METRIC_OPTIONS.find(m => m.value === metricKey)?.label || metricKey;
         const overallOption = { value: "overall", label: `Overall ${metricLabel}` };
-        // 🧠 FIXED: Map Both Mock and Actual Board scores to use the same SubMetric Map!
+        //  FIXED: Map Both Mock and Actual Board scores to use the same SubMetric Map!
         const mapKey = metricKey === "ActualBoardScores" ? "MockScores" : metricKey;
         
         if (subMetricMap[mapKey] && subMetricMap[mapKey].length > 0) {

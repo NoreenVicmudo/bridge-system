@@ -57,7 +57,7 @@ class StatisticsService
             throw new \Exception("Regression requires matched arrays of at least 3 students.");
         }
 
-        // 🧠 FIXED: MathPHP Linear Regression requires an array of [x, y] coordinates
+        //  FIXED: MathPHP Linear Regression requires an array of [x, y] coordinates
         $points = [];
         for ($i = 0; $i < count($x); $i++) {
             $points[] = [$x[$i], $y[$i]];

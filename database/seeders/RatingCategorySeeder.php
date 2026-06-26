@@ -15,12 +15,6 @@ class RatingCategorySeeder extends Seeder
             ['program_id' => 7, 'category_name' => 'Case Analysis'],
             ['program_id' => 7, 'category_name' => 'Ethics & Protocol'],
             ['program_id' => 7, 'category_name' => 'Peer Evaluation'],
-
-            // Biology (Program 12 - Corrected ID)
-            ['program_id' => 12, 'category_name' => 'Lab Techniques'],
-            ['program_id' => 12, 'category_name' => 'Field Work'],
-            ['program_id' => 12, 'category_name' => 'Research Paper'],
-            ['program_id' => 12, 'category_name' => 'Data Analysis'],
         ];
 
         foreach ($categories as $category) {

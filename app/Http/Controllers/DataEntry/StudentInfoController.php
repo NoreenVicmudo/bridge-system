@@ -5,7 +5,7 @@ namespace App\Http\Controllers\DataEntry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB; // 🧠 ADDED DB FACADE
+use Illuminate\Support\Facades\DB; //  ADDED DB FACADE
 use App\Models\Student\SocioeconomicStatus;
 use App\Models\Student\Language;
 use App\Models\Student\LivingArrangement;
@@ -77,7 +77,7 @@ class StudentInfoController extends Controller
             $isActive = !$validated['is_hidden'];
 
             // ==========================================
-            // 🧠 THE SAFEGUARD BOUNCER
+            //  THE SAFEGUARD BOUNCER
             // ==========================================
             if (!$isNew && !$isActive) {
                 $inUse = false;

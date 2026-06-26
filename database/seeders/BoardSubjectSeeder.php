@@ -15,13 +15,6 @@ class BoardSubjectSeeder extends Seeder
             ['program_id' => 7, 'subject_name' => 'Psychological Assessment'],
             ['program_id' => 7, 'subject_name' => 'Abnormal Psychology'],
             ['program_id' => 7, 'subject_name' => 'Experimental Psychology'],
-
-            // Biology (Program 8)
-            ['program_id' => 12, 'subject_name' => 'General Biology'],
-            ['program_id' => 12, 'subject_name' => 'Microbiology'],
-            ['program_id' => 12, 'subject_name' => 'Genetics'],
-            ['program_id' => 12, 'subject_name' => 'Ecology'],
-            ['program_id' => 12, 'subject_name' => 'Cell Biology'],
         ];
 
         foreach ($subjects as $subject) {

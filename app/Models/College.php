@@ -11,7 +11,7 @@ class College extends Model
     // Disable default timestamps since you use 'date_created'
     public $timestamps = false; 
 
-    // 🧠 ADDED: Mass Assignment Protection
+    //  ADDED: Mass Assignment Protection
     protected $fillable = [
         'name',
         'is_active',

@@ -22,7 +22,7 @@ export default function EditUser({ user, colleges, programs }) {
         <AuthenticatedLayout>
             <Head title={`Update User - ${user?.user_username}`} />
             
-            {/* 🧠 FIXED: Uses identical wrapper styling as CreateUser and StudentEntryPage */}
+            {/*  FIXED: Uses identical wrapper styling as CreateUser and StudentEntryPage */}
             <div className="w-full max-w-4xl mx-auto px-4 py-8 animate-fade-in-up">
                 
                 {/* Unified Header */}

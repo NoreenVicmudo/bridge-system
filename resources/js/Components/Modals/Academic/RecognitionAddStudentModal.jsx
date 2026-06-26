@@ -12,10 +12,10 @@ export default function RecognitionAddStudentModal({ isOpen, onClose, currentFil
     const [importProcessing, setImportProcessing] = useState(false);
     const [importError, setImportError] = useState(null);
 
-    // 🧠 FIXED: Ref for the file input
+    //  FIXED: Ref for the file input
     const fileInputRef = useRef(null); 
 
-    // 🧠 FIXED: Scrolling lock logic
+    //  FIXED: Scrolling lock logic
     useEffect(() => {
         if (isOpen) {
             setAnimate(true);
@@ -61,7 +61,7 @@ export default function RecognitionAddStudentModal({ isOpen, onClose, currentFil
         }
     };
 
-    // 🧠 FIXED: Handle File Input and reset the internal value
+    //  FIXED: Handle File Input and reset the internal value
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -151,8 +151,7 @@ export default function RecognitionAddStudentModal({ isOpen, onClose, currentFil
                                     accept=".csv"
                                     ref={fileInputRef} 
                                     onChange={handleFileChange} 
-                                    className="hidden" 
-                                    required 
+                                    className="hidden"                                   
                                 />
                                 <i className="bi bi-cloud-arrow-up text-4xl md:text-5xl text-[#5c297c] mb-3 block group-hover:scale-110 transition-transform duration-300"></i>
                                 

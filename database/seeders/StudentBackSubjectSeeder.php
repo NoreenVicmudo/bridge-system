@@ -19,7 +19,7 @@ class StudentBackSubjectSeeder extends Seeder
                 ->where('is_active', 1)
                 ->get();
 
-            // 🧠 THE FIX: If this program doesn't have any subjects seeded yet, skip this student!
+            //  THE FIX: If this program doesn't have any subjects seeded yet, skip this student!
             if ($generalSubjects->isEmpty()) {
                 continue;
             }

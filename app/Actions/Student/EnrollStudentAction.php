@@ -5,7 +5,7 @@ namespace App\Actions\Student;
 use App\Models\Student\StudentInfo;
 use App\Models\Student\StudentSection;
 use App\Models\ProgramMetric\BoardBatch;
-use App\Services\AuditService; // 🧠 ADD THIS
+use App\Services\AuditService; //  ADD THIS
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -53,7 +53,7 @@ class EnrollStudentAction
             $message = '';
 
             if ($data['mode'] === 'section') {
-                // 🧠 FIXED: Use updateOrCreate to restore previous enrollments
+                //  FIXED: Use updateOrCreate to restore previous enrollments
                 StudentSection::updateOrCreate(
                     [
                         'student_number' => $studentNumber,
@@ -65,7 +65,7 @@ class EnrollStudentAction
                         'year_level'     => $data['year_level'],
                         'program_id'     => $data['program'],
                         'date_created'   => $now,
-                        'is_active'      => 1, // 🧠 Restore
+                        'is_active'      => 1, //  Restore
                     ]
                 );
                 
@@ -76,7 +76,7 @@ class EnrollStudentAction
                 }
                 return 'Student enrolled in section successfully.';
             } else {
-                // 🧠 FIXED: Use updateOrCreate for batches
+                //  FIXED: Use updateOrCreate for batches
                 BoardBatch::updateOrCreate(
                     [
                         'student_number' => $studentNumber,
@@ -86,7 +86,7 @@ class EnrollStudentAction
                     ],
                     [
                         'date_created'   => $now,
-                        'is_active'      => 1, // 🧠 Restore
+                        'is_active'      => 1, //  Restore
                     ]
                 );
                 

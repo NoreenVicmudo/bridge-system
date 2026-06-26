@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id('score_id');
             $table->unsignedBigInteger('batch_id')->nullable();
             
-            // 🧠 THE MAGIC: We point to your existing Mock Subjects table!
+            //  THE MAGIC: We point to your existing Mock Subjects table!
             $table->unsignedBigInteger('mock_subject_id')->nullable(); 
             
             $table->decimal('score', 5, 2)->nullable();

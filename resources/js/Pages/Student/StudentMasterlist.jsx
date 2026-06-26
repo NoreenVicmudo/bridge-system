@@ -70,7 +70,7 @@ export default function StudentMasterlist({ students }) {
     const [searchQuery, setSearchQuery] = useState(currentSearch);
     const [isRemoveMode, setIsRemoveMode] = useState(false);
     
-    // 🧠 THE FIX: Use an Object Map to store full student data across pages!
+    //  THE FIX: Use an Object Map to store full student data across pages!
     const [selectedStudentsMap, setSelectedStudentsMap] = useState({});
     
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -124,7 +124,7 @@ export default function StudentMasterlist({ students }) {
         router.get(route('student.masterlist'), params, { preserveState: true, preserveScroll: true });
     };
 
-    // 🧠 THE FIX: Persistent toggling logic
+    //  THE FIX: Persistent toggling logic
     const toggleSelection = (student) => {
         setSelectedStudentsMap(prev => {
             const next = { ...prev };
@@ -250,7 +250,7 @@ export default function StudentMasterlist({ students }) {
                 {canManageData && (
                     <>
                         <AddStudentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} filterMode="masterlist" />
-                        {/* 🧠 THE FIX: Pass the Object.values array directly to the Modal */}
+                        {/*  THE FIX: Pass the Object.values array directly to the Modal */}
                         <RemoveStudentModal isOpen={isRemoveModalOpen} onClose={() => setIsRemoveModalOpen(false)} selectedStudents={selectedArray} onSuccess={() => {
                             setIsRemoveMode(false);
                             setSelectedStudentsMap({});

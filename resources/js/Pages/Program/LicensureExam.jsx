@@ -95,7 +95,7 @@ export default function LicensureExamPage({ students, filter, search = "", sort 
                     title="Licensure Exam Results"
                     search={searchQuery} onSearch={handleSearch}
                     paginationData={students}
-                    // 🧠 FIXED: Safely append export variables
+                    //  FIXED: Safely append export variables
                     exportEndpoint={route('licensure.exam.export', { 
                         ...filter, 
                         search: searchQuery || "", 

@@ -58,7 +58,7 @@ export default function ChangeMetricModal({
             setTimeout(() => {
                 onClose();
                 
-                // 🧠 THE FIX: Clone the filterData and delete metric-specific fields
+                //  THE FIX: Clone the filterData and delete metric-specific fields
                 // This ensures we only carry over the College, Program, Year, and Batch
                 const cleanPayload = { ...(filterData || {}) };
                 delete cleanPayload.exam_period;

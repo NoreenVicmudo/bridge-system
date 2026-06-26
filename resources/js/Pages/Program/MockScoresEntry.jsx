@@ -10,7 +10,7 @@ export default function MockScoresEntry({ student, subjectOptions, currentScores
         ? `${rawStudent.lname}, ${rawStudent.fname}` 
         : "Unknown Student";
 
-    // 🧠 Add exam_period to the form state
+    //  Add exam_period to the form state
     const { data, setData, put, processing, errors, reset } = useForm({
         mock_subject_id: "",
         score: "",
